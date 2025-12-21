@@ -3,7 +3,7 @@
  * Centralized API communication layer
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://watchman-api-dnm0.onrender.com'
 
 class APIError extends Error {
   constructor(public status: number, message: string) {
