@@ -1,0 +1,216 @@
+/**
+ * Watchman API Service
+ * Centralized API communication layer
+ */
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+class APIError extends Error {
+  constructor(public status: number, message: string) {
+    super(message)
+    this.name = 'APIError'
+  }
+}
+
+class APIService {
+  private baseUrl: string
+  private token: string | null = null
+
+  constructor() {
+    this.baseUrl = API_URL
+  }
+
+  setToken(token: string | null) {
+    this.token = token
+  }
+
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}`
+    
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    }
+
+    if (this.token) {
+      (headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`
+    }
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    })
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      throw new APIError(response.status, data.detail || data.message || 'An error occurred')
+    }
+
+    // Handle blob responses for exports
+    const contentType = response.headers.get('content-type')
+    if (contentType?.includes('application/octet-stream') || 
+        contentType?.includes('text/csv') ||
+        contentType?.includes('application/pdf')) {
+      return response.blob() as Promise<T>
+    }
+
+    return response.json()
+  }
+
+  // Organized API endpoints by resource
+  cycles = {
+    list: () => this.request<any[]>('/api/cycles'),
+    get: (id: string) => this.request<any>(`/api/cycles/${id}`),
+    getActive: () => this.request<any>('/api/cycles/active'),
+    create: (data: any) => this.request<any>('/api/cycles', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    update: (id: string, data: any) => this.request<any>(`/api/cycles/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+    delete: (id: string) => this.request<void>(`/api/cycles/${id}`, {
+      method: 'DELETE',
+    }),
+  }
+
+  commitments = {
+    list: (status?: string) => {
+      const query = status ? `?status=${status}` : ''
+      return this.request<any[]>(`/api/commitments${query}`)
+    },
+    get: (id: string) => this.request<any>(`/api/commitments/${id}`),
+    getActive: () => this.request<any[]>('/api/commitments/active'),
+    create: (data: any) => this.request<any>('/api/commitments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    update: (id: string, data: any) => this.request<any>(`/api/commitments/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+    delete: (id: string) => this.request<void>(`/api/commitments/${id}`, {
+      method: 'DELETE',
+    }),
+  }
+
+  calendar = {
+    getDays: (startDate: string, endDate: string) =>
+      this.request<any>(`/api/calendar?start_date=${startDate}&end_date=${endDate}`),
+    getYear: (year: number) => this.request<any>(`/api/calendar/year/${year}`),
+    getMonth: (year: number, month: number) =>
+      this.request<any>(`/api/calendar/month/${year}/${month}`),
+    getDay: (date: string) => this.request<any>(`/api/calendar/day/${date}`),
+    regenerate: (year: number) => this.request<any>('/api/calendar/generate', {
+      method: 'POST',
+      body: JSON.stringify({ year, regenerate: true }),
+    }),
+    addLeave: (data: any) => this.request<any>('/api/calendar/leave', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    getLeave: () => this.request<any[]>('/api/calendar/leave'),
+    deleteLeave: (id: string) => this.request<void>(`/api/calendar/leave/${id}`, {
+      method: 'DELETE',
+    }),
+  }
+
+  mutations = {
+    list: (status?: string) => {
+      const query = status ? `?status=${status}` : ''
+      return this.request<any[]>(`/api/mutations${query}`)
+    },
+    get: (id: string) => this.request<any>(`/api/mutations/${id}`),
+    getPending: () => this.request<any[]>('/api/mutations/pending'),
+    approve: (id: string) => this.request<any>(`/api/mutations/${id}/review`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'approve' }),
+    }),
+    reject: (id: string, reason?: string) => this.request<any>(`/api/mutations/${id}/review`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'reject', reason }),
+    }),
+    selectAlternative: (id: string, alternativeId: string) =>
+      this.request<any>(`/api/mutations/${id}/select-alternative?alternative_id=${alternativeId}`, {
+        method: 'POST',
+      }),
+    undo: (id: string) => this.request<any>(`/api/mutations/${id}/undo`, {
+      method: 'POST',
+    }),
+  }
+
+  proposals = {
+    list: (status?: string) => {
+      const query = status ? `?status=${status}` : ''
+      return this.request<any[]>(`/api/proposals${query}`)
+    },
+    parse: (text: string, context?: string) => this.request<any>('/api/proposals/parse', {
+      method: 'POST',
+      body: JSON.stringify({ text, context }),
+    }),
+    create: (text: string) => this.request<any>('/api/proposals/create', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    }),
+    preview: (text: string) => this.request<any>('/api/proposals/preview', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    }),
+  }
+
+  stats = {
+    getSummary: (year?: number) => {
+      const query = year ? `?year=${year}` : ''
+      return this.request<any>(`/api/stats/summary${query}`)
+    },
+    getDetailed: (year: number) => this.request<any>(`/api/stats/year/${year}`),
+    getMonthly: (year: number, month: number) =>
+      this.request<any>(`/api/stats/month/${year}/${month}`),
+    getCommitments: () => this.request<any>('/api/stats/commitments'),
+    getDashboard: () => this.request<any>('/api/stats/dashboard'),
+    export: (year: number, format: 'csv' | 'pdf') =>
+      this.request<Blob>(`/api/stats/export?year=${year}&format=${format}`),
+  }
+
+  settings = {
+    get: () => this.request<any>('/api/settings'),
+    update: (data: any) => this.request<any>('/api/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+    updateProfile: (data: any) => this.request<any>('/api/auth/me', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+    getConstraints: () => this.request<any[]>('/api/settings/constraints'),
+    createConstraint: (data: any) => this.request<any>('/api/settings/constraints', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    updateConstraint: (id: string, data: any) =>
+      this.request<any>(`/api/settings/constraints/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    deleteConstraint: (id: string) =>
+      this.request<void>(`/api/settings/constraints/${id}`, {
+        method: 'DELETE',
+      }),
+    getSubscription: () => this.request<any>('/api/settings/subscription'),
+    getPortalUrl: () => this.request<{ url: string }>('/api/settings/billing-portal'),
+    deleteAccount: () => this.request<void>('/api/settings/delete-account', {
+      method: 'DELETE',
+    }),
+  }
+
+  auth = {
+    getProfile: () => this.request<any>('/api/auth/me'),
+    completeOnboarding: () => this.request<any>('/api/auth/complete-onboarding', {
+      method: 'POST',
+    }),
+  }
+}
+
+export const api = new APIService()
+export default api

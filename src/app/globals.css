@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground: #F4F4F4;
+  --background: #1A1B1E;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #25262B;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #373A40;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4A4D52;
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid #2979FF;
+  outline-offset: 2px;
+}
+
+/* Smooth transitions */
+* {
+  transition-property: background-color, border-color, color;
+  transition-duration: 150ms;
+  transition-timing-function: ease-in-out;
+}
+
+/* Custom utilities */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .glass {
+    backdrop-filter: blur(12px);
+    background-color: rgba(37, 38, 43, 0.8);
+  }
+  
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+}
+
+/* Calendar day styles */
+.day-work-day {
+  background-color: rgba(74, 144, 217, 0.2);
+  border-left: 3px solid #4A90D9;
+}
+
+.day-work-night {
+  background-color: rgba(92, 107, 192, 0.2);
+  border-left: 3px solid #5C6BC0;
+}
+
+.day-off {
+  background-color: rgba(102, 187, 106, 0.2);
+  border-left: 3px solid #66BB6A;
+}
+
+.day-leave {
+  background-color: rgba(38, 166, 154, 0.2);
+  border-left: 3px solid #26A69A;
+}
+
+.day-preview {
+  border-style: dashed;
+  opacity: 0.7;
+}
