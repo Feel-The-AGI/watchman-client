@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Shield, Check, ArrowRight, Zap, Crown, Sparkles } from 'lucide-react';
+import { Shield, Check, ArrowRight, Zap, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 const tiers = [
@@ -13,17 +13,17 @@ const tiers = [
     description: 'For individuals getting started with structured scheduling.',
     icon: Zap,
     features: [
-      '1 year calendar',
+      '6 months calendar planning',
       '1 rotation cycle',
       '2 commitments max',
-      'Binary constraints',
+      'Binary constraints only',
       'Manual input only',
-      'Basic statistics',
+      'Basic dashboard stats',
     ],
     limitations: [
       'No LLM parsing',
-      'No email parsing',
-      'Limited exports',
+      'No PDF parsing',
+      'No CSV/PDF exports',
     ],
     cta: 'Get Started Free',
     variant: 'secondary' as const,
@@ -40,38 +40,16 @@ const tiers = [
       'Unlimited rotations',
       'Unlimited commitments',
       'Binary + weighted constraints',
-      'LLM text parsing',
-      'Email & PDF parsing',
-      'Full statistics',
+      'LLM text parsing (Gemini)',
+      'PDF text extraction',
+      'Full statistics & analytics',
       'CSV & PDF exports',
       'Leave planning',
-      'Email notifications',
-      'Priority support',
     ],
     limitations: [],
     cta: 'Start Pro Trial',
     variant: 'primary' as const,
     popular: true,
-  },
-  {
-    name: 'Team',
-    price: 'Contact',
-    period: 'us',
-    description: 'For crews and teams with shared scheduling needs.',
-    icon: Sparkles,
-    features: [
-      'Everything in Pro',
-      'Team calendar view',
-      'Crew rotation sync',
-      'Admin dashboard',
-      'API access',
-      'Custom integrations',
-      'Dedicated support',
-    ],
-    limitations: [],
-    cta: 'Contact Sales',
-    variant: 'secondary' as const,
-    popular: false,
   },
 ];
 
@@ -93,8 +71,8 @@ const faqs = [
     answer: 'Yes. All data is encrypted at rest and in transit. We use Supabase with Row-Level Security. Your calendar is yours.',
   },
   {
-    question: 'What if I need more than what Pro offers?',
-    answer: 'Contact us for Team or Enterprise plans. We can customize features, integrations, and support levels.',
+    question: 'What if I need more features?',
+    answer: 'Contact us if you need custom integrations or have specific requirements. We can discuss your needs.',
   },
 ];
 
@@ -143,7 +121,7 @@ export default function PricingPage() {
       {/* Pricing Cards */}
       <section className="py-16 px-6">
         <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {tiers.map((tier, index) => (
               <motion.div
                 key={tier.name}
@@ -221,27 +199,24 @@ export default function PricingPage() {
                   <th className="text-left py-4 pr-8 text-watchman-muted font-medium">Feature</th>
                   <th className="text-center px-6 py-4 text-watchman-muted font-medium">Free</th>
                   <th className="text-center px-6 py-4 text-watchman-accent font-medium">Pro</th>
-                  <th className="text-center px-6 py-4 text-watchman-muted font-medium">Team</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
                 {[
-                  { feature: 'Calendar years', free: '1', pro: 'Unlimited', team: 'Unlimited' },
-                  { feature: 'Rotation cycles', free: '1', pro: 'Unlimited', team: 'Unlimited' },
-                  { feature: 'Commitments', free: '2', pro: 'Unlimited', team: 'Unlimited' },
-                  { feature: 'LLM text parsing', free: '—', pro: '✓', team: '✓' },
-                  { feature: 'Email/PDF parsing', free: '—', pro: '✓', team: '✓' },
-                  { feature: 'Weighted constraints', free: '—', pro: '✓', team: '✓' },
-                  { feature: 'Full statistics', free: '—', pro: '✓', team: '✓' },
-                  { feature: 'Exports (CSV/PDF)', free: 'Limited', pro: '✓', team: '✓' },
-                  { feature: 'Team calendar', free: '—', pro: '—', team: '✓' },
-                  { feature: 'API access', free: '—', pro: '—', team: '✓' },
+                  { feature: 'Calendar planning', free: '6 months', pro: 'Unlimited' },
+                  { feature: 'Rotation cycles', free: '1', pro: 'Unlimited' },
+                  { feature: 'Commitments', free: '2', pro: 'Unlimited' },
+                  { feature: 'LLM text parsing', free: '—', pro: '✓' },
+                  { feature: 'PDF parsing', free: '—', pro: '✓' },
+                  { feature: 'Weighted constraints', free: '—', pro: '✓' },
+                  { feature: 'Full statistics', free: '—', pro: '✓' },
+                  { feature: 'Exports (CSV/PDF)', free: '—', pro: '✓' },
+                  { feature: 'Leave planning', free: '—', pro: '✓' },
                 ].map((row) => (
                   <tr key={row.feature} className="border-b border-white/5">
                     <td className="py-4 pr-8">{row.feature}</td>
                     <td className="text-center px-6 py-4 text-watchman-muted">{row.free}</td>
                     <td className="text-center px-6 py-4">{row.pro}</td>
-                    <td className="text-center px-6 py-4 text-watchman-muted">{row.team}</td>
                   </tr>
                 ))}
               </tbody>
