@@ -7,7 +7,6 @@ import {
   User,
   CreditCard,
   Bell,
-  Shield,
   Palette,
   Globe,
   Mail,
@@ -21,6 +20,7 @@ import {
   Crown,
   Zap,
   ExternalLink,
+  Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -296,7 +296,7 @@ export default function SettingsPage() {
                             subscription?.tier === 'pro' ? 'bg-watchman-accent' : 'bg-white/10'
                           )}>
                             {subscription?.tier === 'admin' ? (
-                              <Shield className="w-6 h-6 text-white" />
+                              <Star className="w-6 h-6 text-white" />
                             ) : subscription?.tier === 'pro' ? (
                               <Crown className="w-6 h-6 text-white" />
                             ) : (

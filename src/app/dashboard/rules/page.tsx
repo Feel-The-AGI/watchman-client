@@ -17,7 +17,7 @@ import {
   Sun,
   Moon,
   Coffee,
-  Shield,
+  Lock,
   ToggleLeft,
   ToggleRight,
   RefreshCw,
@@ -292,7 +292,7 @@ export default function RulesPage() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-watchman-error/10 flex items-center justify-center">
-                  <Shield className="w-5 h-5 text-watchman-error" />
+                  <Lock className="w-5 h-5 text-watchman-error" />
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold">Constraints</h2>
@@ -318,7 +318,7 @@ export default function RulesPage() {
             {constraints.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
-                  <Shield className="w-12 h-12 mx-auto mb-4 text-watchman-muted opacity-50" />
+                  <Lock className="w-12 h-12 mx-auto mb-4 text-watchman-muted opacity-50" />
                   <p className="text-watchman-muted mb-4">
                     No constraints defined yet.
                   </p>

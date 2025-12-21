@@ -2,8 +2,9 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Shield, Check, ArrowRight, Zap, Crown } from 'lucide-react';
+import { Check, ArrowRight, Zap, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Logo } from '@/components/ui/Logo';
 
 const tiers = [
   {
@@ -83,7 +84,7 @@ export default function PricingPage() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-watchman-bg/80 backdrop-blur-md border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <Shield className="w-8 h-8 text-watchman-accent" />
+            <Logo size="md" />
             <span className="text-xl font-semibold">Watchman</span>
           </Link>
           <div className="flex items-center gap-6">
@@ -270,7 +271,7 @@ export default function PricingPage() {
       <footer className="py-12 px-6 border-t border-white/5">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
-            <Shield className="w-6 h-6 text-watchman-accent" />
+            <Logo size="sm" />
             <span className="font-semibold">Watchman</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-watchman-muted">

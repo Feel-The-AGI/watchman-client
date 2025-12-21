@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Shield, Mail, Lock, ArrowRight, Loader2, Chrome } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Loader2, Chrome } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Logo } from '@/components/ui/Logo';
 import { useAuth } from '@/hooks/useAuth';
 
 type AuthMode = 'signin' | 'signup' | 'magic';
@@ -86,7 +87,7 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:w-1/2 bg-watchman-surface border-r border-white/5 items-center justify-center p-12">
         <div className="max-w-md">
           <Link href="/" className="flex items-center gap-3 mb-8">
-            <Shield className="w-12 h-12 text-watchman-accent" />
+            <Logo size="xl" />
             <span className="text-3xl font-bold">Watchman</span>
           </Link>
           <h2 className="text-2xl font-semibold mb-4">Enter the watchtower.</h2>
@@ -119,7 +120,7 @@ export default function LoginPage() {
         >
           {/* Mobile Logo */}
           <Link href="/" className="flex lg:hidden items-center gap-2 mb-8 justify-center">
-            <Shield className="w-8 h-8 text-watchman-accent" />
+            <Logo size="md" />
             <span className="text-xl font-bold">Watchman</span>
           </Link>
 

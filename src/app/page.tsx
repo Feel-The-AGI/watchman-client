@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Calendar, BarChart3, Lock, CheckCircle, Clock, Zap, ArrowRight, Shield } from 'lucide-react';
+import { Calendar, BarChart3, Lock, CheckCircle, Clock, Zap, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Logo } from '@/components/ui/Logo';
 
@@ -13,7 +13,7 @@ const features = [
     description: 'Define your rotation once. Watch 365 days generate automatically. No manual entry, ever.',
   },
   {
-    icon: Shield,
+    icon: Lock,
     title: 'Approval-First Changes',
     description: 'Nothing mutates without your explicit approval. Every change is proposed, explained, then you decide.',
   },
@@ -261,7 +261,7 @@ export default function LandingPage() {
       <footer className="py-12 px-6 border-t border-white/5">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
-            <Shield className="w-6 h-6 text-watchman-accent" />
+            <Logo size="sm" />
             <span className="font-semibold">Watchman</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-watchman-muted">

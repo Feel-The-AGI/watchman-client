@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import {
-  Shield,
   ArrowRight,
   ArrowLeft,
   Clock,
@@ -23,6 +22,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent } from '@/components/ui/Card';
+import { Logo } from '@/components/ui/Logo';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -215,7 +215,7 @@ export default function OnboardingPage() {
       <header className="px-6 py-4 border-b border-white/5">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Shield className="w-8 h-8 text-watchman-accent" />
+            <Logo size="md" />
             <span className="text-xl font-semibold">Watchman</span>
           </div>
           
