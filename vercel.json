@@ -6,7 +6,7 @@
   "devCommand": "pnpm dev",
   "regions": ["iad1"],
   "env": {
-    "NEXT_PUBLIC_API_URL": "https://watchman-api.onrender.com"
+    "NEXT_PUBLIC_API_URL": "https://watchman-api-dnm0.onrender.com"
   },
   "headers": [
     {
