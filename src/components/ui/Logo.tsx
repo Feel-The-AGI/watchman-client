@@ -29,4 +29,7 @@ export function Logo({ size = 'md', className = '' }: LogoProps) {
   );
 }
 
+// Alias for backwards compatibility
+export const LogoIcon = Logo;
+
 export default Logo;
