@@ -15,7 +15,7 @@ import {
   addMonths,
   subMonths,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Sun, Moon, Coffee, BookOpen, Plane } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Sun, Moon, Coffee, Plane } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface CalendarDay {
@@ -66,7 +66,7 @@ export function CalendarGrid({
   selectedDate, 
   onSelectDate, 
   onMonthChange,
-  view = 'month' 
+  view: _view = 'month'  // Reserved for future view switching
 }: CalendarGridProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
@@ -142,7 +142,7 @@ export function CalendarGrid({
 
       {/* Calendar Grid */}
       <div className="grid grid-cols-7">
-        {calendarDays.map((day, index) => {
+        {calendarDays.map((day) => {
           const dateStr = format(day, 'yyyy-MM-dd');
           const calendarDay = daysMap.get(dateStr);
           const inCurrentMonth = isSameMonth(day, currentMonth);

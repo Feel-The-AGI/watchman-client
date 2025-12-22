@@ -8,7 +8,6 @@ import {
   CreditCard,
   Bell,
   Palette,
-  Globe,
   Mail,
   Smartphone,
   Trash2,
@@ -28,7 +27,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import Link from 'next/link';
 
 interface UserSettings {
   timezone: string;

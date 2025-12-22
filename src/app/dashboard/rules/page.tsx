@@ -11,21 +11,18 @@ import {
   Save,
   X,
   AlertCircle,
-  CheckCircle,
   Clock,
   Calendar,
   Sun,
   Moon,
   Coffee,
   Lock,
-  ToggleLeft,
-  ToggleRight,
   RefreshCw,
   Loader2,
   HelpCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { api } from '@/lib/api';

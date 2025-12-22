@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
-import { Logo, LogoIcon } from '@/components/ui/Logo';
+import { Logo } from '@/components/ui/Logo';
 
 const navigation = [
   { name: 'Calendar', href: '/dashboard', icon: Calendar },

@@ -13,14 +13,9 @@ import {
   ChevronRight,
   Sparkles,
   Loader2,
-  Trash2,
-  Eye,
-  ArrowRight,
-  MessageSquare,
   Calendar,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Textarea } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { api } from '@/lib/api';

@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { format, startOfMonth, endOfMonth, eachMonthOfInterval, startOfYear, endOfYear } from 'date-fns';
+import { format } from 'date-fns';
 import {
   BarChart3,
-  Download,
   Calendar,
   TrendingUp,
   Sun,

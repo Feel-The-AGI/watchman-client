@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Calendar, BarChart3, Lock, CheckCircle, Clock, Zap, ArrowRight } from 'lucide-react';
+import { Calendar, BarChart3, Lock, Clock, Zap, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Logo } from '@/components/ui/Logo';
 

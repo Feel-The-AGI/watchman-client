@@ -31,7 +31,8 @@ interface CycleBlock {
   duration: number;
 }
 
-interface Constraint {
+// Reserved for future constraint editing feature
+interface _Constraint {
   name: string;
   rule: string;
   type: 'binary';
@@ -91,8 +92,8 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Cycle state
-  const [cycleName, setCycleName] = useState('My Rotation');
+    // Cycle state
+    const [cycleName, setCycleName] = useState('My Rotation');
   const [pattern, setPattern] = useState<CycleBlock[]>([
     { label: 'work_day', duration: 10 },
     { label: 'work_night', duration: 5 },

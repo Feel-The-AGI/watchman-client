@@ -38,7 +38,7 @@ export default function DashboardPage() {
   const { profile } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [currentYear] = useState(new Date().getFullYear());
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   const [stats, setStats] = useState<CalendarStats | null>(null);
   const [loading, setLoading] = useState(true);
