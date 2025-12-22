@@ -327,7 +327,7 @@ export default function OnboardingPage() {
                           </select>
                           <input
                             type="number"
-                            min="1"
+                            min="0"
                             value={block.duration}
                             onChange={(e) => handleUpdateBlock(index, 'duration', e.target.value)}
                             className="w-20 px-3 py-2 bg-watchman-bg border border-white/10 rounded-lg focus:border-watchman-accent focus:outline-none text-center"
