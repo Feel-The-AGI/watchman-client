@@ -1,25 +1,30 @@
 import { cn } from '@/lib/utils'
 import { InputHTMLAttributes, forwardRef } from 'react'
+import { Tooltip } from './Tooltip'
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string
   error?: string
   helper?: string
+  tooltip?: string
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, helper, id, ...props }, ref) => {
+  ({ className, label, error, helper, tooltip, id, ...props }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s/g, '-')
     
     return (
       <div className="space-y-1">
         {label && (
-          <label
-            htmlFor={inputId}
-            className="block text-sm font-medium text-watchman-text"
-          >
-            {label}
-          </label>
+          <div className="flex items-center gap-1.5">
+            <label
+              htmlFor={inputId}
+              className="block text-sm font-medium text-watchman-text"
+            >
+              {label}
+            </label>
+            {tooltip && <Tooltip content={tooltip} />}
+          </div>
         )}
         <input
           ref={ref}

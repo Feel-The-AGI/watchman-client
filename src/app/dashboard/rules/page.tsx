@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
+import { Tooltip, LabelWithTooltip } from '@/components/ui/Tooltip';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { api } from '@/lib/api';
@@ -618,6 +619,7 @@ function CycleModal({ cycle, onSave, onClose, loading }: CycleModalProps) {
       <div className="space-y-4">
         <Input
           label="Cycle Name"
+          tooltip="Give your rotation a descriptive name so you can identify it easily."
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g., Mining Rotation"
@@ -625,8 +627,11 @@ function CycleModal({ cycle, onSave, onClose, loading }: CycleModalProps) {
 
         {/* Pattern Builder */}
         <div>
-          <label className="block text-sm font-medium mb-2">Pattern Blocks</label>
-          <div className="space-y-2">
+          <LabelWithTooltip 
+            label="Pattern Blocks" 
+            tooltip="Define the repeating pattern of your work rotation. Each block represents consecutive days of the same shift type."
+          />
+          <div className="space-y-2 mt-2">
             {pattern.map((block, index) => (
               <div key={index} className="flex items-center gap-2">
                 <select
@@ -667,12 +672,14 @@ function CycleModal({ cycle, onSave, onClose, loading }: CycleModalProps) {
         <div className="grid grid-cols-2 gap-4">
           <Input
             label="Anchor Date"
+            tooltip="A reference date when you know exactly what day of your cycle you were on. The app uses this to calculate all other dates."
             type="date"
             value={anchorDate}
             onChange={(e) => setAnchorDate(e.target.value)}
           />
           <Input
             label="Anchor Cycle Day"
+            tooltip="Which day of your cycle (1 to total days) were you on at the anchor date? Day 1 is the first day of your rotation."
             type="number"
             min="1"
             max={totalDays}
