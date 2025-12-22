@@ -84,9 +84,9 @@ export default function RulesPage() {
         api.settings.get(),
       ]);
       
-      setCycles(cyclesRes);
-      setConstraints(constraintsRes);
-      setWeightedMode(settingsRes.weighted_mode || false);
+      setCycles(cyclesRes || []);
+      setConstraints(constraintsRes || []);
+      setWeightedMode(settingsRes?.settings?.weighted_mode_enabled || false);
     } catch (err: any) {
       setError(err.message || 'Failed to load rules');
     } finally {

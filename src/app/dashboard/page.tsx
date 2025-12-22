@@ -52,7 +52,7 @@ export default function DashboardPage() {
 
       // Check if user has set up their cycle
       const cyclesResponse = await api.cycles.list();
-      if (cyclesResponse.length === 0) {
+      if (!cyclesResponse || cyclesResponse.length === 0) {
         setHasSetup(false);
         setLoading(false);
         return;
@@ -60,12 +60,14 @@ export default function DashboardPage() {
       setHasSetup(true);
 
       // Fetch calendar for current year
+      // After unwrapping, this is the days array directly
       const calendarResponse = await api.calendar.getYear(currentYear);
-      setCalendarDays(calendarResponse.days || []);
+      setCalendarDays(calendarResponse || []);
 
       // Fetch stats
+      // After unwrapping, this is the stats object directly
       const statsResponse = await api.stats.getSummary(currentYear);
-      setStats(statsResponse);
+      setStats(statsResponse || null);
     } catch (err: any) {
       console.error('Failed to fetch calendar:', err);
       setError(err.message || 'Failed to load calendar');

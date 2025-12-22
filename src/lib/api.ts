@@ -54,7 +54,14 @@ class APIService {
       return response.blob() as Promise<T>
     }
 
-    return response.json()
+    const json = await response.json()
+    
+    // Unwrap { success: true, data: ... } responses from backend
+    if (json && typeof json === 'object' && 'success' in json && 'data' in json) {
+      return json.data as T
+    }
+    
+    return json as T
   }
 
   // Organized API endpoints by resource

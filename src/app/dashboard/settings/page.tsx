@@ -83,8 +83,21 @@ export default function SettingsPage() {
         api.settings.get(),
         api.settings.getSubscription(),
       ]);
-      setSettings(settingsRes);
-      setSubscription(subRes);
+      // settingsRes is { settings: {...}, tier, role }
+      // subRes is { tier, subscription }
+      setSettings({
+        timezone: settingsRes?.settings?.timezone || 'UTC',
+        notifications_email: settingsRes?.settings?.notifications_email ?? true,
+        notifications_push: settingsRes?.settings?.notifications_push ?? false,
+        theme: settingsRes?.settings?.theme || 'dark',
+        weighted_mode: settingsRes?.settings?.weighted_mode_enabled ?? false,
+      });
+      setSubscription({
+        tier: subRes?.tier || profile?.tier || 'free',
+        status: subRes?.subscription?.status || 'active',
+        current_period_end: subRes?.subscription?.current_period_end,
+        cancel_at_period_end: subRes?.subscription?.cancel_at_period_end,
+      });
     } catch (err: any) {
       setError(err.message || 'Failed to load settings');
     } finally {
