@@ -598,7 +598,7 @@ function CycleModal({ cycle, onSave, onClose, loading }: CycleModalProps) {
 
   const handleUpdateBlock = (index: number, field: 'label' | 'duration', value: any) => {
     const updated = [...pattern];
-    updated[index] = { ...updated[index], [field]: field === 'duration' ? parseInt(value) || 1 : value };
+    updated[index] = { ...updated[index], [field]: field === 'duration' ? Math.max(0, parseInt(value) || 0) : value };
     setPattern(updated);
   };
 
