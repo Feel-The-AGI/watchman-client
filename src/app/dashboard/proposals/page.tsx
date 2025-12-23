@@ -69,9 +69,22 @@ export default function ProposalsPage() {
     try {
       setLoading(true);
       setError(null);
-      const status = activeTab === 'pending' ? 'pending' : undefined;
-      const response = await api.proposals.list(status);
-      setProposals(response);
+      const status = activeTab === 'pending' ? 'proposed' : undefined;
+      // Proposals are stored as mutations in the database
+      const response = await api.mutations.list(status);
+      // Map mutation fields to proposal interface
+      const mapped = (response || []).map((m: any) => ({
+        id: m.id,
+        status: m.status === 'proposed' ? 'pending' : m.status,
+        intent: m.intent || 'Calendar Change',
+        proposed_diff: m.proposed_diff || { changes: [] },
+        explanation: m.explanation || '',
+        warnings: m.violations || [],
+        alternatives: m.alternatives || [],
+        created_at: m.proposed_at || m.created_at,
+        reviewed_at: m.reviewed_at,
+      }));
+      setProposals(mapped);
     } catch (err: any) {
       setError(err.message || 'Failed to load proposals');
     } finally {
