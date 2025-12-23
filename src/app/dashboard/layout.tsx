@@ -22,7 +22,7 @@ import { Logo } from '@/components/ui/Logo';
 
 const navigation = [
   { name: 'Calendar', href: '/dashboard', icon: Calendar },
-  { name: 'Rules', href: '/dashboard/rules', icon: Sliders },
+  { name: 'Master Settings', href: '/dashboard/rules', icon: Sliders },
   { name: 'Statistics', href: '/dashboard/stats', icon: BarChart3 },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
