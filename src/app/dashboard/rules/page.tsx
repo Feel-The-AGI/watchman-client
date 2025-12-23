@@ -186,11 +186,13 @@ export default function MasterSettingsPage() {
 
   const totalCycleDays = settings.cycle.pattern.reduce((sum, b) => sum + b.duration, 0);
 
-  const blockConfig = {
+  const blockConfig: Record<string, { icon: any; color: string; glow: string; label: string; bg: string }> = {
     work_day: { icon: Sun, color: 'from-amber-500 to-orange-600', glow: 'shadow-amber-500/30', label: 'Day Shift', bg: 'bg-amber-500' },
     work_night: { icon: Moon, color: 'from-indigo-500 to-purple-600', glow: 'shadow-indigo-500/30', label: 'Night Shift', bg: 'bg-indigo-500' },
     off: { icon: Coffee, color: 'from-emerald-500 to-teal-600', glow: 'shadow-emerald-500/30', label: 'Off Days', bg: 'bg-emerald-500' },
   };
+
+  const defaultBlockConfig = { icon: Sun, color: 'from-gray-500 to-gray-600', glow: 'shadow-gray-500/30', label: 'Unknown', bg: 'bg-gray-500' };
 
   if (loading) {
     return (
@@ -286,20 +288,32 @@ export default function MasterSettingsPage() {
                 </p>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setEditPattern([...settings.cycle.pattern]);
-                setEditAnchorDate(settings.cycle.anchor_date || '');
-                setEditAnchorDay(settings.cycle.anchor_cycle_day);
-                setEditingSection('cycle');
-              }}
-              className="gap-2"
-            >
-              <Edit2 className="w-4 h-4" />
-              Edit
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleRegenerateCalendar}
+                disabled={saving}
+                className="gap-2"
+              >
+                <RefreshCw className={cn("w-4 h-4", saving && "animate-spin")} />
+                Regenerate
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setEditPattern([...settings.cycle.pattern]);
+                  setEditAnchorDate(settings.cycle.anchor_date || '');
+                  setEditAnchorDay(settings.cycle.anchor_cycle_day);
+                  setEditingSection('cycle');
+                }}
+                className="gap-2"
+              >
+                <Edit2 className="w-4 h-4" />
+                Edit
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -307,7 +321,7 @@ export default function MasterSettingsPage() {
           {/* Pattern Visualization */}
           <div className="flex flex-wrap gap-3 mb-6">
             {settings.cycle.pattern.map((block, idx) => {
-              const config = blockConfig[block.label];
+              const config = blockConfig[block.label] || defaultBlockConfig;
               return (
                 <motion.div
                   key={idx}
@@ -336,7 +350,7 @@ export default function MasterSettingsPage() {
           {/* Cycle Timeline */}
           <div className="flex h-3 rounded-full overflow-hidden mb-6">
             {settings.cycle.pattern.map((block, idx) => {
-              const config = blockConfig[block.label];
+              const config = blockConfig[block.label] || defaultBlockConfig;
               const width = (block.duration / totalCycleDays) * 100;
               return (
                 <motion.div
