@@ -66,7 +66,7 @@ export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
     setMessages(prev => [...prev, tempUserMessage])
 
     try {
-      const response = await api.chat.sendMessage(userMessage, false)
+      const response = await api.chat.sendMessage(userMessage, true) // auto_execute=true
       
       if (response.user_message) {
         setMessages(prev => prev.map(m => 
@@ -81,6 +81,11 @@ export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
           proposal: response.proposal
         }
         setMessages(prev => [...prev, assistantMessage])
+      }
+      
+      // Refresh calendar if a command was executed
+      if (response.execution?.success || response.is_command) {
+        onCalendarUpdate?.()
       }
       
       if (response.proposal) {
