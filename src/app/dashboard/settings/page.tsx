@@ -79,27 +79,46 @@ export default function SettingsPage() {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const [settingsRes, subRes] = await Promise.all([
+      setError(null);
+      
+      // Fetch both in parallel, handle failures gracefully
+      const [settingsRes, subRes] = await Promise.allSettled([
         api.settings.get(),
         api.settings.getSubscription(),
       ]);
-      // settingsRes is { settings: {...}, tier, role }
-      // subRes is { tier, subscription }
-      setSettings({
-        timezone: settingsRes?.settings?.timezone || 'UTC',
-        notifications_email: settingsRes?.settings?.notifications_email ?? true,
-        notifications_push: settingsRes?.settings?.notifications_push ?? false,
-        theme: settingsRes?.settings?.theme || 'dark',
-        weighted_mode: settingsRes?.settings?.weighted_mode_enabled ?? false,
-      });
-      setSubscription({
-        tier: subRes?.tier || profile?.tier || 'free',
-        status: subRes?.subscription?.status || 'active',
-        current_period_end: subRes?.subscription?.current_period_end,
-        cancel_at_period_end: subRes?.subscription?.cancel_at_period_end,
-      });
+      
+      // Handle settings response
+      if (settingsRes.status === 'fulfilled' && settingsRes.value) {
+        setSettings({
+          timezone: settingsRes.value?.settings?.timezone || 'UTC',
+          notifications_email: settingsRes.value?.settings?.notifications_email ?? true,
+          notifications_push: settingsRes.value?.settings?.notifications_push ?? false,
+          theme: settingsRes.value?.settings?.theme || 'dark',
+          weighted_mode: settingsRes.value?.settings?.weighted_mode_enabled ?? false,
+        });
+      }
+      
+      // Handle subscription response
+      if (subRes.status === 'fulfilled' && subRes.value) {
+        setSubscription({
+          tier: subRes.value?.tier || profile?.tier || 'free',
+          status: subRes.value?.subscription?.status || 'active',
+          current_period_end: subRes.value?.subscription?.current_period_end,
+          cancel_at_period_end: subRes.value?.subscription?.cancel_at_period_end,
+        });
+      } else {
+        // Default subscription
+        setSubscription({
+          tier: profile?.tier || 'free',
+          status: 'active',
+        });
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to load settings');
+      console.error('Settings fetch error:', err);
+      // Don't show error for 404s
+      if (err.status !== 404) {
+        setError(err.message || 'Failed to load settings');
+      }
     } finally {
       setLoading(false);
     }

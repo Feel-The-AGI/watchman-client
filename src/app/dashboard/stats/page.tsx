@@ -116,9 +116,19 @@ export default function StatsPage() {
       setError(null);
       setAnimateStats(false);
       const response = await api.stats.getDetailed(year);
-      setStats(response);
+      if (response) {
+        setStats(response);
+      } else {
+        // Empty data is okay - just show empty state
+        setStats(null);
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to load statistics');
+      console.error('Stats fetch error:', err);
+      // Don't crash - show empty state instead
+      setStats(null);
+      if (err.status !== 404) {
+        setError(err.message || 'Failed to load statistics');
+      }
     } finally {
       setLoading(false);
     }

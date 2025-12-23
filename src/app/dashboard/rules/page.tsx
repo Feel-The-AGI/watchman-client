@@ -110,9 +110,14 @@ export default function MasterSettingsPage() {
       const response = await api.masterSettings.get();
       if (response?.settings) {
         setSettings({ ...defaultSettings, ...response.settings });
+      } else {
+        // No settings yet - use defaults
+        setSettings(defaultSettings);
       }
     } catch (err: any) {
-      if (err.message?.includes('404') || err.message?.includes('not found')) {
+      console.error('Settings fetch error:', err);
+      // 404 means no settings yet - use defaults
+      if (err.status === 404 || err.message?.includes('404') || err.message?.includes('not found')) {
         setSettings(defaultSettings);
       } else {
         setError(err.message || 'Failed to load settings');
