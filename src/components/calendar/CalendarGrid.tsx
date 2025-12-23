@@ -40,24 +40,33 @@ interface CalendarGridProps {
   view?: 'month' | 'year';
 }
 
-const workTypeConfig = {
+const workTypeConfig: Record<string, {
+  bg: string;
+  border: string;
+  icon: typeof Sun;
+  label: string;
+  textColor: string;
+}> = {
   work_day: { 
-    bg: 'bg-work-day', 
-    border: 'border-work-day/30',
+    bg: 'bg-amber-500', 
+    border: 'border-amber-500/30',
     icon: Sun,
-    label: 'Day Shift'
+    label: 'Day Shift',
+    textColor: 'text-amber-400'
   },
   work_night: { 
-    bg: 'bg-work-night', 
-    border: 'border-work-night/30',
+    bg: 'bg-indigo-500', 
+    border: 'border-indigo-500/30',
     icon: Moon,
-    label: 'Night Shift'
+    label: 'Night Shift',
+    textColor: 'text-indigo-400'
   },
   off: { 
-    bg: 'bg-work-off', 
-    border: 'border-work-off/30',
+    bg: 'bg-emerald-500', 
+    border: 'border-emerald-500/30',
     icon: Coffee,
-    label: 'Off Day'
+    label: 'Off Day',
+    textColor: 'text-emerald-400'
   },
 };
 
@@ -183,9 +192,14 @@ export function CalendarGrid({
                   >
                     {format(day, 'd')}
                   </span>
-                  {calendarDay?.cycle_day && (
+                  {calendarDay?.cycle_day && calendarDay?.work_type && (
                     <span className="text-[10px] text-watchman-muted">
-                      D{calendarDay.cycle_day}
+                      {calendarDay.work_type === 'off' 
+                        ? 'OFF' 
+                        : calendarDay.work_type === 'work_night' 
+                          ? `N${((calendarDay.cycle_day - 1) % 5) + 1}`
+                          : `D${((calendarDay.cycle_day - 1) % 5) + 1}`
+                      }
                     </span>
                   )}
                 </div>
@@ -235,19 +249,27 @@ export function CalendarGrid({
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-4 px-6 py-4 border-t border-white/5 text-xs text-watchman-muted">
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-work-day" />
-          <span>Day</span>
+          <div className="w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center">
+            <Sun className="w-2.5 h-2.5 text-white" />
+          </div>
+          <span>Day Shift</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-work-night" />
-          <span>Night</span>
+          <div className="w-4 h-4 rounded-full bg-indigo-500 flex items-center justify-center">
+            <Moon className="w-2.5 h-2.5 text-white" />
+          </div>
+          <span>Night Shift</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-work-off" />
+          <div className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center">
+            <Coffee className="w-2.5 h-2.5 text-white" />
+          </div>
           <span>Off</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-watchman-mint" />
+          <div className="w-4 h-4 rounded-full bg-watchman-mint flex items-center justify-center">
+            <Plane className="w-2.5 h-2.5 text-white" />
+          </div>
           <span>Leave</span>
         </div>
         <div className="flex items-center gap-2">
@@ -315,9 +337,9 @@ export function YearOverview({ days, year, onSelectMonth }: YearOverviewProps) {
                   key={format(date, 'yyyy-MM-dd')}
                   className={cn(
                     'w-2 h-2 rounded-sm',
-                    workType === 'work_day' && 'bg-work-day',
-                    workType === 'work_night' && 'bg-work-night',
-                    workType === 'off' && 'bg-work-off',
+                    workType === 'work_day' && 'bg-amber-500',
+                    workType === 'work_night' && 'bg-indigo-500',
+                    workType === 'off' && 'bg-emerald-500',
                     day?.is_leave && 'bg-watchman-mint',
                     !workType && !day?.is_leave && 'bg-white/10'
                   )}
