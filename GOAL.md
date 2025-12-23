@@ -86,30 +86,101 @@ All parameters the agent has learned, editable:
 
 ## Technical Architecture
 
+### The System Language
+
+The system speaks **JSON**. Every action is a structured command.
+
+```json
+{
+  "action": "update_cycle",
+  "payload": {
+    "pattern": [
+      {"type": "day_shift", "days": 5},
+      {"type": "night_shift", "days": 5},
+      {"type": "off", "days": 5}
+    ],
+    "anchor": {"date": "2026-01-01", "cycle_day": 4},
+    "shift_hours": 12
+  }
+}
+```
+
+Gemini's job: **Translate natural language → System commands**
+
+```
+User: "I work 5 days, 5 nights, 5 off. 12-hour shifts. Jan 1 is my Day 4."
+         ↓
+Gemini: {action: "update_cycle", payload: {...}}
+         ↓
+System: Executes, updates Master Settings, regenerates calendar
+```
+
 ### Agent (Gemini 2.5 Pro)
-- Parses natural language
-- Extracts structured data
-- Proposes calendar mutations
-- Learns user preferences
+- Receives natural language input
+- Reads current state from Master Settings
+- Outputs structured JSON commands
+- Supports multi-turn conversation (chat history)
+- Can explain what it's about to do before executing
+- Understands "undo", "revert", "go back"
+
+### Master Settings (Source of Truth)
+All learned parameters live here:
+```json
+{
+  "cycle": { "pattern": [...], "anchor": {...} },
+  "work": { "shift_hours": 12, "break_minutes": 60 },
+  "constraints": [ {"rule": "no_study_on_night_shift"} ],
+  "commitments": [ {"name": "Diploma", "schedule": [...]} ],
+  "leave_blocks": [ {"start": "2026-02-10", "end": "2026-02-20"} ]
+}
+```
+
+Gemini reads this to understand context. Gemini writes to this via commands.
+User can edit directly in UI as override.
+
+### Command Log (Undo Stack)
+Every command is logged with before/after state:
+```json
+{
+  "id": "cmd_123",
+  "action": "update_cycle",
+  "before": { "shift_hours": 8 },
+  "after": { "shift_hours": 12 },
+  "timestamp": "2026-01-01T10:00:00Z",
+  "source": "chat",
+  "message_id": "msg_456"
+}
+```
+
+Undo = replay `before` state. Redo = replay `after` state.
+User says "undo that" → Gemini finds last command → Reverts.
 
 ### Calendar Engine
 - Generates days from cycle pattern
 - Applies constraints
 - Detects conflicts
 - Computes availability
+- Triggered by Master Settings changes
 
-### Mutation Engine
-- All changes are proposals
-- User approves before apply
-- Full undo capability
-- Alternative suggestions
+### Data Flow
+```
+User speaks → Gemini parses → JSON command → Master Settings updated
+                                          → Command logged (undo stack)
+                                          → Calendar regenerated
+                                          → UI reflects changes
+```
+
+### Chat History
+- Persisted per user
+- Provides context for multi-turn conversations
+- Links messages to commands for undo
+- "What did I change yesterday?" → Agent can answer
 
 ### Data Model
-- Cycles (rotation patterns)
-- Calendar Days (the grid)
-- Commitments (courses, events)
-- Constraints (rules)
-- Mutations (change log)
+- Master Settings (the state)
+- Command Log (the history)
+- Calendar Days (the output)
+- Chat Messages (the conversation)
 
 ## Design Philosophy
 

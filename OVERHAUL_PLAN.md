@@ -1,5 +1,97 @@
 # Watchman Overhaul Plan
 
+## Phase 0: System Language Architecture (Priority 0 - Foundation)
+
+### 0.1 Define Command Schema
+- [ ] Create JSON schema for all system commands
+- [ ] Actions: `update_cycle`, `add_commitment`, `add_leave`, `update_constraint`, `undo`, `redo`
+- [ ] Each command has: action, payload, before_state, after_state
+- [ ] Document in `SYSTEM_SCHEMA.md`
+
+```json
+{
+  "action": "update_cycle" | "add_commitment" | "add_leave" | "update_constraint" | "undo" | "redo",
+  "payload": { ... },
+  "confirm": true | false  // Whether to ask user before executing
+}
+```
+
+### 0.2 Master Settings Model
+- [ ] Single source of truth for all user parameters
+- [ ] Structure:
+```json
+{
+  "cycle": {
+    "pattern": [{"type": "day_shift", "days": 5}, ...],
+    "anchor": {"date": "2026-01-01", "cycle_day": 4},
+    "name": "My Rotation"
+  },
+  "work": {
+    "shift_hours": 12,
+    "shift_start": "06:00",
+    "break_minutes": 60
+  },
+  "constraints": [
+    {"id": "c1", "rule": "no_study_on_night_shift", "active": true}
+  ],
+  "commitments": [
+    {"id": "cm1", "name": "Diploma", "type": "education", "schedule": [...]}
+  ],
+  "leave_blocks": [
+    {"id": "l1", "start": "2026-02-10", "end": "2026-02-20", "name": "Annual Leave"}
+  ]
+}
+```
+- [ ] API: `GET/PUT /api/settings/master`
+- [ ] UI: Master Settings page reads/writes this
+
+### 0.3 Command Log (Undo Stack)
+- [ ] Database table: `command_log`
+- [ ] Fields: id, user_id, action, payload, before_state, after_state, timestamp, source, message_id
+- [ ] API: `GET /api/commands` (history), `POST /api/commands/undo`, `POST /api/commands/redo`
+- [ ] Link commands to chat messages for context
+
+### 0.4 Gemini System Prompt
+- [ ] Teach Gemini the command schema
+- [ ] Provide current Master Settings as context
+- [ ] Output format: JSON command or conversational response
+- [ ] Handle: "undo that", "revert", "go back", "what did I change?"
+
+```
+You are Watchman, a calendar assistant for shift workers.
+
+CURRENT STATE:
+{master_settings_json}
+
+AVAILABLE COMMANDS:
+- update_cycle: Change work rotation pattern
+- add_commitment: Add a course, diploma, or recurring event  
+- add_leave: Block out leave dates
+- update_constraint: Add/modify scheduling rules
+- undo: Revert last change
+
+When user requests a change, output:
+{"action": "...", "payload": {...}, "explanation": "..."}
+
+If clarification needed, ask naturally.
+```
+
+### 0.5 Command Executor
+- [ ] Backend service that executes commands
+- [ ] Validates command against schema
+- [ ] Saves before_state, applies change, saves after_state
+- [ ] Logs to command_log
+- [ ] Triggers calendar regeneration
+- [ ] Returns result to chat
+
+### 0.6 Chat History
+- [ ] Database table: `chat_messages`
+- [ ] Fields: id, user_id, role (user/assistant), content, command_id (nullable), timestamp
+- [ ] API: `GET /api/chat/history`, `POST /api/chat/message`
+- [ ] Provides context for multi-turn conversations
+
+---
+
 ## Phase 1: Conversational Core (Priority 1)
 
 ### 1.1 Agent Chat Interface
