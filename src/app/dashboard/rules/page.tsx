@@ -109,7 +109,22 @@ export default function MasterSettingsPage() {
       setError(null);
       const response = await api.masterSettings.get();
       if (response?.settings) {
-        setSettings({ ...defaultSettings, ...response.settings });
+        // Deep merge to handle null/undefined nested objects
+        const merged: MasterSettings = {
+          cycle: {
+            ...defaultSettings.cycle,
+            ...(response.settings.cycle || {}),
+            pattern: response.settings.cycle?.pattern || defaultSettings.cycle.pattern,
+          },
+          work: {
+            ...defaultSettings.work,
+            ...(response.settings.work || {}),
+          },
+          constraints: response.settings.constraints || defaultSettings.constraints,
+          commitments: response.settings.commitments || defaultSettings.commitments,
+          leave_blocks: response.settings.leave_blocks || defaultSettings.leave_blocks,
+        };
+        setSettings(merged);
       } else {
         // No settings yet - use defaults
         setSettings(defaultSettings);
