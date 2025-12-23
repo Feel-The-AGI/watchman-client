@@ -79,12 +79,33 @@ If clarification needed, ask naturally.
 ### 0.5 Command Executor
 - [ ] Backend service that executes commands
 - [ ] Validates command against schema
-- [ ] Saves before_state, applies change, saves after_state
-- [ ] Logs to command_log
+- [ ] **Routes through Constraint Engine before execution**
+- [ ] If violations → Returns proposal with warnings (not auto-apply)
+- [ ] If clean → Returns proposal for user approval
+- [ ] Only after user approval → Applies change
+- [ ] Logs to command_log with before/after state
 - [ ] Triggers calendar regeneration
-- [ ] Returns result to chat
 
-### 0.6 Chat History
+### 0.6 Constraint Engine (The Guardrail)
+- [ ] Validates proposed commands against all active constraints
+- [ ] Clash detection: overlapping commitments, leave conflicts
+- [ ] Fatigue rules: no heavy scheduling after night shifts
+- [ ] Overload detection: too many commitments on one day
+- [ ] Returns: `{valid: bool, violations: [], warnings: [], alternatives: []}`
+
+```
+Command Flow:
+
+Gemini → JSON Command → Constraint Engine →
+  ├─ Valid + no warnings → Proposal (user approves) → Execute
+  ├─ Valid + warnings → Proposal with warnings (user decides)
+  └─ Invalid (hard constraint) → Proposal blocked + alternatives shown
+```
+
+This is the GUARDRAIL. The agent cannot hallucinate changes through.
+User always has final say.
+
+### 0.7 Chat History
 - [ ] Database table: `chat_messages`
 - [ ] Fields: id, user_id, role (user/assistant), content, command_id (nullable), timestamp
 - [ ] API: `GET /api/chat/history`, `POST /api/chat/message`

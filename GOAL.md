@@ -162,6 +162,41 @@ User says "undo that" → Gemini finds last command → Reverts.
 - Computes availability
 - Triggered by Master Settings changes
 
+### Constraint Engine (The Guardian)
+
+**The agent is NOT free-range.** Every proposed change goes through validation:
+
+```
+Gemini outputs command → Constraint Engine validates →
+  ├─ No violations? → Show proposal to user → User approves → Apply
+  └─ Violations found? → Show warnings + alternatives → User decides
+```
+
+This is the GUARDRAIL. It prevents hallucinations from destroying the calendar.
+
+**Constraint types:**
+- **Hard constraints**: "Never schedule study on night shift days" → Blocks the action
+- **Soft constraints**: "Prefer study on off days" → Warns but allows
+- **Clash detection**: "This overlaps with your leave" → Shows conflict
+- **Fatigue rules**: "After night shift, you need rest" → Suggests alternatives
+- **Overload detection**: "You already have 3 commitments that day" → Warns
+
+**The flow:**
+```
+User: "Add my diploma classes on Tuesday evenings"
+         ↓
+Gemini: {action: "add_commitment", payload: {...}}
+         ↓
+Constraint Engine: "Tuesday Jan 7 is a night shift - violates no_study_on_night_shift"
+         ↓
+Proposal shown: "This conflicts with 3 night shifts. Skip those dates?"
+         ↓
+User: Accepts with modification → Only non-conflicting dates added
+```
+
+**The agent proposes. The system validates. The user decides.**
+No hallucination can bypass this structure.
+
 ### Data Flow
 ```
 User speaks → Gemini parses → JSON command → Master Settings updated
