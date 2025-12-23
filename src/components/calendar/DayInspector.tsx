@@ -27,26 +27,26 @@ interface DayInspectorProps {
 }
 
 const workTypeInfo = {
-  day: {
+  work_day: {
     icon: Sun,
     label: 'Day Shift',
     description: 'Working during daytime hours',
-    color: 'text-work-day',
-    bg: 'bg-work-day',
+    color: 'text-amber-400',
+    bg: 'bg-amber-500',
   },
-  night: {
+  work_night: {
     icon: Moon,
     label: 'Night Shift',
     description: 'Working during nighttime hours',
-    color: 'text-work-night',
-    bg: 'bg-work-night',
+    color: 'text-indigo-400',
+    bg: 'bg-indigo-500',
   },
   off: {
     icon: Coffee,
     label: 'Off Day',
     description: 'Rest and recovery day',
-    color: 'text-work-off',
-    bg: 'bg-work-off',
+    color: 'text-emerald-400',
+    bg: 'bg-emerald-500',
   },
 };
 
