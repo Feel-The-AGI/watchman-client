@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar,
-  FileCheck,
   Settings,
   BarChart3,
   Sliders,
@@ -15,6 +14,7 @@ import {
   LogOut,
   User,
   ChevronDown,
+  MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
@@ -22,7 +22,6 @@ import { Logo } from '@/components/ui/Logo';
 
 const navigation = [
   { name: 'Calendar', href: '/dashboard', icon: Calendar },
-  { name: 'Proposals', href: '/dashboard/proposals', icon: FileCheck },
   { name: 'Rules', href: '/dashboard/rules', icon: Sliders },
   { name: 'Statistics', href: '/dashboard/stats', icon: BarChart3 },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
@@ -193,12 +192,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-4">
-            <Link href="/dashboard/proposals">
-              <Button variant="primary" size="sm" className="gap-2">
-                <FileCheck className="w-4 h-4" />
-                <span className="hidden sm:inline">Propose Change</span>
-              </Button>
-            </Link>
+            <span className="text-sm text-watchman-muted hidden sm:flex items-center gap-2">
+              <MessageSquare className="w-4 h-4" />
+              Chat with agent on dashboard
+            </span>
           </div>
         </header>
 

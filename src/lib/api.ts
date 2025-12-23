@@ -123,49 +123,6 @@ class APIService {
     }),
   }
 
-  mutations = {
-    list: (status?: string) => {
-      const query = status ? `?status=${status}` : ''
-      return this.request<any[]>(`/api/mutations${query}`)
-    },
-    get: (id: string) => this.request<any>(`/api/mutations/${id}`),
-    getPending: () => this.request<any[]>('/api/mutations/pending'),
-    approve: (id: string) => this.request<any>(`/api/mutations/${id}/review`, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'approve' }),
-    }),
-    reject: (id: string, reason?: string) => this.request<any>(`/api/mutations/${id}/review`, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'reject', reason }),
-    }),
-    selectAlternative: (id: string, alternativeId: string) =>
-      this.request<any>(`/api/mutations/${id}/select-alternative?alternative_id=${alternativeId}`, {
-        method: 'POST',
-      }),
-    undo: (id: string) => this.request<any>(`/api/mutations/${id}/undo`, {
-      method: 'POST',
-    }),
-  }
-
-  proposals = {
-    list: (status?: string) => {
-      const query = status ? `?status=${status}` : ''
-      return this.request<any[]>(`/api/proposals${query}`)
-    },
-    parse: (text: string, context?: string) => this.request<any>('/api/proposals/parse', {
-      method: 'POST',
-      body: JSON.stringify({ text, context }),
-    }),
-    create: (text: string) => this.request<any>('/api/proposals/create', {
-      method: 'POST',
-      body: JSON.stringify({ text }),
-    }),
-    preview: (text: string) => this.request<any>('/api/proposals/preview', {
-      method: 'POST',
-      body: JSON.stringify({ text }),
-    }),
-  }
-
   stats = {
     getSummary: (year?: number) => {
       const query = year ? `?year=${year}` : ''
