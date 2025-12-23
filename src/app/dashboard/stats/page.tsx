@@ -117,7 +117,20 @@ export default function StatsPage() {
       setAnimateStats(false);
       const response = await api.stats.getDetailed(year);
       if (response) {
-        setStats(response);
+        // Ensure all required properties have defaults
+        setStats({
+          year: response.year || year,
+          total_days: response.total_days || 0,
+          work_days: response.work_days || 0,
+          work_nights: response.work_nights || 0,
+          off_days: response.off_days || 0,
+          leave_days: response.leave_days || 0,
+          study_hours: response.study_hours || 0,
+          commitment_count: response.commitment_count || 0,
+          monthly_breakdown: response.monthly_breakdown || [],
+          peak_weeks: response.peak_weeks || [],
+          commitment_breakdown: response.commitment_breakdown || [],
+        });
       } else {
         // Empty data is okay - just show empty state
         setStats(null);
