@@ -40,7 +40,9 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 // Pages that don't require redirect after auth
-const PUBLIC_PATHS = ['/', '/pricing', '/login', '/auth/callback']
+const PUBLIC_PATHS = ['/', '/login', '/auth/callback']
+// Pages where logged-in users should NOT be redirected away from
+const NO_REDIRECT_PATHS = ['/pricing']
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
@@ -73,6 +75,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Handle redirect after sign in - this is our own logic, no Supabase callback dependency
   const handleAuthRedirect = useCallback((newSession: Session | null, profile: UserProfile | null) => {
     if (!newSession) return
+    
+    // Don't redirect on certain pages (e.g., pricing - users should stay there)
+    const shouldNotRedirect = NO_REDIRECT_PATHS.some(path => pathname === path)
+    if (shouldNotRedirect) return
     
     // Only redirect if we're on public/auth pages
     const isOnPublicPage = PUBLIC_PATHS.some(path => pathname === path || pathname?.startsWith('/auth/'))

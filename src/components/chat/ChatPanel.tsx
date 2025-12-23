@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Loader2, Bot, User, Undo2, CheckCircle, XCircle, AlertTriangle, Sparkles, Command } from 'lucide-react'
+import { Send, Loader2, Bot, User, Undo2, Redo2, CheckCircle, XCircle, AlertTriangle, Sparkles, Command } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
 
@@ -152,6 +152,23 @@ export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
     }
   }
 
+  const handleRedo = async () => {
+    try {
+      const result = await api.commands.redo()
+      if (result.success) {
+        setMessages(prev => [...prev, {
+          id: `redo-${Date.now()}`,
+          role: 'assistant',
+          content: 'Redone! The change has been reapplied.',
+          created_at: new Date().toISOString()
+        }])
+        onCalendarUpdate?.()
+      }
+    } catch (error) {
+      console.error('Failed to redo:', error)
+    }
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -178,15 +195,26 @@ export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
             <p className="text-xs text-watchman-muted">Talk naturally about your schedule</p>
           </div>
         </div>
-        <motion.button 
-          onClick={handleUndo}
-          className="p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all text-watchman-muted hover:text-white"
-          title="Undo last change"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <Undo2 className="w-4 h-4" />
-        </motion.button>
+        <div className="flex items-center gap-1">
+          <motion.button 
+            onClick={handleUndo}
+            className="p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all text-watchman-muted hover:text-white"
+            title="Undo last change"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <Undo2 className="w-4 h-4" />
+          </motion.button>
+          <motion.button 
+            onClick={handleRedo}
+            className="p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all text-watchman-muted hover:text-white"
+            title="Redo last undone change"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <Redo2 className="w-4 h-4" />
+          </motion.button>
+        </div>
       </div>
 
       {/* Messages */}

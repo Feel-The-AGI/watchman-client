@@ -44,29 +44,36 @@ interface Message {
 
 const PRESET_CYCLES = [
   {
-    name: 'Mining Standard',
-    description: '10 days, 5 nights, 10 off',
+    name: '10 On / 5 Off',
+    description: '10 straight days working, 5 days off',
     pattern: [
       { label: 'work_day' as const, duration: 10 },
+      { label: 'off' as const, duration: 5 },
+    ],
+  },
+  {
+    name: '5/5/5 Rotation',
+    description: '5 days, 5 nights, 5 off',
+    pattern: [
+      { label: 'work_day' as const, duration: 5 },
       { label: 'work_night' as const, duration: 5 },
-      { label: 'off' as const, duration: 10 },
+      { label: 'off' as const, duration: 5 },
     ],
   },
   {
-    name: '2 Week Rotation',
-    description: '7 days on, 7 off',
+    name: 'Weekdays',
+    description: 'Monday to Friday (standard work week)',
     pattern: [
-      { label: 'work_day' as const, duration: 7 },
-      { label: 'off' as const, duration: 7 },
+      { label: 'work_day' as const, duration: 5 },
+      { label: 'off' as const, duration: 2 },
     ],
   },
   {
-    name: '4x4 Shift',
-    description: '4 days, 4 nights, 4 off',
+    name: '5 On / 5 Off',
+    description: '5 days working, 5 days off',
     pattern: [
-      { label: 'work_day' as const, duration: 4 },
-      { label: 'work_night' as const, duration: 4 },
-      { label: 'off' as const, duration: 4 },
+      { label: 'work_day' as const, duration: 5 },
+      { label: 'off' as const, duration: 5 },
     ],
   },
 ];
@@ -209,11 +216,26 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
-    addMessage('user', inputValue);
+    const userMessage = inputValue;
+    addMessage('user', userMessage);
     setInputValue('');
-    // For now, just acknowledge - in full version would parse intent
+    
+    // Send to Gemini via backend
+    try {
+      setLoading(true);
+      const response = await api.chat.sendMessage(userMessage);
+      if (response?.response) {
+        addMessage('assistant', response.response);
+      } else if (response?.message) {
+        addMessage('assistant', response.message);
+      }
+    } catch (err: any) {
+      addMessage('assistant', "I couldn't process that right now. Try selecting one of the options above.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Preview calendar generation
@@ -370,6 +392,15 @@ export default function OnboardingPage() {
                 className="space-y-4 pb-4"
               >
                 <div className="glass rounded-2xl p-5 border border-white/10 space-y-4">
+                  <div className="p-3 mb-2 bg-watchman-accent/10 rounded-xl border border-watchman-accent/20">
+                    <p className="text-xs text-watchman-accent flex items-center gap-2">
+                      <Sparkles className="w-3 h-3" />
+                      <strong>What is anchoring?</strong>
+                    </p>
+                    <p className="text-xs text-watchman-muted mt-1">
+                      Pick a date you know for sure (e.g., today) and tell us which day of your rotation cycle it is. This lets us calculate your entire year.
+                    </p>
+                  </div>
                   <div>
                     <label className="block text-xs text-watchman-muted uppercase tracking-wider mb-2">Anchor Date</label>
                     <input
