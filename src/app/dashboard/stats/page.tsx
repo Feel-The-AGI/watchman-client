@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import {
   BarChart3,
@@ -18,6 +18,11 @@ import {
   ChevronRight,
   FileText,
   Table,
+  Sparkles,
+  Zap,
+  Clock,
+  Target,
+  Trophy,
 } from 'lucide-react';
 import {
   BarChart,
@@ -33,9 +38,10 @@ import {
   LineChart,
   Line,
   Legend,
+  Area,
+  AreaChart,
 } from 'recharts';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -78,11 +84,12 @@ interface CommitmentStats {
 }
 
 const COLORS = {
-  work_day: '#4A90D9',
-  work_night: '#5C6BC0',
-  off: '#66BB6A',
-  leave: '#1DE9B6',
-  study: '#2979FF',
+  work_day: '#F59E0B',
+  work_night: '#6366F1',
+  off: '#10B981',
+  leave: '#14B8A6',
+  study: '#3B82F6',
+  accent: '#3B82F6',
 };
 
 export default function StatsPage() {
@@ -91,15 +98,23 @@ export default function StatsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [animateStats, setAnimateStats] = useState(false);
 
   useEffect(() => {
     fetchStats();
   }, [year]);
 
+  useEffect(() => {
+    if (stats) {
+      setAnimateStats(true);
+    }
+  }, [stats]);
+
   const fetchStats = async () => {
     try {
       setLoading(true);
       setError(null);
+      setAnimateStats(false);
       const response = await api.stats.getDetailed(year);
       setStats(response);
     } catch (err: any) {
@@ -109,14 +124,14 @@ export default function StatsPage() {
     }
   };
 
-  const handleExport = async (format: 'csv' | 'pdf') => {
+  const handleExport = async (exportFormat: 'csv' | 'pdf') => {
     try {
       setExporting(true);
-      const blob = await api.stats.export(year, format);
+      const blob = await api.stats.export(year, exportFormat);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `watchman-stats-${year}.${format}`;
+      a.download = `watchman-stats-${year}.${exportFormat}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -159,38 +174,54 @@ export default function StatsPage() {
   }, [stats]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Statistics</h1>
-          <p className="text-watchman-muted">
-            Detailed breakdown of your schedule
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+        >
+          <h1 className="text-3xl font-bold flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-watchman-accent to-watchman-purple flex items-center justify-center shadow-lg shadow-watchman-accent/30">
+              <BarChart3 className="w-5 h-5 text-white" />
+            </div>
+            Statistics
+          </h1>
+          <p className="text-watchman-muted mt-1">
+            Detailed insights into your schedule
           </p>
-        </div>
+        </motion.div>
 
-        <div className="flex items-center gap-3">
+        <motion.div 
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="flex items-center gap-3"
+        >
           {/* Year Selector */}
-          <div className="flex items-center bg-watchman-surface rounded-xl border border-white/5">
-            <button
+          <div className="flex items-center glass rounded-2xl border border-white/10 overflow-hidden">
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
               onClick={() => setYear(y => y - 1)}
-              className="p-2 hover:bg-white/5 rounded-l-xl transition-colors"
+              className="p-3 hover:bg-white/5 transition-colors"
             >
               <ChevronLeft className="w-5 h-5" />
-            </button>
-            <span className="px-4 font-medium">{year}</span>
-            <button
+            </motion.button>
+            <span className="px-6 font-bold text-lg">{year}</span>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
               onClick={() => setYear(y => y + 1)}
-              className="p-2 hover:bg-white/5 rounded-r-xl transition-colors"
+              className="p-3 hover:bg-white/5 transition-colors"
             >
               <ChevronRight className="w-5 h-5" />
-            </button>
+            </motion.button>
           </div>
 
           {/* Export Buttons */}
           <div className="flex gap-2">
             <Button
-              variant="secondary"
+              variant="glass"
               size="sm"
               onClick={() => handleExport('csv')}
               disabled={exporting || !stats}
@@ -200,7 +231,7 @@ export default function StatsPage() {
               CSV
             </Button>
             <Button
-              variant="secondary"
+              variant="glass"
               size="sm"
               onClick={() => handleExport('pdf')}
               disabled={exporting || !stats}
@@ -210,351 +241,388 @@ export default function StatsPage() {
               PDF
             </Button>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Error State */}
-      {error && (
-        <div className="p-4 rounded-xl bg-watchman-error/10 border border-watchman-error/20 flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-watchman-error flex-shrink-0" />
-          <p className="text-sm text-watchman-error">{error}</p>
-          <Button variant="ghost" size="sm" onClick={fetchStats} className="ml-auto gap-2">
-            <RefreshCw className="w-4 h-4" />
-            Retry
-          </Button>
-        </div>
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="p-4 rounded-2xl glass border border-red-500/30 flex items-center gap-3"
+          >
+            <AlertTriangle className="w-5 h-5 text-red-400" />
+            <p className="text-sm text-red-400">{error}</p>
+            <Button variant="ghost" size="sm" onClick={fetchStats} className="ml-auto gap-2">
+              <RefreshCw className="w-4 h-4" />
+              Retry
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Loading State */}
       {loading && (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-2 border-watchman-accent border-t-transparent rounded-full animate-spin" />
+        <div className="flex flex-col items-center justify-center py-20">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+            className="w-12 h-12 rounded-full border-2 border-watchman-accent border-t-transparent mb-4"
+          />
+          <p className="text-watchman-muted">Loading your statistics...</p>
         </div>
       )}
 
       {/* Stats Content */}
       {!loading && stats && (
         <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            <StatCard
-              icon={<Calendar className="w-5 h-5" />}
-              label="Total Days"
-              value={stats.total_days}
-              color="bg-watchman-accent"
-            />
-            <StatCard
-              icon={<Sun className="w-5 h-5" />}
-              label="Day Shifts"
-              value={stats.work_days}
-              color="bg-work-day"
-            />
-            <StatCard
-              icon={<Moon className="w-5 h-5" />}
-              label="Night Shifts"
-              value={stats.work_nights}
-              color="bg-work-night"
-            />
-            <StatCard
-              icon={<Coffee className="w-5 h-5" />}
-              label="Off Days"
-              value={stats.off_days}
-              color="bg-work-off"
-            />
-            <StatCard
-              icon={<Plane className="w-5 h-5" />}
-              label="Leave Days"
-              value={stats.leave_days}
-              color="bg-watchman-mint"
-            />
-            <StatCard
-              icon={<BookOpen className="w-5 h-5" />}
-              label="Study Hours"
-              value={stats.study_hours}
-              suffix="h"
-              color="bg-watchman-accent"
-            />
+          {/* Summary Cards - Bento Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {[
+              { icon: Calendar, label: 'Total Days', value: stats.total_days, color: 'from-watchman-accent to-watchman-purple', glow: 'shadow-watchman-accent/30' },
+              { icon: Sun, label: 'Day Shifts', value: stats.work_days, color: 'from-amber-500 to-orange-600', glow: 'shadow-amber-500/30' },
+              { icon: Moon, label: 'Night Shifts', value: stats.work_nights, color: 'from-indigo-500 to-purple-600', glow: 'shadow-indigo-500/30' },
+              { icon: Coffee, label: 'Off Days', value: stats.off_days, color: 'from-emerald-500 to-teal-600', glow: 'shadow-emerald-500/30' },
+              { icon: Plane, label: 'Leave Days', value: stats.leave_days, color: 'from-teal-400 to-cyan-600', glow: 'shadow-teal-500/30' },
+              { icon: BookOpen, label: 'Study Hours', value: stats.study_hours, suffix: 'h', color: 'from-blue-500 to-indigo-600', glow: 'shadow-blue-500/30' },
+            ].map((stat, i) => (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                animate={animateStats ? { opacity: 1, y: 0, scale: 1 } : {}}
+                transition={{ delay: i * 0.05, type: 'spring', stiffness: 300, damping: 25 }}
+                whileHover={{ scale: 1.02, y: -4 }}
+                className="glass rounded-2xl border border-white/10 p-5 group cursor-default"
+              >
+                <div className={cn(
+                  'w-12 h-12 rounded-2xl bg-gradient-to-br flex items-center justify-center mb-4 shadow-lg transition-transform group-hover:scale-110',
+                  stat.color,
+                  stat.glow
+                )}>
+                  <stat.icon className="w-6 h-6 text-white" />
+                </div>
+                <motion.p 
+                  className="text-3xl font-bold"
+                  initial={{ opacity: 0 }}
+                  animate={animateStats ? { opacity: 1 } : {}}
+                  transition={{ delay: i * 0.05 + 0.2 }}
+                >
+                  {stat.value.toLocaleString()}{stat.suffix}
+                </motion.p>
+                <p className="text-sm text-watchman-muted mt-1">{stat.label}</p>
+              </motion.div>
+            ))}
           </div>
 
           {/* Charts Row */}
           <div className="grid lg:grid-cols-2 gap-6">
             {/* Distribution Pie Chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Day Distribution</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        paddingAngle={2}
-                        dataKey="value"
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#1A1B1E',
-                          border: '1px solid rgba(255,255,255,0.1)',
-                          borderRadius: '8px',
-                        }}
-                      />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+              className="glass rounded-3xl border border-white/10 p-6"
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-watchman-accent/20 to-watchman-purple/20 flex items-center justify-center">
+                  <Target className="w-5 h-5 text-watchman-accent" />
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Monthly Study Hours */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Study Hours by Month</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={studyHoursData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                      <XAxis 
-                        dataKey="month" 
-                        stroke="#6B7280"
-                        tick={{ fill: '#6B7280' }}
-                      />
-                      <YAxis 
-                        stroke="#6B7280"
-                        tick={{ fill: '#6B7280' }}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#1A1B1E',
-                          border: '1px solid rgba(255,255,255,0.1)',
-                          borderRadius: '8px',
-                        }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="hours"
-                        stroke={COLORS.study}
-                        strokeWidth={2}
-                        dot={{ fill: COLORS.study }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Monthly Breakdown Bar Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Monthly Breakdown</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[400px]">
+                <h3 className="text-lg font-semibold">Day Distribution</h3>
+              </div>
+              <div className="h-[280px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                    <XAxis 
-                      dataKey="month" 
-                      stroke="#6B7280"
-                      tick={{ fill: '#6B7280' }}
-                    />
-                    <YAxis 
-                      stroke="#6B7280"
-                      tick={{ fill: '#6B7280' }}
-                    />
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={70}
+                      outerRadius={110}
+                      paddingAngle={3}
+                      dataKey="value"
+                      stroke="transparent"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: '#1A1B1E',
+                        backgroundColor: 'rgba(24, 24, 27, 0.95)',
+                        backdropFilter: 'blur(12px)',
                         border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: '8px',
+                        borderRadius: '16px',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
                       }}
                     />
-                    <Legend />
-                    <Bar dataKey="Day Shifts" fill={COLORS.work_day} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Night Shifts" fill={COLORS.work_night} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Off Days" fill={COLORS.off} radius={[4, 4, 0, 0]} />
-                  </BarChart>
+                  </PieChart>
                 </ResponsiveContainer>
               </div>
-            </CardContent>
-          </Card>
+              {/* Custom Legend */}
+              <div className="flex flex-wrap justify-center gap-4 mt-4">
+                {pieData.map((item) => (
+                  <div key={item.name} className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span className="text-xs text-watchman-muted">{item.name}</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
 
-          {/* Additional Stats */}
+            {/* Monthly Study Hours */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4 }}
+              className="glass rounded-3xl border border-white/10 p-6"
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-blue-400" />
+                </div>
+                <h3 className="text-lg font-semibold">Study Hours Trend</h3>
+              </div>
+              <div className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={studyHoursData}>
+                    <defs>
+                      <linearGradient id="studyGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={COLORS.study} stopOpacity={0.3} />
+                        <stop offset="100%" stopColor={COLORS.study} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                    <XAxis dataKey="month" stroke="#6B7280" tick={{ fill: '#6B7280', fontSize: 12 }} />
+                    <YAxis stroke="#6B7280" tick={{ fill: '#6B7280', fontSize: 12 }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgba(24, 24, 27, 0.95)',
+                        backdropFilter: 'blur(12px)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '16px',
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="hours"
+                      stroke={COLORS.study}
+                      strokeWidth={3}
+                      fill="url(#studyGradient)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Monthly Breakdown */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="glass rounded-3xl border border-white/10 p-6"
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center">
+                <BarChart3 className="w-5 h-5 text-emerald-400" />
+              </div>
+              <h3 className="text-lg font-semibold">Monthly Breakdown</h3>
+            </div>
+            <div className="h-[350px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyChartData} barCategoryGap="20%">
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="month" stroke="#6B7280" tick={{ fill: '#6B7280', fontSize: 12 }} />
+                  <YAxis stroke="#6B7280" tick={{ fill: '#6B7280', fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(24, 24, 27, 0.95)',
+                      backdropFilter: 'blur(12px)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '16px',
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="Day Shifts" fill={COLORS.work_day} radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="Night Shifts" fill={COLORS.work_night} radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="Off Days" fill={COLORS.off} radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+
+          {/* Additional Stats Grid */}
           <div className="grid lg:grid-cols-2 gap-6">
             {/* Peak Weeks */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-watchman-error" />
-                  Peak Weeks
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {stats.peak_weeks && stats.peak_weeks.length > 0 ? (
-                  <div className="space-y-3">
-                    {stats.peak_weeks.slice(0, 5).map((week, index) => (
-                      <div
-                        key={index}
-                        className={cn(
-                          'p-4 rounded-xl flex items-center justify-between',
-                          week.is_overloaded
-                            ? 'bg-watchman-error/10 border border-watchman-error/20'
-                            : 'bg-watchman-bg'
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+              className="glass rounded-3xl border border-white/10 p-6"
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500/20 to-orange-500/20 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-red-400" />
+                </div>
+                <h3 className="text-lg font-semibold">Peak Weeks</h3>
+              </div>
+              {stats.peak_weeks && stats.peak_weeks.length > 0 ? (
+                <div className="space-y-3">
+                  {stats.peak_weeks.slice(0, 5).map((week, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.7 + index * 0.05 }}
+                      whileHover={{ scale: 1.01, x: 4 }}
+                      className={cn(
+                        'p-4 rounded-2xl flex items-center justify-between transition-all cursor-default',
+                        week.is_overloaded
+                          ? 'bg-gradient-to-r from-red-500/10 to-transparent border border-red-500/20'
+                          : 'glass'
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        {week.is_overloaded && (
+                          <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
+                            <AlertTriangle className="w-4 h-4 text-red-400" />
+                          </div>
                         )}
-                      >
                         <div>
                           <p className="font-medium">
                             {format(new Date(week.week_start), 'MMM d')} - {format(new Date(week.week_end), 'MMM d')}
                           </p>
-                          <p className="text-sm text-watchman-muted">
-                            {week.is_overloaded && (
-                              <span className="text-watchman-error mr-2">⚠️ High Load</span>
-                            )}
-                          </p>
+                          {week.is_overloaded && (
+                            <p className="text-xs text-red-400">High workload</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold">{week.total_hours}h</p>
+                        <p className="text-xs text-watchman-muted">study</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <TrendingUp className="w-12 h-12 mx-auto mb-4 text-watchman-muted/30" />
+                  <p className="text-watchman-muted">No peak weeks data</p>
+                </div>
+              )}
+            </motion.div>
+
+            {/* Commitments */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7 }}
+              className="glass rounded-3xl border border-white/10 p-6"
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-watchman-accent/20 to-watchman-purple/20 flex items-center justify-center">
+                  <BookOpen className="w-5 h-5 text-watchman-accent" />
+                </div>
+                <h3 className="text-lg font-semibold">Commitments</h3>
+              </div>
+              {stats.commitment_breakdown && stats.commitment_breakdown.length > 0 ? (
+                <div className="space-y-4">
+                  {stats.commitment_breakdown.map((commitment, i) => (
+                    <motion.div
+                      key={commitment.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.8 + i * 0.05 }}
+                      whileHover={{ scale: 1.01 }}
+                      className="glass rounded-2xl p-4"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className="font-semibold">{commitment.name}</p>
+                          <p className="text-xs text-watchman-muted capitalize">{commitment.type}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-2xl font-bold">{week.total_hours}h</p>
-                          <p className="text-xs text-watchman-muted">study</p>
+                          <p className="font-bold text-watchman-accent">{commitment.total_hours}h</p>
+                          <p className="text-xs text-watchman-muted">{commitment.sessions_count} sessions</p>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-watchman-muted text-center py-8">
-                    No peak weeks data available
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Commitment Breakdown */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="w-5 h-5 text-watchman-accent" />
-                  Commitments
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {stats.commitment_breakdown && stats.commitment_breakdown.length > 0 ? (
-                  <div className="space-y-3">
-                    {stats.commitment_breakdown.map((commitment) => (
-                      <div
-                        key={commitment.id}
-                        className="p-4 bg-watchman-bg rounded-xl"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <p className="font-medium">{commitment.name}</p>
-                            <p className="text-xs text-watchman-muted capitalize">
-                              {commitment.type}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold">{commitment.total_hours}h</p>
-                            <p className="text-xs text-watchman-muted">
-                              {commitment.sessions_count} sessions
-                            </p>
-                          </div>
-                        </div>
-                        {/* Progress Bar */}
-                        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-watchman-accent rounded-full"
-                            style={{
-                              width: `${Math.min((commitment.total_hours / (stats.study_hours || 1)) * 100, 100)}%`,
-                            }}
-                          />
-                        </div>
+                      <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.min((commitment.total_hours / (stats.study_hours || 1)) * 100, 100)}%` }}
+                          transition={{ delay: 1, duration: 0.8, ease: 'easeOut' }}
+                          className="h-full bg-gradient-to-r from-watchman-accent to-watchman-purple rounded-full"
+                        />
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-watchman-muted text-center py-8">
-                    No commitments tracked yet
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <BookOpen className="w-12 h-12 mx-auto mb-4 text-watchman-muted/30" />
+                  <p className="text-watchman-muted">No commitments tracked</p>
+                </div>
+              )}
+            </motion.div>
           </div>
 
           {/* Summary Footer */}
-          <Card>
-            <CardContent className="py-6">
-              <div className="flex flex-wrap items-center justify-center gap-8 text-center">
-                <div>
-                  <p className="text-3xl font-bold text-watchman-accent">{stats.work_days + stats.work_nights}</p>
-                  <p className="text-sm text-watchman-muted">Total Work Days</p>
-                </div>
-                <div className="w-px h-12 bg-white/10" />
-                <div>
-                  <p className="text-3xl font-bold text-work-off">{stats.off_days + stats.leave_days}</p>
-                  <p className="text-sm text-watchman-muted">Total Rest Days</p>
-                </div>
-                <div className="w-px h-12 bg-white/10" />
-                <div>
-                  <p className="text-3xl font-bold text-watchman-mint">{stats.study_hours}</p>
-                  <p className="text-sm text-watchman-muted">Study Hours</p>
-                </div>
-                <div className="w-px h-12 bg-white/10" />
-                <div>
-                  <p className="text-3xl font-bold">{stats.commitment_count}</p>
-                  <p className="text-sm text-watchman-muted">Active Commitments</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.9 }}
+            className="glass rounded-3xl border border-white/10 p-8"
+          >
+            <div className="flex items-center justify-center gap-3 mb-6">
+              <Trophy className="w-6 h-6 text-amber-400" />
+              <h3 className="text-lg font-semibold">Year Summary</h3>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-12 text-center">
+              {[
+                { value: stats.work_days + stats.work_nights, label: 'Total Work Days', color: 'text-watchman-accent' },
+                { value: stats.off_days + stats.leave_days, label: 'Total Rest Days', color: 'text-emerald-400' },
+                { value: stats.study_hours, label: 'Study Hours', suffix: 'h', color: 'text-blue-400' },
+                { value: stats.commitment_count, label: 'Active Commitments', color: 'text-purple-400' },
+              ].map((item, i) => (
+                <motion.div
+                  key={item.label}
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 1 + i * 0.1, type: 'spring' }}
+                >
+                  <p className={cn('text-4xl font-bold', item.color)}>
+                    {item.value.toLocaleString()}{item.suffix}
+                  </p>
+                  <p className="text-sm text-watchman-muted mt-1">{item.label}</p>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
         </>
       )}
 
       {/* Empty State */}
       {!loading && !stats && !error && (
-        <div className="text-center py-20">
-          <BarChart3 className="w-16 h-16 mx-auto mb-6 text-watchman-muted opacity-50" />
-          <h2 className="text-xl font-semibold mb-2">No Statistics Yet</h2>
-          <p className="text-watchman-muted mb-6">
-            Generate your calendar first to see statistics.
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center py-20"
+        >
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-watchman-accent/20 to-watchman-purple/20 flex items-center justify-center mx-auto mb-6">
+            <Sparkles className="w-10 h-10 text-watchman-accent" />
+          </div>
+          <h2 className="text-2xl font-bold mb-2">No Statistics Yet</h2>
+          <p className="text-watchman-muted mb-6 max-w-md mx-auto">
+            Generate your calendar first to see beautiful insights about your schedule.
           </p>
-        </div>
+          <Button variant="gradient" className="gap-2">
+            <Zap className="w-4 h-4" />
+            Generate Calendar
+          </Button>
+        </motion.div>
       )}
     </div>
-  );
-}
-
-// Stat Card Component
-interface StatCardProps {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  suffix?: string;
-  color: string;
-}
-
-function StatCard({ icon, label, value, suffix, color }: StatCardProps) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="p-4 bg-watchman-surface rounded-xl border border-white/5"
-    >
-      <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center mb-3 text-white', color)}>
-        {icon}
-      </div>
-      <p className="text-2xl font-bold">
-        {value.toLocaleString()}{suffix}
-      </p>
-      <p className="text-sm text-watchman-muted">{label}</p>
-    </motion.div>
   );
 }

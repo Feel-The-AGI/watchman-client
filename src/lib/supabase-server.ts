@@ -1,9 +1,9 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY || 
-                   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+                   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key'
 
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies()

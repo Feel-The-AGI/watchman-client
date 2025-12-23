@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import {
   Settings,
@@ -18,12 +18,14 @@ import {
   Check,
   Edit2,
   Plus,
-  Trash2,
   Save,
   X,
+  Sparkles,
+  Zap,
+  Target,
+  GraduationCap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { api } from '@/lib/api';
@@ -92,7 +94,6 @@ export default function MasterSettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
-  // Edit states
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [editPattern, setEditPattern] = useState(settings.cycle.pattern);
   const [editAnchorDate, setEditAnchorDate] = useState(settings.cycle.anchor_date || '');
@@ -111,7 +112,6 @@ export default function MasterSettingsPage() {
         setSettings({ ...defaultSettings, ...response.settings });
       }
     } catch (err: any) {
-      // If no master settings exist yet, use defaults
       if (err.message?.includes('404') || err.message?.includes('not found')) {
         setSettings(defaultSettings);
       } else {
@@ -167,35 +167,46 @@ export default function MasterSettingsPage() {
   const totalCycleDays = settings.cycle.pattern.reduce((sum, b) => sum + b.duration, 0);
 
   const blockConfig = {
-    work_day: { icon: Sun, color: 'bg-amber-500', label: 'Day Shift' },
-    work_night: { icon: Moon, color: 'bg-indigo-500', label: 'Night Shift' },
-    off: { icon: Coffee, color: 'bg-emerald-500', label: 'Off Days' },
+    work_day: { icon: Sun, color: 'from-amber-500 to-orange-600', glow: 'shadow-amber-500/30', label: 'Day Shift', bg: 'bg-amber-500' },
+    work_night: { icon: Moon, color: 'from-indigo-500 to-purple-600', glow: 'shadow-indigo-500/30', label: 'Night Shift', bg: 'bg-indigo-500' },
+    off: { icon: Coffee, color: 'from-emerald-500 to-teal-600', glow: 'shadow-emerald-500/30', label: 'Off Days', bg: 'bg-emerald-500' },
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-2 border-watchman-accent border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center py-20">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          className="w-12 h-12 rounded-full border-2 border-watchman-accent border-t-transparent mb-4"
+        />
+        <p className="text-watchman-muted">Loading settings...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
+    <div className="space-y-8 max-w-5xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+      >
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-3">
-            <Settings className="w-7 h-7 text-watchman-accent" />
+          <h1 className="text-3xl font-bold flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-watchman-accent to-watchman-purple flex items-center justify-center shadow-lg shadow-watchman-accent/30">
+              <Settings className="w-6 h-6 text-white" />
+            </div>
             Master Settings
           </h1>
           <p className="text-watchman-muted mt-1">
-            Your single source of truth - all calendar rules in one place
+            Your single source of truth for all calendar rules
           </p>
         </div>
 
         <Button
-          variant="secondary"
+          variant="glass"
           onClick={handleRegenerateCalendar}
           disabled={saving}
           className="gap-2"
@@ -203,46 +214,55 @@ export default function MasterSettingsPage() {
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
           Regenerate Calendar
         </Button>
-      </div>
+      </motion.div>
 
       {/* Status Messages */}
-      {error && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3"
-        >
-          <AlertCircle className="w-5 h-5 text-red-400" />
-          <p className="text-sm text-red-400">{error}</p>
-          <Button variant="ghost" size="sm" onClick={() => setError(null)} className="ml-auto">
-            <X className="w-4 h-4" />
-          </Button>
-        </motion.div>
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            className="p-4 rounded-2xl glass border border-red-500/30 flex items-center gap-3"
+          >
+            <AlertCircle className="w-5 h-5 text-red-400" />
+            <p className="text-sm text-red-400 flex-1">{error}</p>
+            <Button variant="ghost" size="sm" onClick={() => setError(null)}>
+              <X className="w-4 h-4" />
+            </Button>
+          </motion.div>
+        )}
 
-      {success && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3"
-        >
-          <Check className="w-5 h-5 text-emerald-400" />
-          <p className="text-sm text-emerald-400">{success}</p>
-        </motion.div>
-      )}
+        {success && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            className="p-4 rounded-2xl glass border border-emerald-500/30 flex items-center gap-3"
+          >
+            <Check className="w-5 h-5 text-emerald-400" />
+            <p className="text-sm text-emerald-400">{success}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Cycle Section */}
-      <Card>
-        <CardContent className="py-6">
-          <div className="flex items-start justify-between mb-6">
+      {/* Cycle Section - Hero Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="glass rounded-3xl border border-white/10 overflow-hidden"
+      >
+        <div className="p-6 border-b border-white/5 bg-gradient-to-r from-watchman-accent/10 to-transparent">
+          <div className="flex items-start justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-watchman-accent/10 flex items-center justify-center">
-                <Clock className="w-6 h-6 text-watchman-accent" />
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-watchman-accent to-watchman-purple flex items-center justify-center shadow-lg shadow-watchman-accent/30">
+                <Clock className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold">Work Rotation Cycle</h2>
+                <h2 className="text-xl font-bold">Work Rotation Cycle</h2>
                 <p className="text-sm text-watchman-muted">
-                  {totalCycleDays} days total
+                  {totalCycleDays} days total cycle length
                 </p>
               </div>
             </div>
@@ -255,259 +275,342 @@ export default function MasterSettingsPage() {
                 setEditAnchorDay(settings.cycle.anchor_cycle_day);
                 setEditingSection('cycle');
               }}
+              className="gap-2"
             >
               <Edit2 className="w-4 h-4" />
+              Edit
             </Button>
           </div>
+        </div>
 
+        <div className="p-6">
           {/* Pattern Visualization */}
           <div className="flex flex-wrap gap-3 mb-6">
             {settings.cycle.pattern.map((block, idx) => {
               const config = blockConfig[block.label];
               return (
-                <div
+                <motion.div
                   key={idx}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-watchman-bg border border-white/5"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: idx * 0.1 }}
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  className="flex items-center gap-3 px-5 py-3 glass rounded-2xl border border-white/5 cursor-default group"
                 >
-                  <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', config.color)}>
-                    <config.icon className="w-4 h-4 text-white" />
+                  <div className={cn(
+                    'w-10 h-10 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-lg transition-transform group-hover:scale-110',
+                    config.color,
+                    config.glow
+                  )}>
+                    <config.icon className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <p className="font-medium">{block.duration} days</p>
+                    <p className="text-lg font-bold">{block.duration} days</p>
                     <p className="text-xs text-watchman-muted">{config.label}</p>
                   </div>
-                </div>
+                </motion.div>
+              );
+            })}
+          </div>
+
+          {/* Cycle Timeline */}
+          <div className="flex h-3 rounded-full overflow-hidden mb-6">
+            {settings.cycle.pattern.map((block, idx) => {
+              const config = blockConfig[block.label];
+              const width = (block.duration / totalCycleDays) * 100;
+              return (
+                <motion.div
+                  key={idx}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${width}%` }}
+                  transition={{ delay: 0.5 + idx * 0.1, duration: 0.5 }}
+                  className={cn('h-full', config.bg)}
+                />
               );
             })}
           </div>
 
           {/* Anchor Info */}
-          <div className="flex items-center gap-6 text-sm text-watchman-muted">
-            <span>
-              Anchor: {settings.cycle.anchor_date 
-                ? format(new Date(settings.cycle.anchor_date), 'MMM d, yyyy')
-                : 'Not set'}
-            </span>
-            <span>Day {settings.cycle.anchor_cycle_day} of cycle</span>
+          <div className="flex items-center gap-6 text-sm">
+            <div className="flex items-center gap-2 px-4 py-2 glass rounded-xl">
+              <Sparkles className="w-4 h-4 text-watchman-accent" />
+              <span className="text-watchman-muted">Anchor:</span>
+              <span className="font-medium">
+                {settings.cycle.anchor_date 
+                  ? format(new Date(settings.cycle.anchor_date), 'MMM d, yyyy')
+                  : 'Not set'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 glass rounded-xl">
+              <Target className="w-4 h-4 text-watchman-purple" />
+              <span className="text-watchman-muted">Day</span>
+              <span className="font-bold text-watchman-accent">{settings.cycle.anchor_cycle_day}</span>
+              <span className="text-watchman-muted">of cycle</span>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </motion.div>
 
-      {/* Constraints Section */}
-      <Card>
-        <CardContent className="py-6">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center">
-                <Shield className="w-6 h-6 text-red-400" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold">Constraints</h2>
-                <p className="text-sm text-watchman-muted">
-                  Rules that protect your schedule
-                </p>
-              </div>
+      {/* Grid of Settings Cards */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* Constraints Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="glass rounded-3xl border border-white/10 p-6"
+        >
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-lg shadow-red-500/30">
+              <Shield className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold">Constraints</h2>
+              <p className="text-sm text-watchman-muted">Rules that protect your schedule</p>
             </div>
           </div>
 
           {settings.constraints.length === 0 ? (
-            <div className="text-center py-8 text-watchman-muted">
-              <Shield className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p>No constraints yet. Add them via chat!</p>
-              <p className="text-xs mt-1">Try: &quot;Don&apos;t schedule study on night shifts&quot;</p>
+            <div className="text-center py-10">
+              <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
+                <Shield className="w-8 h-8 text-watchman-muted/30" />
+              </div>
+              <p className="text-watchman-muted mb-2">No constraints yet</p>
+              <p className="text-xs text-watchman-muted/60">
+                Try: &ldquo;Don&apos;t schedule study on night shifts&rdquo;
+              </p>
             </div>
           ) : (
             <div className="space-y-2">
-              {settings.constraints.map((c) => (
-                <div key={c.id} className="p-3 rounded-lg bg-watchman-bg border border-white/5 flex items-center justify-between">
+              {settings.constraints.map((c, i) => (
+                <motion.div
+                  key={c.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  whileHover={{ scale: 1.01, x: 4 }}
+                  className="p-4 rounded-xl glass border border-white/5 flex items-center justify-between group cursor-default"
+                >
                   <div>
-                    <p className="font-medium">{c.name}</p>
-                    <p className="text-xs text-watchman-muted">{c.rule}</p>
+                    <p className="font-medium group-hover:text-watchman-accent transition-colors">{c.name}</p>
+                    <p className="text-xs text-watchman-muted font-mono">{c.rule}</p>
                   </div>
                   <span className={cn(
-                    'px-2 py-0.5 rounded text-xs',
-                    c.type === 'binary' ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'
+                    'px-3 py-1 rounded-lg text-xs font-medium',
+                    c.type === 'binary' 
+                      ? 'bg-red-500/20 text-red-400' 
+                      : 'bg-emerald-500/20 text-emerald-400'
                   )}>
                     {c.type}
                   </span>
-                </div>
+                </motion.div>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </motion.div>
 
-      {/* Commitments Section */}
-      <Card>
-        <CardContent className="py-6">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-blue-400" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold">Commitments</h2>
-                <p className="text-sm text-watchman-muted">
-                  Courses, diplomas, and recurring events
-                </p>
-              </div>
+        {/* Commitments Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="glass rounded-3xl border border-white/10 p-6"
+        >
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+              <GraduationCap className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold">Commitments</h2>
+              <p className="text-sm text-watchman-muted">Courses and recurring events</p>
             </div>
           </div>
 
           {settings.commitments.length === 0 ? (
-            <div className="text-center py-8 text-watchman-muted">
-              <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p>No commitments yet. Add them via chat!</p>
-              <p className="text-xs mt-1">Try: &quot;I&apos;m studying for my MBA from Jan to June&quot;</p>
+            <div className="text-center py-10">
+              <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
+                <BookOpen className="w-8 h-8 text-watchman-muted/30" />
+              </div>
+              <p className="text-watchman-muted mb-2">No commitments yet</p>
+              <p className="text-xs text-watchman-muted/60">
+                Try: &ldquo;I&apos;m studying for my MBA from Jan to June&rdquo;
+              </p>
             </div>
           ) : (
             <div className="space-y-2">
-              {settings.commitments.map((c) => (
-                <div key={c.id} className="p-3 rounded-lg bg-watchman-bg border border-white/5 flex items-center justify-between">
+              {settings.commitments.map((c, i) => (
+                <motion.div
+                  key={c.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  whileHover={{ scale: 1.01, x: 4 }}
+                  className="p-4 rounded-xl glass border border-white/5 flex items-center justify-between group cursor-default"
+                >
                   <div>
-                    <p className="font-medium">{c.name}</p>
-                    <p className="text-xs text-watchman-muted">{c.type}</p>
+                    <p className="font-medium group-hover:text-watchman-accent transition-colors">{c.name}</p>
+                    <p className="text-xs text-watchman-muted capitalize">{c.type}</p>
                   </div>
                   {c.start_date && c.end_date && (
                     <span className="text-xs text-watchman-muted">
                       {format(new Date(c.start_date), 'MMM d')} - {format(new Date(c.end_date), 'MMM d, yyyy')}
                     </span>
                   )}
-                </div>
+                </motion.div>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </motion.div>
+      </div>
 
       {/* Leave Blocks Section */}
-      <Card>
-        <CardContent className="py-6">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                <Plane className="w-6 h-6 text-purple-400" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold">Leave Blocks</h2>
-                <p className="text-sm text-watchman-muted">
-                  Scheduled time off and holidays
-                </p>
-              </div>
-            </div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="glass rounded-3xl border border-white/10 p-6"
+      >
+        <div className="flex items-center gap-4 mb-6">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-400 to-cyan-600 flex items-center justify-center shadow-lg shadow-teal-500/30">
+            <Plane className="w-6 h-6 text-white" />
           </div>
+          <div>
+            <h2 className="text-lg font-bold">Leave Blocks</h2>
+            <p className="text-sm text-watchman-muted">Scheduled time off and holidays</p>
+          </div>
+        </div>
 
-          {settings.leave_blocks.length === 0 ? (
-            <div className="text-center py-8 text-watchman-muted">
-              <Plane className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p>No leave scheduled. Add via chat!</p>
-              <p className="text-xs mt-1">Try: &quot;I&apos;m on vacation from Dec 25 to Jan 2&quot;</p>
+        {settings.leave_blocks.length === 0 ? (
+          <div className="text-center py-10">
+            <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
+              <Plane className="w-8 h-8 text-watchman-muted/30" />
             </div>
-          ) : (
-            <div className="space-y-2">
-              {settings.leave_blocks.map((l) => (
-                <div key={l.id} className="p-3 rounded-lg bg-watchman-bg border border-white/5 flex items-center justify-between">
-                  <p className="font-medium">{l.name}</p>
-                  <span className="text-xs text-watchman-muted">
-                    {format(new Date(l.start_date), 'MMM d')} - {format(new Date(l.end_date), 'MMM d, yyyy')}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            <p className="text-watchman-muted mb-2">No leave scheduled</p>
+            <p className="text-xs text-watchman-muted/60">
+              Try: &ldquo;I&apos;m on vacation from Dec 25 to Jan 2&rdquo;
+            </p>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {settings.leave_blocks.map((l, i) => (
+              <motion.div
+                key={l.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: i * 0.05 }}
+                whileHover={{ scale: 1.02, y: -2 }}
+                className="p-4 rounded-2xl bg-gradient-to-br from-teal-500/10 to-transparent border border-teal-500/20 cursor-default"
+              >
+                <p className="font-medium text-teal-400">{l.name}</p>
+                <p className="text-sm text-watchman-muted mt-1">
+                  {format(new Date(l.start_date), 'MMM d')} - {format(new Date(l.end_date), 'MMM d, yyyy')}
+                </p>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </motion.div>
 
       {/* Cycle Edit Modal */}
-      {editingSection === 'cycle' && (
-        <Modal isOpen onClose={() => setEditingSection(null)} title="Edit Work Rotation">
-          <div className="space-y-4">
-            {/* Pattern Editor */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Pattern Blocks</label>
-              <div className="space-y-2">
-                {editPattern.map((block, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <select
-                      value={block.label}
-                      onChange={(e) => {
-                        const updated = [...editPattern];
-                        updated[index] = { ...updated[index], label: e.target.value as any };
-                        setEditPattern(updated);
-                      }}
-                      className="flex-1 px-3 py-2 bg-watchman-bg border border-white/10 rounded-lg focus:border-watchman-accent focus:outline-none"
+      <AnimatePresence>
+        {editingSection === 'cycle' && (
+          <Modal isOpen onClose={() => setEditingSection(null)} title="Edit Work Rotation">
+            <div className="space-y-6">
+              {/* Pattern Editor */}
+              <div>
+                <label className="block text-sm font-medium mb-3">Pattern Blocks</label>
+                <div className="space-y-2">
+                  {editPattern.map((block, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="flex items-center gap-2"
                     >
-                      <option value="work_day">Day Shift</option>
-                      <option value="work_night">Night Shift</option>
-                      <option value="off">Off Days</option>
-                    </select>
-                    <input
-                      type="number"
-                      min="1"
-                      value={block.duration}
-                      onChange={(e) => {
-                        const updated = [...editPattern];
-                        updated[index] = { ...updated[index], duration: Math.max(1, parseInt(e.target.value) || 1) };
-                        setEditPattern(updated);
-                      }}
-                      className="w-20 px-3 py-2 bg-watchman-bg border border-white/10 rounded-lg focus:border-watchman-accent focus:outline-none"
-                    />
-                    <span className="text-sm text-watchman-muted">days</span>
-                    {editPattern.length > 1 && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => setEditPattern(editPattern.filter((_, i) => i !== index))}
+                      <select
+                        value={block.label}
+                        onChange={(e) => {
+                          const updated = [...editPattern];
+                          updated[index] = { ...updated[index], label: e.target.value as 'work_day' | 'work_night' | 'off' };
+                          setEditPattern(updated);
+                        }}
+                        className="flex-1 px-4 py-3 glass border border-white/10 rounded-xl focus:border-watchman-accent focus:outline-none"
                       >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
+                        <option value="work_day">Day Shift</option>
+                        <option value="work_night">Night Shift</option>
+                        <option value="off">Off Days</option>
+                      </select>
+                      <input
+                        type="number"
+                        min="1"
+                        value={block.duration}
+                        onChange={(e) => {
+                          const updated = [...editPattern];
+                          updated[index] = { ...updated[index], duration: Math.max(1, parseInt(e.target.value) || 1) };
+                          setEditPattern(updated);
+                        }}
+                        className="w-24 px-4 py-3 glass border border-white/10 rounded-xl focus:border-watchman-accent focus:outline-none text-center"
+                      />
+                      <span className="text-sm text-watchman-muted w-12">days</span>
+                      {editPattern.length > 1 && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setEditPattern(editPattern.filter((_, i) => i !== index))}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditPattern([...editPattern, { label: 'off', duration: 5 }])}
+                  className="mt-3 gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Block
+                </Button>
+                <div className="mt-3 p-3 glass rounded-xl">
+                  <span className="text-sm text-watchman-muted">Total cycle: </span>
+                  <span className="font-bold text-watchman-accent">
+                    {editPattern.reduce((s, b) => s + b.duration, 0)} days
+                  </span>
+                </div>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setEditPattern([...editPattern, { label: 'off', duration: 5 }])}
-                className="mt-2 gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Add Block
-              </Button>
-              <p className="text-xs text-watchman-muted mt-2">
-                Total: {editPattern.reduce((s, b) => s + b.duration, 0)} days
-              </p>
-            </div>
 
-            {/* Anchor Settings */}
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Anchor Date"
-                type="date"
-                value={editAnchorDate}
-                onChange={(e) => setEditAnchorDate(e.target.value)}
-              />
-              <Input
-                label="Cycle Day on Anchor"
-                type="number"
-                min="1"
-                max={editPattern.reduce((s, b) => s + b.duration, 0)}
-                value={editAnchorDay}
-                onChange={(e) => setEditAnchorDay(parseInt(e.target.value) || 1)}
-              />
-            </div>
+              {/* Anchor Settings */}
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="Anchor Date"
+                  type="date"
+                  value={editAnchorDate}
+                  onChange={(e) => setEditAnchorDate(e.target.value)}
+                />
+                <Input
+                  label="Cycle Day on Anchor"
+                  type="number"
+                  min="1"
+                  max={editPattern.reduce((s, b) => s + b.duration, 0)}
+                  value={editAnchorDay}
+                  onChange={(e) => setEditAnchorDay(parseInt(e.target.value) || 1)}
+                />
+              </div>
 
-            {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
-              <Button variant="ghost" onClick={() => setEditingSection(null)}>Cancel</Button>
-              <Button variant="primary" onClick={handleSaveCycle} disabled={saving} className="gap-2">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Save Changes
-              </Button>
+              {/* Actions */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
+                <Button variant="ghost" onClick={() => setEditingSection(null)}>Cancel</Button>
+                <Button variant="gradient" onClick={handleSaveCycle} disabled={saving} className="gap-2">
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Save Changes
+                </Button>
+              </div>
             </div>
-          </div>
-        </Modal>
-      )}
+          </Modal>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

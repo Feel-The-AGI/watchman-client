@@ -1,37 +1,95 @@
 import { cn } from '@/lib/utils'
-import { ButtonHTMLAttributes, forwardRef } from 'react'
+import { forwardRef, ReactNode } from 'react'
+import { motion, HTMLMotionProps } from 'framer-motion'
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success'
-  size?: 'sm' | 'md' | 'lg'
+interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'ref' | 'children'> {
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success' | 'glass' | 'gradient'
+  size?: 'sm' | 'md' | 'lg' | 'xl'
   loading?: boolean
+  glow?: boolean
+  children?: ReactNode
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', loading, disabled, children, ...props }, ref) => {
-    const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-watchman-bg disabled:opacity-50 disabled:cursor-not-allowed'
+  ({ className, variant = 'primary', size = 'md', loading, disabled, children, glow, ...props }, ref) => {
+    const baseStyles = `
+      relative inline-flex items-center justify-center font-medium rounded-xl
+      transition-all duration-300 ease-spring
+      focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-watchman-bg
+      disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none
+      overflow-hidden
+    `
     
     const variants = {
-      primary: 'bg-watchman-accent text-white hover:bg-watchman-accent/90 focus:ring-watchman-accent',
-      secondary: 'bg-watchman-surface text-watchman-text border border-watchman-border hover:bg-watchman-border focus:ring-watchman-border',
-      ghost: 'text-watchman-text hover:bg-watchman-surface focus:ring-watchman-border',
-      danger: 'bg-watchman-error text-white hover:bg-watchman-error/90 focus:ring-watchman-error',
-      success: 'bg-watchman-success text-white hover:bg-watchman-success/90 focus:ring-watchman-success',
+      primary: `
+        bg-watchman-accent text-white
+        hover:bg-watchman-accent-hover hover:scale-[1.02]
+        active:scale-[0.98]
+        focus:ring-watchman-accent
+        shadow-lg shadow-watchman-accent/20
+      `,
+      secondary: `
+        bg-white/5 text-watchman-text border border-white/10
+        hover:bg-white/10 hover:border-white/20 hover:scale-[1.02]
+        active:scale-[0.98]
+        focus:ring-white/30
+      `,
+      ghost: `
+        text-watchman-text-secondary
+        hover:text-watchman-text hover:bg-white/5
+        active:scale-[0.98]
+        focus:ring-white/20
+      `,
+      danger: `
+        bg-watchman-error text-white
+        hover:bg-red-600 hover:scale-[1.02]
+        active:scale-[0.98]
+        focus:ring-watchman-error
+        shadow-lg shadow-watchman-error/20
+      `,
+      success: `
+        bg-watchman-success text-white
+        hover:bg-green-600 hover:scale-[1.02]
+        active:scale-[0.98]
+        focus:ring-watchman-success
+        shadow-lg shadow-watchman-success/20
+      `,
+      glass: `
+        glass text-watchman-text
+        hover:bg-white/10 hover:scale-[1.02]
+        active:scale-[0.98]
+        focus:ring-white/30
+      `,
+      gradient: `
+        bg-gradient-to-r from-watchman-accent via-watchman-purple to-watchman-pink
+        text-white font-semibold
+        hover:scale-[1.02] hover:shadow-xl hover:shadow-watchman-accent/30
+        active:scale-[0.98]
+        focus:ring-watchman-accent
+        bg-[length:200%_100%] animate-gradient-shift
+      `,
     }
     
     const sizes = {
-      sm: 'px-3 py-1.5 text-sm',
-      md: 'px-4 py-2 text-sm',
-      lg: 'px-6 py-3 text-base',
+      sm: 'px-3 py-1.5 text-sm gap-1.5',
+      md: 'px-4 py-2.5 text-sm gap-2',
+      lg: 'px-6 py-3 text-base gap-2',
+      xl: 'px-8 py-4 text-lg gap-3',
     }
+
+    const glowStyles = glow ? 'animate-pulse-glow' : ''
     
     return (
-      <button
+      <motion.button
         ref={ref}
-        className={cn(baseStyles, variants[variant], sizes[size], className)}
+        className={cn(baseStyles, variants[variant], sizes[size], glowStyles, className)}
         disabled={disabled || loading}
+        whileTap={{ scale: 0.97 }}
         {...props}
       >
+        {/* Shine overlay */}
+        <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full hover:translate-x-full transition-transform duration-700" />
+        
         {loading && (
           <svg
             className="animate-spin -ml-1 mr-2 h-4 w-4"
@@ -53,8 +111,10 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             />
           </svg>
         )}
-        {children}
-      </button>
+        <span className="relative z-10 flex items-center justify-center gap-2">
+          {children}
+        </span>
+      </motion.button>
     )
   }
 )

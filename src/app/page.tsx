@@ -1,72 +1,142 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import Link from 'next/link';
-import { Calendar, BarChart3, Lock, Clock, Zap, ArrowRight } from 'lucide-react';
+import Image from 'next/image';
+import { 
+  Calendar, 
+  BarChart3, 
+  Shield, 
+  Clock, 
+  Sparkles, 
+  ArrowRight, 
+  MessageSquare,
+  Zap,
+  Check,
+  ChevronRight,
+  Sun,
+  Moon,
+  Coffee,
+  Target,
+  Layers,
+  Command,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Logo } from '@/components/ui/Logo';
+import { useRef } from 'react';
 
-const features = [
+// Bento Grid Features
+const bentoFeatures = [
   {
-    icon: Calendar,
-    title: 'Rule-Driven Scheduling',
-    description: 'Define your rotation once. Watch 365 days generate automatically. No manual entry, ever.',
+    title: 'Conversational Setup',
+    description: 'Just talk. "I work 5 days, 5 nights, 5 off. Jan 1 is my Day 4." Your calendar builds itself.',
+    icon: MessageSquare,
+    span: 2,
+    gradient: 'from-blue-500/20 to-cyan-500/20',
+    iconColor: 'text-blue-400',
   },
   {
-    icon: Lock,
-    title: 'Approval-First Changes',
-    description: 'Nothing mutates without your explicit approval. Every change is proposed, explained, then you decide.',
+    title: 'Constraint Engine',
+    description: 'Set hard rules. No study on night shifts. The system never breaks your boundaries.',
+    icon: Shield,
+    span: 1,
+    gradient: 'from-red-500/20 to-orange-500/20',
+    iconColor: 'text-red-400',
   },
   {
-    icon: BarChart3,
-    title: 'Complete Statistics',
-    description: 'Total work days, off days, study hours, peak weeks. Know your year at a glance.',
+    title: 'Smart Proposals',
+    description: 'Every change is proposed, explained, and waits for your approval. Nothing happens silently.',
+    icon: Target,
+    span: 1,
+    gradient: 'from-purple-500/20 to-pink-500/20',
+    iconColor: 'text-purple-400',
   },
   {
-    icon: Lock,
-    title: 'Binary Constraints',
-    description: 'Set hard rules. No studying on night shifts. Max 2 commitments. The system respects boundaries.',
+    title: 'Full Year Visibility',
+    description: 'See 365 days at a glance. Patterns become visible. Plan months ahead with confidence.',
+    icon: Layers,
+    span: 2,
+    gradient: 'from-emerald-500/20 to-teal-500/20',
+    iconColor: 'text-emerald-400',
   },
 ];
 
-const workflowSteps = [
+// How it works steps
+const steps = [
   {
     step: '01',
     title: 'Define Your Cycle',
-    description: 'Set your rotation pattern and anchor date. "10 days on, 5 nights, 10 off. Jan 1 = Day 4."',
+    description: 'Tell us your rotation pattern and anchor date. "10 on, 5 nights, 10 off. Jan 1 = Day 4."',
+    icon: Clock,
   },
   {
     step: '02',
-    title: 'Add Constraints',
-    description: 'Binary rules that never break. "No study on night shifts." "Max 2 active commitments."',
+    title: 'Set Constraints',
+    description: 'Binary rules that never break. No study on nights. Max 2 commitments. Your boundaries.',
+    icon: Shield,
   },
   {
     step: '03',
-    title: 'Paste Any Change',
-    description: 'Email, WhatsApp, PDF text. The system parses and proposes. You review before anything applies.',
+    title: 'Talk to the Agent',
+    description: 'Need to add leave? A new course? Just chat. The agent understands and proposes changes.',
+    icon: MessageSquare,
   },
   {
     step: '04',
-    title: 'Live With Clarity',
-    description: 'Statistics update in real-time. Undo anytime. Your year becomes visible and controlled.',
+    title: 'Approve & Live',
+    description: 'Review every change. Approve or reject. Your calendar updates. Statistics update. Control.',
+    icon: Check,
   },
 ];
 
+// Industries
+const industries = [
+  { name: 'Mining & Resources', icon: '⛏️', desc: 'FIFO rotations, long swings' },
+  { name: 'Healthcare', icon: '🏥', desc: 'Nursing shifts, on-call schedules' },
+  { name: 'Security', icon: '🛡️', desc: '24/7 coverage, rotating crews' },
+  { name: 'Transportation', icon: '✈️', desc: 'Pilots, rail, shift drivers' },
+  { name: 'Manufacturing', icon: '🏭', desc: 'Factory rotations, overtime' },
+  { name: 'Emergency', icon: '🚑', desc: 'First responders, variable shifts' },
+];
+
 export default function LandingPage() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start start", "end end"]
+  });
+
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
+  const heroScale = useTransform(scrollYProgress, [0, 0.2], [1, 0.95]);
+
   return (
-    <div className="min-h-screen bg-watchman-bg text-white">
+    <div ref={containerRef} className="min-h-screen bg-watchman-bg text-white overflow-hidden">
+      {/* Mesh Background */}
+      <div className="fixed inset-0 mesh-bg opacity-50 pointer-events-none" />
+      
+      {/* Noise Overlay */}
+      <div className="fixed inset-0 noise-overlay pointer-events-none" />
+
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-watchman-bg/80 backdrop-blur-md border-b border-white/5">
+      <nav className="fixed top-0 left-0 right-0 z-50 glass-strong border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/">
-            <Logo size="sm" />
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="relative w-10 h-10">
+              <Image 
+                src="/watchman-logo.png" 
+                alt="Watchman" 
+                width={40}
+                height={40}
+                className="object-contain"
+              />
+            </div>
+            <span className="text-xl font-bold tracking-tight">Watchman</span>
           </Link>
           <div className="flex items-center gap-6">
-            <Link href="/pricing" className="text-watchman-muted hover:text-white transition-colors">
+            <Link href="/pricing" className="text-watchman-text-secondary hover:text-white transition-colors hidden sm:block">
               Pricing
             </Link>
             <Link href="/login">
-              <Button variant="primary" size="sm">
+              <Button variant="glass" size="sm">
                 Sign In
               </Button>
             </Link>
@@ -75,121 +145,249 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-6">
-        <div className="max-w-4xl mx-auto text-center">
+      <motion.section 
+        className="relative min-h-screen flex items-center justify-center px-6 pt-24"
+        style={{ opacity: heroOpacity, scale: heroScale }}
+      >
+        {/* Gradient Orbs */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-watchman-accent/20 rounded-full blur-[120px] animate-pulse-soft" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-watchman-purple/20 rounded-full blur-[120px] animate-pulse-soft" style={{ animationDelay: '1s' }} />
+        
+        <div className="relative max-w-5xl mx-auto text-center">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-watchman-accent/10 border border-watchman-accent/20 mb-8">
-              <Zap className="w-4 h-4 text-watchman-accent" />
-              <span className="text-sm text-watchman-accent">Deterministic Life-State Simulator</span>
-            </div>
+            {/* Badge */}
+            <motion.div 
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass border border-white/10 mb-8"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              <Sparkles className="w-4 h-4 text-watchman-accent" />
+              <span className="text-sm text-watchman-text-secondary">Conversational Calendar for Shift Workers</span>
+            </motion.div>
             
-            <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
+            {/* Headline */}
+            <h1 className="text-display-lg md:text-display-xl mb-8 leading-[0.95]">
               <span className="text-white">Time Under</span>
               <br />
-              <span className="text-watchman-accent">Control</span>
+              <span className="text-gradient">Control</span>
             </h1>
             
-            <p className="text-xl text-watchman-muted mb-8 max-w-2xl mx-auto leading-relaxed">
-              A rule-driven calendar that simulates your year before committing to it. 
-              No auto-planning. No silent decisions. Every change is proposed. You decide.
+            {/* Subheadline */}
+            <p className="text-xl md:text-2xl text-watchman-text-secondary mb-12 max-w-2xl mx-auto leading-relaxed">
+              A rule-driven calendar that understands rotating shifts. 
+              Talk naturally. The agent listens. 
+              <span className="text-white"> Nothing changes without your approval.</span>
             </p>
             
+            {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link href="/login">
-                <Button variant="primary" size="lg" className="gap-2">
+                <Button variant="primary" size="xl" className="group">
                   Create Your Year
-                  <ArrowRight className="w-5 h-5" />
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
-              <Link href="/pricing">
-                <Button variant="ghost" size="lg">
-                  View Pricing
+              <Link href="#how-it-works">
+                <Button variant="glass" size="xl">
+                  See How It Works
                 </Button>
               </Link>
             </div>
           </motion.div>
+
+          {/* Scroll Indicator */}
+          <motion.div 
+            className="absolute bottom-8 left-1/2 -translate-x-1/2"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.5 }}
+          >
+            <motion.div 
+              className="w-6 h-10 rounded-full border-2 border-white/20 flex items-start justify-center p-2"
+              animate={{ y: [0, 8, 0] }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <div className="w-1.5 h-1.5 rounded-full bg-white/50" />
+            </motion.div>
+          </motion.div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Philosophy Banner */}
-      <section className="py-12 px-6 border-y border-white/5 bg-watchman-surface/30">
-        <div className="max-w-4xl mx-auto text-center">
-          <p className="text-lg text-watchman-muted italic">
+      <section className="py-16 px-6 border-y border-white/5 relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-watchman-accent/5 via-transparent to-watchman-purple/5" />
+        <div className="max-w-4xl mx-auto text-center relative">
+          <p className="text-2xl md:text-3xl font-light text-watchman-text-secondary italic">
             "Guard your hours. Live by rule, not noise."
           </p>
         </div>
       </section>
 
-      {/* Features Grid */}
+      {/* Bento Features Grid */}
       <section className="py-24 px-6">
         <div className="max-w-6xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl font-bold mb-4">Built for Real Constraints</h2>
-            <p className="text-watchman-muted max-w-2xl mx-auto">
-              Not another calendar app. A temporal reasoning engine that understands cycles, 
-              respects rules, and never mutates without permission.
+            <h2 className="text-display-md mb-4">Built for Real Constraints</h2>
+            <p className="text-xl text-watchman-text-secondary max-w-2xl mx-auto">
+              Not another calendar app. A temporal reasoning engine that understands cycles 
+              and respects your rules.
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-6">
-            {features.map((feature, index) => (
+          {/* Bento Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {bentoFeatures.map((feature, index) => (
               <motion.div
                 key={feature.title}
-                initial={{ opacity: 0, y: 20 }}
+                className={`group relative overflow-hidden rounded-3xl p-8 glass border border-white/5 hover:border-white/10 transition-all duration-500 ${
+                  feature.span === 2 ? 'md:col-span-2' : ''
+                }`}
+                initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="p-8 rounded-2xl bg-watchman-surface border border-white/5 hover:border-watchman-accent/20 transition-colors"
+                transition={{ delay: index * 0.1, duration: 0.5 }}
+                whileHover={{ y: -4 }}
               >
-                <feature.icon className="w-10 h-10 text-watchman-accent mb-4" />
-                <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-                <p className="text-watchman-muted leading-relaxed">{feature.description}</p>
+                {/* Gradient Background */}
+                <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+                
+                <div className="relative">
+                  <div className={`w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mb-4 ${feature.iconColor}`}>
+                    <feature.icon className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
+                  <p className="text-watchman-text-secondary">{feature.description}</p>
+                </div>
               </motion.div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Calendar Preview Section */}
+      <section className="py-24 px-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-watchman-accent/5 to-transparent" />
+        
+        <div className="max-w-6xl mx-auto relative">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-16"
+          >
+            <h2 className="text-display-md mb-4">See Your Pattern</h2>
+            <p className="text-xl text-watchman-text-secondary max-w-2xl mx-auto">
+              Day shifts. Night shifts. Off days. Leave. Everything color-coded and visible at a glance.
+            </p>
+          </motion.div>
+
+          {/* Calendar Preview */}
+          <motion.div
+            className="glass rounded-3xl p-8 border border-white/10"
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+          >
+            {/* Legend */}
+            <div className="flex flex-wrap items-center justify-center gap-6 mb-8">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-work-day" />
+                <span className="text-sm text-watchman-text-secondary">Day Shift</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-work-night" />
+                <span className="text-sm text-watchman-text-secondary">Night Shift</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-work-off" />
+                <span className="text-sm text-watchman-text-secondary">Off Day</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-commit-leave" />
+                <span className="text-sm text-watchman-text-secondary">Leave</span>
+              </div>
+            </div>
+
+            {/* Mini Calendar Grid */}
+            <div className="grid grid-cols-7 gap-2 max-w-2xl mx-auto">
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+                <div key={day} className="text-center text-xs text-watchman-muted py-2">
+                  {day}
+                </div>
+              ))}
+              {/* Sample days - showing a 5-5-5 pattern */}
+              {Array.from({ length: 28 }, (_, i) => {
+                const cycleDay = i % 15;
+                let type = 'day';
+                if (cycleDay >= 5 && cycleDay < 10) type = 'night';
+                else if (cycleDay >= 10) type = 'off';
+                
+                const colors = {
+                  day: 'bg-work-day/30 border-work-day/50',
+                  night: 'bg-work-night/30 border-work-night/50',
+                  off: 'bg-work-off/30 border-work-off/50',
+                };
+                
+                return (
+                  <motion.div
+                    key={i}
+                    className={`aspect-square rounded-lg border ${colors[type as keyof typeof colors]} flex items-center justify-center text-sm`}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.02 }}
+                  >
+                    {i + 1}
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.div>
         </div>
       </section>
 
       {/* How It Works */}
-      <section className="py-24 px-6 bg-watchman-surface/30 border-y border-white/5">
+      <section id="how-it-works" className="py-24 px-6">
         <div className="max-w-5xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl font-bold mb-4">How Watchman Works</h2>
-            <p className="text-watchman-muted">Four steps to controlled time.</p>
+            <h2 className="text-display-md mb-4">How Watchman Works</h2>
+            <p className="text-xl text-watchman-text-secondary">Four steps to controlled time.</p>
           </motion.div>
 
-          <div className="space-y-8">
-            {workflowSteps.map((step, index) => (
+          <div className="space-y-6">
+            {steps.map((step, index) => (
               <motion.div
                 key={step.step}
-                initial={{ opacity: 0, x: -20 }}
+                className="flex gap-6 items-start group"
+                initial={{ opacity: 0, x: -30 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="flex gap-6 items-start"
+                transition={{ delay: index * 0.15 }}
               >
-                <div className="flex-shrink-0 w-16 h-16 rounded-xl bg-watchman-accent/10 border border-watchman-accent/20 flex items-center justify-center">
-                  <span className="text-watchman-accent font-bold text-lg">{step.step}</span>
+                <div className="flex-shrink-0 w-20 h-20 rounded-2xl glass border border-white/10 flex items-center justify-center group-hover:border-watchman-accent/30 group-hover:bg-watchman-accent/5 transition-all duration-300">
+                  <span className="text-2xl font-bold text-gradient">{step.step}</span>
                 </div>
-                <div className="pt-2">
-                  <h3 className="text-xl font-semibold mb-2">{step.title}</h3>
-                  <p className="text-watchman-muted">{step.description}</p>
+                <div className="pt-2 flex-1">
+                  <h3 className="text-xl font-semibold mb-2 flex items-center gap-3">
+                    <step.icon className="w-5 h-5 text-watchman-accent" />
+                    {step.title}
+                  </h3>
+                  <p className="text-watchman-text-secondary">{step.description}</p>
                 </div>
               </motion.div>
             ))}
@@ -197,60 +395,60 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Use Cases */}
-      <section className="py-24 px-6">
-        <div className="max-w-5xl mx-auto">
+      {/* Industries */}
+      <section className="py-24 px-6 border-y border-white/5">
+        <div className="max-w-6xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl font-bold mb-4">Built For People With Structure</h2>
-            <p className="text-watchman-muted">Rotational workers. Students. Anyone with cycles.</p>
+            <h2 className="text-display-md mb-4">Built For People With Structure</h2>
+            <p className="text-xl text-watchman-text-secondary">Rotational workers. Students. Anyone with cycles.</p>
           </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            {[
-              { title: 'Mining Engineers', desc: 'Shift rotations, crew schedules, leave planning' },
-              { title: 'Healthcare Workers', desc: 'Nursing shifts, recovery days, study blocks' },
-              { title: 'Working Students', desc: 'Balance education with job constraints' },
-            ].map((useCase, index) => (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {industries.map((industry, index) => (
               <motion.div
-                key={useCase.title}
+                key={industry.name}
+                className="p-6 rounded-2xl glass border border-white/5 text-center hover:border-white/10 hover:bg-white/5 transition-all duration-300 group"
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="p-6 rounded-xl bg-watchman-surface border border-white/5 text-center"
+                transition={{ delay: index * 0.05 }}
+                whileHover={{ y: -4 }}
               >
-                <h3 className="text-lg font-semibold mb-2">{useCase.title}</h3>
-                <p className="text-sm text-watchman-muted">{useCase.desc}</p>
+                <div className="text-3xl mb-3">{industry.icon}</div>
+                <h3 className="font-medium text-sm mb-1">{industry.name}</h3>
+                <p className="text-xs text-watchman-muted">{industry.desc}</p>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-24 px-6">
-        <div className="max-w-3xl mx-auto text-center">
+      {/* Final CTA */}
+      <section className="py-32 px-6 relative">
+        <div className="absolute inset-0 bg-gradient-to-t from-watchman-accent/10 via-transparent to-transparent" />
+        
+        <div className="max-w-3xl mx-auto text-center relative">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
           >
-            <Clock className="w-16 h-16 text-watchman-accent mx-auto mb-6" />
-            <h2 className="text-3xl font-bold mb-4">Start Watching Your Time</h2>
-            <p className="text-watchman-muted mb-8">
+            <div className="w-20 h-20 rounded-full bg-watchman-accent/10 border border-watchman-accent/20 flex items-center justify-center mx-auto mb-8">
+              <Command className="w-10 h-10 text-watchman-accent" />
+            </div>
+            <h2 className="text-display-md mb-6">Start Watching Your Time</h2>
+            <p className="text-xl text-watchman-text-secondary mb-10">
               Define your rules. Generate your year. Take control.
             </p>
             <Link href="/login">
-              <Button variant="primary" size="lg" className="gap-2">
+              <Button variant="gradient" size="xl" className="group">
                 Get Started Free
-                <ArrowRight className="w-5 h-5" />
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
           </motion.div>
@@ -260,8 +458,14 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="py-12 px-6 border-t border-white/5">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2">
-            <Logo size="sm" />
+          <div className="flex items-center gap-3">
+            <Image 
+              src="/watchman-logo.png" 
+              alt="Watchman" 
+              width={32}
+              height={32}
+              className="object-contain"
+            />
             <span className="font-semibold">Watchman</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-watchman-muted">

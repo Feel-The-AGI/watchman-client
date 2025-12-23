@@ -15,12 +15,17 @@ import {
   Coffee,
   TrendingUp,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Clock,
+  Target,
+  Zap,
+  BarChart2,
+  Plane,
 } from 'lucide-react';
 import { CalendarGrid, YearOverview, DayInspector, type CalendarDay } from '@/components/calendar';
 import { ChatPanel } from '@/components/chat';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card, CardContent, CardHeader, CardTitle, BentoCard } from '@/components/ui/Card';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import Link from 'next/link';
@@ -53,7 +58,6 @@ export default function DashboardPage() {
       setLoading(true);
       setError(null);
 
-      // Check if user has set up their cycle
       const cyclesResponse = await api.cycles.list();
       if (!cyclesResponse || cyclesResponse.length === 0) {
         setHasSetup(false);
@@ -62,24 +66,18 @@ export default function DashboardPage() {
       }
       setHasSetup(true);
 
-      // If we're on the first load, use the cycle's anchor year
       const activeCycle = cyclesResponse.find((c: any) => c.is_active) || cyclesResponse[0];
       if (activeCycle?.anchor_date) {
         const anchorYear = new Date(activeCycle.anchor_date).getFullYear();
-        // Only auto-set year if it's different and we haven't manually changed it
         if (anchorYear !== currentYear && anchorYear >= new Date().getFullYear()) {
           setCurrentYear(anchorYear);
-          return; // Will re-fetch with new year
+          return;
         }
       }
 
-      // Fetch calendar for current year
-      // After unwrapping, this is the days array directly
       const calendarResponse = await api.calendar.getYear(currentYear);
       setCalendarDays(calendarResponse || []);
 
-      // Fetch stats
-      // After unwrapping, this is the stats object directly
       const statsResponse = await api.stats.getSummary(currentYear);
       setStats(statsResponse || null);
     } catch (err: any) {
@@ -98,31 +96,43 @@ export default function DashboardPage() {
     ? calendarDays.find(d => d.date === format(selectedDate, 'yyyy-MM-dd')) || null
     : null;
 
-  // No setup state
+  // No setup state - Premium empty state
   if (!loading && !hasSetup) {
     return (
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-3xl mx-auto py-12">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
           className="text-center"
         >
-          <div className="w-20 h-20 rounded-full bg-watchman-accent/10 border border-watchman-accent/20 flex items-center justify-center mx-auto mb-6">
-            <Sparkles className="w-10 h-10 text-watchman-accent" />
+          {/* Animated gradient orb */}
+          <div className="relative w-32 h-32 mx-auto mb-8">
+            <div className="absolute inset-0 bg-gradient-to-br from-watchman-accent to-watchman-purple rounded-full blur-2xl opacity-30 animate-pulse-soft" />
+            <div className="relative w-32 h-32 rounded-full glass border border-white/10 flex items-center justify-center">
+              <Sparkles className="w-12 h-12 text-watchman-accent" />
+            </div>
           </div>
           
-          <h1 className="text-2xl font-bold mb-4">Welcome to Watchman</h1>
-          <p className="text-watchman-muted mb-8 max-w-md mx-auto">
-            You haven&apos;t set up your rotation yet. Define your cycle pattern 
-            and constraints to generate your calendar.
+          <h1 className="text-display-sm mb-4">Welcome to Watchman</h1>
+          <p className="text-xl text-watchman-text-secondary mb-8 max-w-md mx-auto">
+            You haven&apos;t set up your rotation yet. Let&apos;s define your cycle pattern 
+            and generate your calendar.
           </p>
 
-          <Link href="/dashboard/rules">
-            <Button variant="primary" size="lg" className="gap-2">
-              Set Up Your Rotation
-              <ArrowRight className="w-5 h-5" />
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link href="/onboarding">
+              <Button variant="primary" size="xl" className="group">
+                Start Setup
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </Link>
+            <Link href="/dashboard/rules">
+              <Button variant="glass" size="xl">
+                Manual Setup
+              </Button>
+            </Link>
+          </div>
         </motion.div>
       </div>
     );
@@ -134,36 +144,42 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           {/* Year Navigation */}
-          <button
+          <motion.button
             onClick={() => setCurrentYear(y => y - 1)}
-            className="p-2 rounded-lg hover:bg-white/5 transition-colors"
+            className="p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
             <ChevronLeft className="w-5 h-5" />
-          </button>
+          </motion.button>
+          
           <div>
-            <h1 className="text-2xl font-bold">
-              {currentYear} Calendar
+            <h1 className="text-2xl font-bold tracking-tight">
+              <span className="text-gradient">{currentYear}</span> Calendar
             </h1>
-            <p className="text-watchman-muted">
+            <p className="text-watchman-text-secondary text-sm">
               {profile?.name ? `${profile.name}'s schedule` : 'Your schedule overview'}
             </p>
           </div>
-          <button
+          
+          <motion.button
             onClick={() => setCurrentYear(y => y + 1)}
-            className="p-2 rounded-lg hover:bg-white/5 transition-colors"
+            className="p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
             <ChevronRight className="w-5 h-5" />
-          </button>
+          </motion.button>
         </div>
 
         <div className="flex items-center gap-3">
           {/* View Mode Toggle */}
-          <div className="flex items-center bg-watchman-surface rounded-xl p-1 border border-white/5">
+          <div className="flex items-center glass rounded-xl p-1 border border-white/5">
             <button
               onClick={() => setViewMode('month')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
                 viewMode === 'month'
-                  ? 'bg-watchman-accent text-white'
+                  ? 'bg-watchman-accent text-white shadow-lg shadow-watchman-accent/30'
                   : 'text-watchman-muted hover:text-white'
               }`}
             >
@@ -172,9 +188,9 @@ export default function DashboardPage() {
             </button>
             <button
               onClick={() => setViewMode('year')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
                 viewMode === 'year'
-                  ? 'bg-watchman-accent text-white'
+                  ? 'bg-watchman-accent text-white shadow-lg shadow-watchman-accent/30'
                   : 'text-watchman-muted hover:text-white'
               }`}
             >
@@ -185,7 +201,7 @@ export default function DashboardPage() {
 
           {/* Refresh Button */}
           <Button
-            variant="secondary"
+            variant="glass"
             size="sm"
             onClick={fetchCalendarData}
             disabled={loading}
@@ -198,141 +214,180 @@ export default function DashboardPage() {
       </div>
 
       {/* Error State */}
-      {error && (
-        <div className="p-4 rounded-xl bg-watchman-error/10 border border-watchman-error/20 flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-watchman-error flex-shrink-0" />
-          <p className="text-sm text-watchman-error">{error}</p>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={fetchCalendarData}
-            className="ml-auto"
+      <AnimatePresence>
+        {error && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="p-4 rounded-2xl glass-accent border border-red-500/20 flex items-center gap-3"
           >
-            Retry
-          </Button>
-        </div>
-      )}
+            <AlertCircle className="w-5 h-5 text-watchman-error flex-shrink-0" />
+            <p className="text-sm text-watchman-error">{error}</p>
+            <Button variant="ghost" size="sm" onClick={fetchCalendarData} className="ml-auto">
+              Retry
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Loading State */}
       {loading && (
         <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-2 border-watchman-accent border-t-transparent rounded-full animate-spin" />
+          <div className="relative">
+            <div className="w-16 h-16 rounded-full border-2 border-watchman-accent/20 border-t-watchman-accent animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Sparkles className="w-6 h-6 text-watchman-accent" />
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Main Content */}
+      {/* Main Bento Layout */}
       {!loading && !error && (
-        <div className="grid lg:grid-cols-[1fr,380px] gap-6">
-          {/* Calendar */}
-          <div>
-            {viewMode === 'month' ? (
-              <CalendarGrid
-                days={calendarDays}
-                selectedDate={selectedDate}
-                onSelectDate={setSelectedDate}
-              />
-            ) : (
-              <YearOverview
-                days={calendarDays}
-                year={currentYear}
-                onSelectMonth={(month) => {
-                  setViewMode('month');
-                  setSelectedDate(month);
-                }}
-              />
-            )}
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* Calendar - Main Focus */}
+          <motion.div 
+            className="lg:col-span-8"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Card variant="glass" padding="none" className="overflow-hidden">
+              {viewMode === 'month' ? (
+                <CalendarGrid
+                  days={calendarDays}
+                  selectedDate={selectedDate}
+                  onSelectDate={setSelectedDate}
+                />
+              ) : (
+                <div className="p-6">
+                  <YearOverview
+                    days={calendarDays}
+                    year={currentYear}
+                    onSelectMonth={(month) => {
+                      setViewMode('month');
+                      setSelectedDate(month);
+                    }}
+                  />
+                </div>
+              )}
+            </Card>
+          </motion.div>
 
-          {/* Sidebar - Chat + Inspector */}
-          <div className="space-y-4">
-            {/* Chat Panel - Always visible */}
-            <ChatPanel 
-              onCalendarUpdate={fetchCalendarData}
-              className="h-[400px]"
-            />
+          {/* Right Sidebar - Chat + Stats */}
+          <div className="lg:col-span-4 space-y-4">
+            {/* Chat Panel */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+            >
+              <ChatPanel 
+                onCalendarUpdate={fetchCalendarData}
+                className="h-[420px]"
+              />
+            </motion.div>
 
-            {/* Day Inspector or Quick Stats */}
+            {/* Day Inspector or Stats */}
             <AnimatePresence mode="wait">
               {selectedDate ? (
-                <DayInspector
+                <motion.div
                   key="inspector"
-                  date={selectedDate}
-                  dayData={selectedDayData}
-                  onClose={() => setSelectedDate(null)}
-                />
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <DayInspector
+                    date={selectedDate}
+                    dayData={selectedDayData}
+                    onClose={() => setSelectedDate(null)}
+                  />
+                </motion.div>
               ) : (
                 <motion.div
                   key="stats"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
+                  className="space-y-4"
                 >
-                  {/* Quick Stats */}
+                  {/* Quick Stats Grid */}
                   {stats && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <TrendingUp className="w-5 h-5 text-watchman-accent" />
-                          Year Overview
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-3">
-                          <StatBlock
-                            icon={<Sun className="w-4 h-4" />}
-                            label="Day Shifts"
-                            value={stats.work_days}
-                            color="bg-work-day"
-                          />
-                          <StatBlock
-                            icon={<Moon className="w-4 h-4" />}
-                            label="Night Shifts"
-                            value={stats.work_nights}
-                            color="bg-work-night"
-                          />
-                          <StatBlock
-                            icon={<Coffee className="w-4 h-4" />}
-                            label="Off Days"
-                            value={stats.off_days}
-                            color="bg-work-off"
-                          />
-                          <StatBlock
-                            icon={<CalendarIcon className="w-4 h-4" />}
-                            label="Leave Days"
-                            value={stats.leave_days}
-                            color="bg-watchman-mint"
-                          />
-                        </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <StatCard
+                        icon={<Sun className="w-4 h-4" />}
+                        label="Day Shifts"
+                        value={stats.work_days}
+                        color="bg-work-day"
+                        glow="shadow-work-day/30"
+                      />
+                      <StatCard
+                        icon={<Moon className="w-4 h-4" />}
+                        label="Night Shifts"
+                        value={stats.work_nights}
+                        color="bg-work-night"
+                        glow="shadow-work-night/30"
+                      />
+                      <StatCard
+                        icon={<Coffee className="w-4 h-4" />}
+                        label="Off Days"
+                        value={stats.off_days}
+                        color="bg-work-off"
+                        glow="shadow-work-off/30"
+                      />
+                      <StatCard
+                        icon={<Plane className="w-4 h-4" />}
+                        label="Leave Days"
+                        value={stats.leave_days}
+                        color="bg-commit-leave"
+                        glow="shadow-commit-leave/30"
+                      />
+                    </div>
+                  )}
 
-                        <div className="pt-4 border-t border-white/5">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm text-watchman-muted">Study Hours</span>
-                            <span className="font-semibold">{stats.study_hours}h</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-watchman-muted">Commitments</span>
-                            <span className="font-semibold">{stats.commitment_count}</span>
-                          </div>
+                  {/* Stats Summary Card */}
+                  {stats && (
+                    <Card variant="glass" className="p-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <BarChart2 className="w-5 h-5 text-watchman-accent" />
+                        <span className="font-medium">Year Overview</span>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-watchman-muted">Study Hours</span>
+                          <span className="font-semibold text-watchman-accent">{stats.study_hours}h</span>
                         </div>
-
-                        <Link href="/dashboard/stats" className="block pt-2">
-                          <Button variant="ghost" size="sm" className="w-full gap-2">
-                            View Detailed Stats
-                            <ArrowRight className="w-4 h-4" />
-                          </Button>
-                        </Link>
-                      </CardContent>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-watchman-muted">Commitments</span>
+                          <span className="font-semibold">{stats.commitment_count}</span>
+                        </div>
+                        <div className="pt-3 border-t border-white/5">
+                          <Link href="/dashboard/stats">
+                            <Button variant="ghost" size="sm" className="w-full justify-center gap-2 group">
+                              View Detailed Stats
+                              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
                     </Card>
                   )}
 
                   {/* Tip Card */}
-                  <Card className="mt-4">
-                    <CardContent className="pt-4">
-                      <p className="text-sm text-watchman-muted">
-                        <span className="font-medium text-white">Tip:</span> Click on any 
-                        day to see details, or chat with the agent above.
-                      </p>
-                    </CardContent>
+                  <Card variant="outline" className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-watchman-accent/10 flex items-center justify-center flex-shrink-0">
+                        <Zap className="w-4 h-4 text-watchman-accent" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-watchman-text-secondary">
+                          <span className="font-medium text-white">Tip:</span> Click any day to see details, 
+                          or chat with the agent to make changes.
+                        </p>
+                      </div>
+                    </div>
                   </Card>
                 </motion.div>
               )}
@@ -344,24 +399,28 @@ export default function DashboardPage() {
   );
 }
 
-// Stat Block Component
-interface StatBlockProps {
+// Premium Stat Card
+interface StatCardProps {
   icon: React.ReactNode;
   label: string;
   value: number;
   color: string;
+  glow: string;
 }
 
-function StatBlock({ icon, label, value, color }: StatBlockProps) {
+function StatCard({ icon, label, value, color, glow }: StatCardProps) {
   return (
-    <div className="p-3 bg-watchman-bg rounded-xl">
-      <div className="flex items-center gap-2 mb-1">
-        <div className={`w-6 h-6 rounded-full ${color} flex items-center justify-center text-white`}>
+    <motion.div 
+      className="p-4 rounded-2xl glass border border-white/5 hover:border-white/10 transition-all group"
+      whileHover={{ y: -2 }}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <div className={`w-7 h-7 rounded-lg ${color} flex items-center justify-center text-white shadow-lg ${glow}`}>
           {icon}
         </div>
         <span className="text-xs text-watchman-muted">{label}</span>
       </div>
-      <p className="text-xl font-bold pl-8">{value}</p>
-    </div>
+      <p className="text-2xl font-bold tracking-tight">{value}</p>
+    </motion.div>
   );
 }

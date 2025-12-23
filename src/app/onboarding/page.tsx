@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import {
   ArrowRight,
   ArrowLeft,
@@ -18,10 +18,13 @@ import {
   Loader2,
   Sparkles,
   Target,
+  Send,
+  Bot,
+  User,
+  Zap,
+  Shield,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Card, CardContent } from '@/components/ui/Card';
 import { Logo } from '@/components/ui/Logo';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -31,20 +34,13 @@ interface CycleBlock {
   duration: number;
 }
 
-// Reserved for future constraint editing feature
-interface _Constraint {
-  name: string;
-  rule: string;
-  type: 'binary';
+interface Message {
+  id: string;
+  role: 'assistant' | 'user';
+  content: string;
+  timestamp: Date;
+  typing?: boolean;
 }
-
-const STEPS = [
-  { id: 'welcome', title: 'Welcome' },
-  { id: 'cycle', title: 'Define Rotation' },
-  { id: 'anchor', title: 'Set Anchor' },
-  { id: 'constraints', title: 'Set Rules' },
-  { id: 'complete', title: 'Complete' },
-];
 
 const PRESET_CYCLES = [
   {
@@ -58,7 +54,7 @@ const PRESET_CYCLES = [
   },
   {
     name: '2 Week Rotation',
-    description: '7 on, 7 off',
+    description: '7 days on, 7 off',
     pattern: [
       { label: 'work_day' as const, duration: 7 },
       { label: 'off' as const, duration: 7 },
@@ -66,78 +62,88 @@ const PRESET_CYCLES = [
   },
   {
     name: '4x4 Shift',
-    description: '4 days, 4 off',
+    description: '4 days, 4 nights, 4 off',
     pattern: [
       { label: 'work_day' as const, duration: 4 },
+      { label: 'work_night' as const, duration: 4 },
       { label: 'off' as const, duration: 4 },
     ],
-  },
-  {
-    name: 'Custom',
-    description: 'Build your own',
-    pattern: [],
   },
 ];
 
 const PRESET_CONSTRAINTS = [
-  { name: 'No study on night shifts', rule: 'no_study_on:work_night' },
-  { name: 'Max 2 commitments', rule: 'max_concurrent_commitments:2' },
-  { name: 'Study only on off days', rule: 'study_only_on:off' },
-  { name: 'No study on work days', rule: 'no_study_on:work_day' },
+  { name: 'No study on night shifts', rule: 'no_study_on:work_night', icon: Moon },
+  { name: 'Max 2 commitments per day', rule: 'max_concurrent_commitments:2', icon: Target },
+  { name: 'Study only on off days', rule: 'study_only_on:off', icon: Coffee },
+  { name: 'No study on work days', rule: 'no_study_on:work_day', icon: Sun },
 ];
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const [currentStep, setCurrentStep] = useState(0);
+  const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // Cycle state
-    const [cycleName, setCycleName] = useState('My Rotation');
-  const [pattern, setPattern] = useState<CycleBlock[]>([
-    { label: 'work_day', duration: 10 },
-    { label: 'work_night', duration: 5 },
-    { label: 'off', duration: 10 },
-  ]);
-  const [selectedPreset, setSelectedPreset] = useState<string | null>('Mining Standard');
+  // Chat state
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [showQuickActions, setShowQuickActions] = useState(false);
 
-  // Anchor state
+  // Setup state
+  const [cycleName] = useState('My Rotation');
+  const [pattern, setPattern] = useState<CycleBlock[]>([]);
   const [anchorDate, setAnchorDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [anchorCycleDay, setAnchorCycleDay] = useState(1);
-
-  // Constraints state
-  const [selectedConstraints, setSelectedConstraints] = useState<string[]>([
-    'no_study_on:work_night',
-    'max_concurrent_commitments:2',
-  ]);
+  const [selectedConstraints, setSelectedConstraints] = useState<string[]>([]);
 
   const totalDays = pattern.reduce((sum, block) => sum + block.duration, 0);
 
-  const handlePresetSelect = (preset: typeof PRESET_CYCLES[0]) => {
-    setSelectedPreset(preset.name);
-    if (preset.pattern.length > 0) {
-      setPattern(preset.pattern);
-    }
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Initial greeting
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      addMessage('assistant', "Hey! I'm your Watchman assistant. Let's set up your rotation schedule in under 2 minutes. First, what type of shift rotation do you work?");
+      setStep(1);
+      setTimeout(() => setShowQuickActions(true), 500);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const addMessage = (role: 'assistant' | 'user', content: string) => {
+    setMessages(prev => [...prev, {
+      id: Date.now().toString(),
+      role,
+      content,
+      timestamp: new Date(),
+    }]);
   };
 
-  const handleAddBlock = () => {
-    setPattern([...pattern, { label: 'off', duration: 1 }]);
-    setSelectedPreset('Custom');
+  const handleSelectCycle = (preset: typeof PRESET_CYCLES[0]) => {
+    addMessage('user', `I work ${preset.name}`);
+    setPattern(preset.pattern);
+    setShowQuickActions(false);
+    
+    setTimeout(() => {
+      addMessage('assistant', `Perfect! ${preset.name} - ${preset.description}. Now I need to anchor your calendar. What date do you know your schedule for? And which day of the ${preset.pattern.reduce((s, b) => s + b.duration, 0)}-day cycle is it?`);
+      setStep(2);
+      setTimeout(() => setShowQuickActions(true), 500);
+    }, 600);
   };
 
-  const handleRemoveBlock = (index: number) => {
-    setPattern(pattern.filter((_, i) => i !== index));
-    setSelectedPreset('Custom');
-  };
-
-  const handleUpdateBlock = (index: number, field: 'label' | 'duration', value: any) => {
-    const updated = [...pattern];
-    updated[index] = { 
-      ...updated[index], 
-      [field]: field === 'duration' ? Math.max(1, parseInt(value) || 1) : value 
-    };
-    setPattern(updated);
-    setSelectedPreset('Custom');
+  const handleSetAnchor = () => {
+    addMessage('user', `${format(new Date(anchorDate), 'MMM d, yyyy')} is day ${anchorCycleDay} of my cycle`);
+    setShowQuickActions(false);
+    
+    setTimeout(() => {
+      addMessage('assistant', "Great! Finally, what rules should I always respect? These are hard constraints that will never be broken.");
+      setStep(3);
+      setTimeout(() => setShowQuickActions(true), 500);
+    }, 600);
   };
 
   const toggleConstraint = (rule: string) => {
@@ -149,6 +155,17 @@ export default function OnboardingPage() {
   };
 
   const handleComplete = async () => {
+    if (selectedConstraints.length > 0) {
+      addMessage('user', `Apply these rules: ${selectedConstraints.map(r => PRESET_CONSTRAINTS.find(c => c.rule === r)?.name).join(', ')}`);
+    } else {
+      addMessage('user', "No specific rules needed");
+    }
+    setShowQuickActions(false);
+
+    setTimeout(() => {
+      addMessage('assistant', "Perfect! Setting up your calendar now...");
+    }, 400);
+
     try {
       setLoading(true);
       setError(null);
@@ -180,399 +197,399 @@ export default function OnboardingPage() {
       const currentYear = new Date().getFullYear();
       await api.calendar.regenerate(currentYear);
 
-      // Move to complete step
-      setCurrentStep(4);
+      setTimeout(() => {
+        addMessage('assistant', "All done! Your calendar is ready. Welcome to Watchman! 🎉");
+        setStep(4);
+      }, 1000);
     } catch (err: any) {
       setError(err.message || 'Failed to complete setup');
+      addMessage('assistant', `Oops, something went wrong: ${err.message}. Let's try again.`);
     } finally {
       setLoading(false);
     }
   };
 
-  const canProceed = () => {
-    switch (currentStep) {
-      case 1: return pattern.length > 0 && totalDays > 0;
-      case 2: return anchorDate && anchorCycleDay >= 1 && anchorCycleDay <= totalDays;
-      case 3: return true;
-      default: return true;
-    }
+  const handleSendMessage = () => {
+    if (!inputValue.trim()) return;
+    addMessage('user', inputValue);
+    setInputValue('');
+    // For now, just acknowledge - in full version would parse intent
   };
 
-  const handleNext = () => {
-    if (currentStep === 3) {
-      handleComplete();
-    } else {
-      setCurrentStep(Math.min(currentStep + 1, STEPS.length - 1));
-    }
-  };
-
-  const handleBack = () => {
-    setCurrentStep(Math.max(currentStep - 1, 0));
-  };
+  // Preview calendar generation
+  const previewDays = pattern.length > 0 ? generatePreviewDays(pattern, anchorDate, anchorCycleDay) : [];
 
   return (
     <div className="min-h-screen bg-watchman-bg text-white flex flex-col">
+      {/* Decorative Background */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-watchman-accent/10 rounded-full blur-[150px]" />
+        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-watchman-purple/10 rounded-full blur-[150px]" />
+      </div>
+
       {/* Header */}
-      <header className="px-6 py-4 border-b border-white/5">
-        <div className="max-w-3xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
+      <header className="relative z-10 px-6 py-4 glass-strong border-b border-white/5">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
             <Logo size="md" />
-            <span className="text-xl font-semibold">Watchman</span>
+            <span className="text-xl font-bold tracking-tight">Watchman</span>
           </div>
           
-          {/* Progress */}
-          <div className="hidden sm:flex items-center gap-2">
-            {STEPS.slice(1, -1).map((step, index) => (
-              <div key={step.id} className="flex items-center">
-                <div
-                  className={cn(
-                    'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors',
-                    currentStep > index + 1
-                      ? 'bg-watchman-mint text-white'
-                      : currentStep === index + 1
-                      ? 'bg-watchman-accent text-white'
-                      : 'bg-white/10 text-watchman-muted'
-                  )}
-                >
-                  {currentStep > index + 1 ? (
-                    <CheckCircle className="w-4 h-4" />
-                  ) : (
-                    index + 1
-                  )}
-                </div>
-                {index < 2 && (
-                  <div
-                    className={cn(
-                      'w-12 h-0.5 mx-1',
-                      currentStep > index + 1 ? 'bg-watchman-mint' : 'bg-white/10'
-                    )}
-                  />
+          {/* Progress Dots */}
+          <div className="flex items-center gap-2">
+            {[1, 2, 3, 4].map((s) => (
+              <motion.div
+                key={s}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: s * 0.1 }}
+                className={cn(
+                  'w-2.5 h-2.5 rounded-full transition-all duration-300',
+                  step >= s 
+                    ? 'bg-watchman-accent shadow-lg shadow-watchman-accent/50' 
+                    : 'bg-white/20'
                 )}
-              </div>
+              />
             ))}
           </div>
         </div>
       </header>
 
-      {/* Content */}
-      <main className="flex-1 flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-2xl">
-          <AnimatePresence mode="wait">
-            {/* Step 0: Welcome */}
-            {currentStep === 0 && (
-              <StepContainer key="welcome">
-                <div className="text-center">
-                  <div className="w-20 h-20 rounded-full bg-watchman-accent/10 border border-watchman-accent/20 flex items-center justify-center mx-auto mb-6">
-                    <Sparkles className="w-10 h-10 text-watchman-accent" />
+      {/* Main Content */}
+      <main className="relative z-10 flex-1 flex max-w-6xl mx-auto w-full">
+        {/* Chat Panel */}
+        <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full p-6">
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto space-y-4 pb-4">
+            <AnimatePresence mode="popLayout">
+              {messages.map((message) => (
+                <motion.div
+                  key={message.id}
+                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                  className={cn(
+                    'flex gap-3',
+                    message.role === 'user' && 'flex-row-reverse'
+                  )}
+                >
+                  <div className={cn(
+                    'w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0',
+                    message.role === 'assistant' 
+                      ? 'bg-gradient-to-br from-watchman-accent to-watchman-purple shadow-lg shadow-watchman-accent/30' 
+                      : 'bg-white/10'
+                  )}>
+                    {message.role === 'assistant' ? (
+                      <Bot className="w-5 h-5 text-white" />
+                    ) : (
+                      <User className="w-5 h-5 text-white" />
+                    )}
                   </div>
-                  <h1 className="text-3xl font-bold mb-4">Welcome to Watchman</h1>
-                  <p className="text-watchman-muted mb-8 max-w-md mx-auto">
-                    Let&apos;s set up your rotation schedule. This will take about 2 minutes.
-                    You can always change these settings later.
-                  </p>
-                  <Button variant="primary" size="lg" onClick={handleNext} className="gap-2">
-                    Get Started
-                    <ArrowRight className="w-5 h-5" />
-                  </Button>
+                  <div className={cn(
+                    'max-w-[80%] px-5 py-3 rounded-2xl',
+                    message.role === 'assistant' 
+                      ? 'glass border border-white/10' 
+                      : 'bg-watchman-accent text-white'
+                  )}>
+                    <p className="text-sm leading-relaxed">{message.content}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            {/* Loading Indicator */}
+            {loading && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex gap-3"
+              >
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-watchman-accent to-watchman-purple flex items-center justify-center">
+                  <Bot className="w-5 h-5 text-white" />
                 </div>
-              </StepContainer>
+                <div className="glass px-5 py-4 rounded-2xl border border-white/10">
+                  <div className="flex gap-1.5">
+                    {[0, 1, 2].map((i) => (
+                      <motion.div
+                        key={i}
+                        className="w-2 h-2 bg-watchman-accent rounded-full"
+                        animate={{ y: [0, -6, 0] }}
+                        transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
             )}
 
-            {/* Step 1: Define Cycle */}
-            {currentStep === 1 && (
-              <StepContainer key="cycle">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-12 h-12 rounded-xl bg-watchman-accent/10 flex items-center justify-center">
-                    <Clock className="w-6 h-6 text-watchman-accent" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold">Define Your Rotation</h2>
-                    <p className="text-watchman-muted">How does your work schedule repeat?</p>
-                  </div>
-                </div>
+            <div ref={messagesEndRef} />
+          </div>
 
-                {/* Presets */}
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                  {PRESET_CYCLES.map((preset) => (
-                    <button
+          {/* Quick Actions */}
+          <AnimatePresence>
+            {showQuickActions && step === 1 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                className="space-y-3 pb-4"
+              >
+                <p className="text-xs text-watchman-muted uppercase tracking-wider px-1">Select your rotation</p>
+                <div className="grid gap-2">
+                  {PRESET_CYCLES.map((preset, i) => (
+                    <motion.button
                       key={preset.name}
-                      onClick={() => handlePresetSelect(preset)}
-                      className={cn(
-                        'p-4 rounded-xl border text-left transition-colors',
-                        selectedPreset === preset.name
-                          ? 'bg-watchman-accent/10 border-watchman-accent/30'
-                          : 'bg-watchman-surface border-white/5 hover:border-white/10'
-                      )}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.1 }}
+                      whileHover={{ scale: 1.02, x: 4 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleSelectCycle(preset)}
+                      className="flex items-center gap-4 p-4 glass rounded-2xl border border-white/5 hover:border-watchman-accent/30 transition-all group text-left"
                     >
-                      <p className="font-medium">{preset.name}</p>
-                      <p className="text-sm text-watchman-muted">{preset.description}</p>
-                    </button>
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-watchman-accent/20 to-watchman-purple/20 flex items-center justify-center group-hover:shadow-lg group-hover:shadow-watchman-accent/20 transition-shadow">
+                        <Clock className="w-6 h-6 text-watchman-accent" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold group-hover:text-watchman-accent transition-colors">{preset.name}</p>
+                        <p className="text-sm text-watchman-muted">{preset.description}</p>
+                      </div>
+                      <ArrowRight className="w-5 h-5 text-watchman-muted group-hover:text-watchman-accent transition-colors" />
+                    </motion.button>
                   ))}
                 </div>
-
-                {/* Pattern Builder */}
-                <Card>
-                  <CardContent className="py-4">
-                    <label className="block text-sm font-medium mb-3">Pattern Blocks</label>
-                    <div className="space-y-2">
-                      {pattern.map((block, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <select
-                            value={block.label}
-                            onChange={(e) => handleUpdateBlock(index, 'label', e.target.value)}
-                            className="flex-1 px-3 py-2 bg-watchman-bg border border-white/10 rounded-lg focus:border-watchman-accent focus:outline-none"
-                          >
-                            <option value="work_day">Day Shift</option>
-                            <option value="work_night">Night Shift</option>
-                            <option value="off">Off</option>
-                          </select>
-                          <input
-                            type="number"
-                            min="0"
-                            value={block.duration}
-                            onChange={(e) => handleUpdateBlock(index, 'duration', e.target.value)}
-                            className="w-20 px-3 py-2 bg-watchman-bg border border-white/10 rounded-lg focus:border-watchman-accent focus:outline-none text-center"
-                          />
-                          <span className="text-sm text-watchman-muted w-12">days</span>
-                          {pattern.length > 1 && (
-                            <button
-                              onClick={() => handleRemoveBlock(index)}
-                              className="p-2 text-watchman-muted hover:text-watchman-error transition-colors"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      onClick={handleAddBlock}
-                      className="flex items-center gap-2 mt-3 text-sm text-watchman-accent hover:underline"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Add Block
-                    </button>
-                    <div className="mt-4 p-3 bg-watchman-bg rounded-lg">
-                      <p className="text-sm">
-                        <span className="text-watchman-muted">Total cycle length: </span>
-                        <span className="font-semibold">{totalDays} days</span>
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </StepContainer>
+              </motion.div>
             )}
 
-            {/* Step 2: Set Anchor */}
-            {currentStep === 2 && (
-              <StepContainer key="anchor">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-12 h-12 rounded-xl bg-watchman-accent/10 flex items-center justify-center">
-                    <Calendar className="w-6 h-6 text-watchman-accent" />
-                  </div>
+            {showQuickActions && step === 2 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                className="space-y-4 pb-4"
+              >
+                <div className="glass rounded-2xl p-5 border border-white/10 space-y-4">
                   <div>
-                    <h2 className="text-2xl font-bold">Set Your Anchor</h2>
-                    <p className="text-watchman-muted">When does your rotation start?</p>
-                  </div>
-                </div>
-
-                <Card>
-                  <CardContent className="py-6 space-y-6">
-                    <div>
-                      <p className="text-watchman-muted mb-4">
-                        Pick any date you know your schedule for, and tell us which day 
-                        of the {totalDays}-day cycle it falls on.
-                      </p>
-                    </div>
-
-                    <Input
-                      label="Anchor Date"
+                    <label className="block text-xs text-watchman-muted uppercase tracking-wider mb-2">Anchor Date</label>
+                    <input
                       type="date"
                       value={anchorDate}
                       onChange={(e) => setAnchorDate(e.target.value)}
-                      helper="Choose a date you know your schedule for"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:border-watchman-accent focus:outline-none focus:ring-2 focus:ring-watchman-accent/20 transition-all"
                     />
-
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        What day of the cycle is {format(new Date(anchorDate), 'MMM d, yyyy')}?
-                      </label>
-                      <div className="flex items-center gap-4">
-                        <input
-                          type="range"
-                          min="1"
-                          max={totalDays}
-                          value={anchorCycleDay}
-                          onChange={(e) => setAnchorCycleDay(parseInt(e.target.value))}
-                          className="flex-1"
-                        />
-                        <div className="w-20 text-center">
-                          <span className="text-2xl font-bold text-watchman-accent">
-                            {anchorCycleDay}
-                          </span>
-                          <span className="text-watchman-muted text-sm"> / {totalDays}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Cycle Day Preview */}
-                    <div className="p-4 bg-watchman-bg rounded-xl">
-                      <p className="text-sm text-watchman-muted mb-2">On this day you are:</p>
-                      <CycleDayPreview 
-                        cycleDay={anchorCycleDay} 
-                        pattern={pattern} 
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              </StepContainer>
-            )}
-
-            {/* Step 3: Constraints */}
-            {currentStep === 3 && (
-              <StepContainer key="constraints">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-12 h-12 rounded-xl bg-watchman-error/10 flex items-center justify-center">
-                    <Target className="w-6 h-6 text-watchman-error" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold">Set Your Rules</h2>
-                    <p className="text-watchman-muted">What boundaries should the system respect?</p>
-                  </div>
-                </div>
-
-                <Card>
-                  <CardContent className="py-6">
-                    <p className="text-watchman-muted mb-4">
-                      These are hard rules that will never be broken. Select the ones that apply to you.
-                    </p>
-
-                    <div className="space-y-3">
-                      {PRESET_CONSTRAINTS.map((constraint) => (
-                        <button
-                          key={constraint.rule}
-                          onClick={() => toggleConstraint(constraint.rule)}
-                          className={cn(
-                            'w-full p-4 rounded-xl border text-left flex items-center gap-4 transition-colors',
-                            selectedConstraints.includes(constraint.rule)
-                              ? 'bg-watchman-error/10 border-watchman-error/30'
-                              : 'bg-watchman-surface border-white/5 hover:border-white/10'
-                          )}
-                        >
-                          <div
-                            className={cn(
-                              'w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors',
-                              selectedConstraints.includes(constraint.rule)
-                                ? 'border-watchman-error bg-watchman-error'
-                                : 'border-white/20'
-                            )}
-                          >
-                            {selectedConstraints.includes(constraint.rule) && (
-                              <CheckCircle className="w-4 h-4 text-white" />
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-medium">{constraint.name}</p>
-                            <p className="text-sm text-watchman-muted">{constraint.rule}</p>
-                          </div>
-                        </button>
-                      ))}
+                    <label className="block text-xs text-watchman-muted uppercase tracking-wider mb-2">
+                      Which day of the cycle? ({anchorCycleDay} of {totalDays})
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max={totalDays}
+                      value={anchorCycleDay}
+                      onChange={(e) => setAnchorCycleDay(parseInt(e.target.value))}
+                      className="w-full accent-watchman-accent"
+                    />
+                    <div className="flex justify-between text-xs text-watchman-muted mt-1">
+                      <span>Day 1</span>
+                      <span className="text-watchman-accent font-bold text-lg">{anchorCycleDay}</span>
+                      <span>Day {totalDays}</span>
                     </div>
-
-                    <p className="text-sm text-watchman-muted mt-4">
-                      You can add more constraints later in Settings.
-                    </p>
-                  </CardContent>
-                </Card>
-
-                {error && (
-                  <div className="mt-4 p-4 rounded-xl bg-watchman-error/10 border border-watchman-error/20">
-                    <p className="text-sm text-watchman-error">{error}</p>
                   </div>
-                )}
-              </StepContainer>
+                  <CycleDayPreview cycleDay={anchorCycleDay} pattern={pattern} />
+                </div>
+                <Button variant="gradient" className="w-full gap-2" onClick={handleSetAnchor}>
+                  <Calendar className="w-4 h-4" />
+                  Set Anchor
+                </Button>
+              </motion.div>
             )}
 
-            {/* Step 4: Complete */}
-            {currentStep === 4 && (
-              <StepContainer key="complete">
-                <div className="text-center">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: 'spring', duration: 0.5 }}
-                    className="w-20 h-20 rounded-full bg-watchman-mint/10 border border-watchman-mint/20 flex items-center justify-center mx-auto mb-6"
-                  >
-                    <CheckCircle className="w-10 h-10 text-watchman-mint" />
-                  </motion.div>
-                  <h1 className="text-3xl font-bold mb-4">You&apos;re All Set!</h1>
-                  <p className="text-watchman-muted mb-8 max-w-md mx-auto">
-                    Your calendar has been generated. You can now view your schedule,
-                    add commitments, and propose changes.
-                  </p>
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    onClick={() => router.push('/dashboard')}
-                    className="gap-2"
-                  >
-                    Go to Dashboard
-                    <ArrowRight className="w-5 h-5" />
-                  </Button>
+            {showQuickActions && step === 3 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                className="space-y-4 pb-4"
+              >
+                <div className="space-y-2">
+                  {PRESET_CONSTRAINTS.map((constraint, i) => (
+                    <motion.button
+                      key={constraint.rule}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                      onClick={() => toggleConstraint(constraint.rule)}
+                      className={cn(
+                        'w-full flex items-center gap-4 p-4 rounded-2xl border transition-all text-left',
+                        selectedConstraints.includes(constraint.rule)
+                          ? 'glass-strong border-watchman-accent/50 shadow-lg shadow-watchman-accent/10'
+                          : 'glass border-white/5 hover:border-white/10'
+                      )}
+                    >
+                      <div className={cn(
+                        'w-10 h-10 rounded-xl flex items-center justify-center transition-all',
+                        selectedConstraints.includes(constraint.rule)
+                          ? 'bg-watchman-accent shadow-lg shadow-watchman-accent/30'
+                          : 'bg-white/5'
+                      )}>
+                        <constraint.icon className={cn(
+                          'w-5 h-5',
+                          selectedConstraints.includes(constraint.rule) ? 'text-white' : 'text-watchman-muted'
+                        )} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium">{constraint.name}</p>
+                      </div>
+                      <div className={cn(
+                        'w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all',
+                        selectedConstraints.includes(constraint.rule)
+                          ? 'border-watchman-accent bg-watchman-accent'
+                          : 'border-white/20'
+                      )}>
+                        {selectedConstraints.includes(constraint.rule) && (
+                          <CheckCircle className="w-4 h-4 text-white" />
+                        )}
+                      </div>
+                    </motion.button>
+                  ))}
                 </div>
-              </StepContainer>
+                <Button 
+                  variant="gradient" 
+                  className="w-full gap-2" 
+                  onClick={handleComplete}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Setting up...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Complete Setup
+                    </>
+                  )}
+                </Button>
+              </motion.div>
+            )}
+
+            {step === 4 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="pb-4"
+              >
+                <Button 
+                  variant="gradient" 
+                  size="lg"
+                  className="w-full gap-2" 
+                  onClick={() => router.push('/dashboard')}
+                >
+                  <Zap className="w-5 h-5" />
+                  Go to Dashboard
+                </Button>
+              </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Navigation */}
-          {currentStep > 0 && currentStep < 4 && (
-            <div className="flex items-center justify-between mt-8">
-              <Button variant="ghost" onClick={handleBack} className="gap-2">
-                <ArrowLeft className="w-4 h-4" />
-                Back
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleNext}
-                disabled={!canProceed() || loading}
-                className="gap-2"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Setting up...
-                  </>
-                ) : currentStep === 3 ? (
-                  <>
-                    Complete Setup
-                    <CheckCircle className="w-4 h-4" />
-                  </>
-                ) : (
-                  <>
-                    Continue
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </Button>
-            </div>
-          )}
+          {/* Input */}
+          <div className="glass rounded-2xl border border-white/10 p-2 flex gap-2">
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+              placeholder="Type a message..."
+              className="flex-1 px-4 py-3 bg-transparent border-none focus:outline-none text-sm"
+            />
+            <Button variant="ghost" size="sm" onClick={handleSendMessage} className="px-3">
+              <Send className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
-      </main>
-    </div>
-  );
-}
 
-// Step Container with animation
-function StepContainer({ children }: { children: React.ReactNode }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      transition={{ duration: 0.3 }}
-    >
-      {children}
-    </motion.div>
+        {/* Preview Panel - Desktop Only */}
+        {pattern.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="hidden lg:block w-80 p-6 border-l border-white/5"
+          >
+            <div className="sticky top-6 space-y-4">
+              <div className="flex items-center gap-2 text-sm text-watchman-muted">
+                <Calendar className="w-4 h-4" />
+                <span>Calendar Preview</span>
+              </div>
+              
+              <div className="glass rounded-2xl p-4 border border-white/10">
+                <p className="text-xs text-watchman-muted mb-3">{format(new Date(), 'MMMM yyyy')}</p>
+                <div className="grid grid-cols-7 gap-1">
+                  {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+                    <div key={i} className="text-[10px] text-center text-watchman-muted/50">{d}</div>
+                  ))}
+                  {previewDays.slice(0, 35).map((day, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: i * 0.02 }}
+                      className={cn(
+                        'aspect-square rounded-md flex items-center justify-center',
+                        day.workType === 'work_day' && 'bg-amber-500/30',
+                        day.workType === 'work_night' && 'bg-indigo-500/30',
+                        day.workType === 'off' && 'bg-emerald-500/30',
+                      )}
+                    >
+                      <span className="text-[10px]">{day.date}</span>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs">
+                  <div className="w-3 h-3 rounded bg-amber-500" />
+                  <span className="text-watchman-muted">Day Shift</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <div className="w-3 h-3 rounded bg-indigo-500" />
+                  <span className="text-watchman-muted">Night Shift</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <div className="w-3 h-3 rounded bg-emerald-500" />
+                  <span className="text-watchman-muted">Off Day</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </main>
+
+      {/* Error Toast */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
+          >
+            <div className="glass-strong px-6 py-4 rounded-2xl border border-red-500/30 bg-red-500/10 flex items-center gap-3">
+              <Shield className="w-5 h-5 text-red-400" />
+              <p className="text-sm text-red-400">{error}</p>
+              <button onClick={() => setError(null)} className="p-1 hover:bg-white/10 rounded-lg">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -590,19 +607,56 @@ function CycleDayPreview({ cycleDay, pattern }: { cycleDay: number; pattern: Cyc
   }
 
   const config = {
-    work_day: { icon: Sun, label: 'Day Shift', color: 'text-work-day', bg: 'bg-work-day' },
-    work_night: { icon: Moon, label: 'Night Shift', color: 'text-work-night', bg: 'bg-work-night' },
-    off: { icon: Coffee, label: 'Off Day', color: 'text-work-off', bg: 'bg-work-off' },
+    work_day: { icon: Sun, label: 'Day Shift', color: 'text-amber-400', bg: 'bg-gradient-to-br from-amber-500 to-orange-600' },
+    work_night: { icon: Moon, label: 'Night Shift', color: 'text-indigo-400', bg: 'bg-gradient-to-br from-indigo-500 to-purple-600' },
+    off: { icon: Coffee, label: 'Off Day', color: 'text-emerald-400', bg: 'bg-gradient-to-br from-emerald-500 to-teal-600' },
   };
 
   const blockConfig = config[blockType];
 
   return (
-    <div className="flex items-center gap-3">
-      <div className={cn('w-10 h-10 rounded-full flex items-center justify-center', blockConfig.bg)}>
+    <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5">
+      <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shadow-lg', blockConfig.bg)}>
         <blockConfig.icon className="w-5 h-5 text-white" />
       </div>
-      <span className={cn('font-medium', blockConfig.color)}>{blockConfig.label}</span>
+      <div>
+        <p className="text-xs text-watchman-muted">On this day you are</p>
+        <p className={cn('font-semibold', blockConfig.color)}>{blockConfig.label}</p>
+      </div>
     </div>
   );
+}
+
+// Generate preview days
+function generatePreviewDays(pattern: CycleBlock[], anchorDate: string, anchorCycleDay: number) {
+  const days: { date: number; workType: 'work_day' | 'work_night' | 'off' }[] = [];
+  const startDate = new Date();
+  startDate.setDate(1); // Start of month
+  
+  const totalCycleDays = pattern.reduce((s, b) => s + b.duration, 0);
+  
+  for (let i = 0; i < 35; i++) {
+    const date = addDays(startDate, i);
+    const dayOfMonth = date.getDate();
+    
+    // Calculate cycle day for this date
+    const anchor = new Date(anchorDate);
+    const diff = Math.floor((date.getTime() - anchor.getTime()) / (1000 * 60 * 60 * 24));
+    let cycleDay = ((anchorCycleDay - 1 + diff) % totalCycleDays + totalCycleDays) % totalCycleDays + 1;
+    
+    // Find work type for this cycle day
+    let currentDay = 0;
+    let workType: 'work_day' | 'work_night' | 'off' = 'off';
+    for (const block of pattern) {
+      if (cycleDay <= currentDay + block.duration) {
+        workType = block.label;
+        break;
+      }
+      currentDay += block.duration;
+    }
+    
+    days.push({ date: dayOfMonth, workType });
+  }
+  
+  return days;
 }

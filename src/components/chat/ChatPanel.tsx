@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Loader2, Bot, User, Undo2, RotateCcw, CheckCircle, XCircle, AlertTriangle, Sparkles } from 'lucide-react'
+import { Send, Loader2, Bot, User, Undo2, CheckCircle, XCircle, AlertTriangle, Sparkles, Command } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
 
@@ -29,12 +29,10 @@ export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  // Load chat history on mount
   useEffect(() => {
     loadHistory()
   }, [])
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -59,7 +57,6 @@ export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
     setInput('')
     setIsLoading(true)
     
-    // Optimistically add user message
     const tempUserMessage: Message = {
       id: `temp-${Date.now()}`,
       role: 'user',
@@ -69,16 +66,14 @@ export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
     setMessages(prev => [...prev, tempUserMessage])
 
     try {
-      const response = await api.chat.sendMessage(userMessage, false) // Don't auto-execute
+      const response = await api.chat.sendMessage(userMessage, false)
       
-      // Update with real messages
       if (response.user_message) {
         setMessages(prev => prev.map(m => 
           m.id === tempUserMessage.id ? response.user_message : m
         ))
       }
       
-      // Add assistant response
       if (response.assistant_message) {
         const assistantMessage: Message = {
           ...response.assistant_message,
@@ -88,14 +83,12 @@ export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
         setMessages(prev => [...prev, assistantMessage])
       }
       
-      // If there's a proposal, set it for approval UI
       if (response.proposal) {
         setPendingProposal(response.proposal)
       }
       
     } catch (error) {
       console.error('Failed to send message:', error)
-      // Add error message
       setMessages(prev => [...prev, {
         id: `error-${Date.now()}`,
         role: 'assistant',
@@ -109,19 +102,18 @@ export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
 
   const approveProposal = async (proposalId: string) => {
     try {
-      // Execute the command from the proposal
       const proposal = pendingProposal
       if (proposal?.command) {
         const response = await api.chat.sendMessage(
           `Execute: ${JSON.stringify(proposal.command)}`,
-          true // Auto-execute
+          true
         )
         
         if (response.execution?.success) {
           setMessages(prev => [...prev, {
             id: `success-${Date.now()}`,
             role: 'assistant',
-            content: `✅ Done! ${proposal.command.explanation || 'Changes applied successfully.'}`,
+            content: `Done! ${proposal.command.explanation || 'Changes applied successfully.'}`,
             created_at: new Date().toISOString()
           }])
           onCalendarUpdate?.()
@@ -150,7 +142,7 @@ export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
         setMessages(prev => [...prev, {
           id: `undo-${Date.now()}`,
           role: 'assistant',
-          content: '↩️ Undone! The last change has been reverted.',
+          content: 'Undone! The last change has been reverted.',
           created_at: new Date().toISOString()
         }])
         onCalendarUpdate?.()
@@ -169,100 +161,120 @@ export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
 
   return (
     <div className={cn(
-      'flex flex-col h-full bg-watchman-surface rounded-2xl border border-white/5 overflow-hidden',
+      'flex flex-col h-full glass rounded-2xl border border-white/5 overflow-hidden',
       className
     )}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-watchman-accent to-watchman-mint flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-white" />
+      <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-watchman-accent to-watchman-purple flex items-center justify-center shadow-lg shadow-watchman-accent/20">
+              <Command className="w-5 h-5 text-white" />
+            </div>
+            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-watchman-success rounded-full border-2 border-watchman-surface" />
           </div>
           <div>
             <h2 className="text-sm font-semibold">Watchman Agent</h2>
-            <p className="text-xs text-watchman-muted">Tell me about your schedule</p>
+            <p className="text-xs text-watchman-muted">Talk naturally about your schedule</p>
           </div>
         </div>
-        <button 
+        <motion.button 
           onClick={handleUndo}
-          className="p-2 rounded-lg hover:bg-white/5 transition-colors text-watchman-muted hover:text-white"
+          className="p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all text-watchman-muted hover:text-white"
           title="Undo last change"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
         >
           <Undo2 className="w-4 h-4" />
-        </button>
+        </motion.button>
       </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
-          <div className="text-center py-8 text-watchman-muted">
-            <Sparkles className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p className="text-sm">Start by telling me about your work schedule.</p>
-            <p className="text-xs mt-2 opacity-70">
-              Try: "I work 5 days, 5 nights, 5 off. 12-hour shifts. Jan 1 2026 is my Day 4."
+          <motion.div 
+            className="text-center py-8"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-watchman-accent/10 to-watchman-purple/10 border border-white/5 flex items-center justify-center mx-auto mb-4">
+              <Sparkles className="w-8 h-8 text-watchman-accent" />
+            </div>
+            <p className="text-sm text-watchman-text-secondary mb-2">Start by telling me about your schedule</p>
+            <p className="text-xs text-watchman-muted max-w-[200px] mx-auto">
+              Try: "I work 5 days, 5 nights, 5 off. Jan 1 2026 is my Day 4."
             </p>
-          </div>
+          </motion.div>
         )}
         
         <AnimatePresence>
-          {messages.map((message) => (
+          {messages.map((message, index) => (
             <motion.div
               key={message.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0, y: 10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
               className={cn(
                 'flex gap-3',
                 message.role === 'user' ? 'justify-end' : 'justify-start'
               )}
             >
               {message.role !== 'user' && (
-                <div className="w-8 h-8 rounded-full bg-watchman-accent/20 flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-watchman-accent/20 to-watchman-purple/20 flex items-center justify-center flex-shrink-0 border border-white/5">
                   <Bot className="w-4 h-4 text-watchman-accent" />
                 </div>
               )}
               
               <div className={cn(
-                'max-w-[80%] rounded-2xl px-4 py-2.5',
+                'max-w-[85%] rounded-2xl px-4 py-3',
                 message.role === 'user' 
-                  ? 'bg-watchman-accent text-white rounded-br-sm' 
-                  : 'bg-white/5 text-watchman-text rounded-bl-sm'
+                  ? 'bg-watchman-accent text-white rounded-br-lg shadow-lg shadow-watchman-accent/20' 
+                  : 'glass border border-white/5 text-watchman-text rounded-bl-lg'
               )}>
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
                 
                 {/* Proposal approval buttons */}
                 {message.isProposal && message.proposal && pendingProposal?.id === message.proposal.id && (
-                  <div className="mt-3 pt-3 border-t border-white/10">
+                  <div className="mt-4 pt-3 border-t border-white/10">
                     {message.proposal.validation?.warnings?.length > 0 && (
-                      <div className="mb-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                        <div className="flex items-center gap-2 text-amber-400 text-xs">
-                          <AlertTriangle className="w-3 h-3" />
-                          {message.proposal.validation.warnings[0].message}
+                      <motion.div 
+                        className="mb-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20"
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                      >
+                        <div className="flex items-start gap-2 text-amber-400 text-xs">
+                          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                          <span>{message.proposal.validation.warnings[0].message}</span>
                         </div>
-                      </div>
+                      </motion.div>
                     )}
                     <div className="flex gap-2">
-                      <button
+                      <motion.button
                         onClick={() => approveProposal(message.proposal.id)}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-xs font-medium transition-colors"
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-watchman-success/20 hover:bg-watchman-success/30 text-watchman-success rounded-xl text-xs font-medium transition-colors border border-watchman-success/20"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                       >
-                        <CheckCircle className="w-3.5 h-3.5" />
+                        <CheckCircle className="w-4 h-4" />
                         Apply
-                      </button>
-                      <button
+                      </motion.button>
+                      <motion.button
                         onClick={rejectProposal}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs font-medium transition-colors"
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-medium transition-colors border border-red-500/20"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                       >
-                        <XCircle className="w-3.5 h-3.5" />
+                        <XCircle className="w-4 h-4" />
                         Decline
-                      </button>
+                      </motion.button>
                     </div>
                   </div>
                 )}
               </div>
               
               {message.role === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 border border-white/5">
                   <User className="w-4 h-4" />
                 </div>
               )}
@@ -270,17 +282,34 @@ export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
           ))}
         </AnimatePresence>
         
+        {/* Typing Indicator */}
         {isLoading && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
             className="flex gap-3"
           >
-            <div className="w-8 h-8 rounded-full bg-watchman-accent/20 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-watchman-accent/20 to-watchman-purple/20 flex items-center justify-center border border-white/5">
               <Bot className="w-4 h-4 text-watchman-accent" />
             </div>
-            <div className="bg-white/5 rounded-2xl rounded-bl-sm px-4 py-3">
-              <Loader2 className="w-4 h-4 animate-spin text-watchman-muted" />
+            <div className="glass border border-white/5 rounded-2xl rounded-bl-lg px-4 py-3">
+              <div className="flex gap-1.5">
+                <motion.div 
+                  className="w-2 h-2 bg-watchman-accent rounded-full"
+                  animate={{ y: [0, -4, 0] }}
+                  transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
+                />
+                <motion.div 
+                  className="w-2 h-2 bg-watchman-accent rounded-full"
+                  animate={{ y: [0, -4, 0] }}
+                  transition={{ duration: 0.6, repeat: Infinity, delay: 0.15 }}
+                />
+                <motion.div 
+                  className="w-2 h-2 bg-watchman-accent rounded-full"
+                  animate={{ y: [0, -4, 0] }}
+                  transition={{ duration: 0.6, repeat: Infinity, delay: 0.3 }}
+                />
+              </div>
             </div>
           </motion.div>
         )}
@@ -299,29 +328,31 @@ export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
               onKeyDown={handleKeyDown}
               placeholder="Tell me about your schedule..."
               rows={1}
-              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-watchman-text placeholder-watchman-muted focus:outline-none focus:ring-2 focus:ring-watchman-accent focus:border-transparent resize-none"
-              style={{ minHeight: '46px', maxHeight: '120px' }}
+              className="w-full px-4 py-3 glass border border-white/10 rounded-xl text-sm text-watchman-text placeholder-watchman-muted focus:outline-none focus:ring-2 focus:ring-watchman-accent focus:border-transparent resize-none transition-all"
+              style={{ minHeight: '48px', maxHeight: '120px' }}
             />
           </div>
-          <button
+          <motion.button
             type="submit"
             disabled={!input.trim() || isLoading}
             className={cn(
               'px-4 py-3 rounded-xl transition-all flex items-center justify-center',
               input.trim() && !isLoading
-                ? 'bg-watchman-accent hover:bg-watchman-accent/80 text-white'
-                : 'bg-white/5 text-watchman-muted cursor-not-allowed'
+                ? 'bg-watchman-accent hover:bg-watchman-accent-hover text-white shadow-lg shadow-watchman-accent/20'
+                : 'glass border border-white/10 text-watchman-muted cursor-not-allowed'
             )}
+            whileHover={input.trim() && !isLoading ? { scale: 1.05 } : {}}
+            whileTap={input.trim() && !isLoading ? { scale: 0.95 } : {}}
           >
             {isLoading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <Send className="w-5 h-5" />
             )}
-          </button>
+          </motion.button>
         </div>
-        <p className="text-xs text-watchman-muted mt-2 text-center">
-          Press Enter to send • Shift+Enter for new line
+        <p className="text-[10px] text-watchman-muted mt-2 text-center opacity-70">
+          Enter to send · Shift+Enter for new line
         </p>
       </form>
     </div>

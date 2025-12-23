@@ -5,6 +5,7 @@ import Image from 'next/image';
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  showText?: boolean;
 }
 
 const sizeMap = {
@@ -14,18 +15,25 @@ const sizeMap = {
   xl: 64,
 };
 
-export function Logo({ size = 'md', className = '' }: LogoProps) {
+export function Logo({ size = 'md', className = '', showText = false }: LogoProps) {
   const dimension = sizeMap[size];
   
   return (
-    <Image
-      src="/logo.png"
-      alt="Watchman"
-      width={dimension}
-      height={dimension}
-      className={`rounded-full ${className}`}
-      priority
-    />
+    <div className={`flex items-center gap-2 ${className}`}>
+      <Image
+        src="/watchman-logo.png"
+        alt="Watchman"
+        width={dimension}
+        height={dimension}
+        className="object-contain"
+        priority
+      />
+      {showText && (
+        <span className="font-bold text-watchman-text tracking-tight">
+          Watchman
+        </span>
+      )}
+    </div>
   );
 }
 
