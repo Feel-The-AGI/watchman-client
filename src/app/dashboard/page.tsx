@@ -47,6 +47,7 @@ export default function DashboardPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [initialYearSet, setInitialYearSet] = useState(false);
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   const [stats, setStats] = useState<CalendarStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,12 +68,16 @@ export default function DashboardPage() {
       setHasSetup(true);
 
       const activeCycle = cyclesResponse.find((c: any) => c.is_active) || cyclesResponse[0];
-      if (activeCycle?.anchor_date) {
+      
+      // Only set anchor year on FIRST load, not every navigation
+      if (!initialYearSet && activeCycle?.anchor_date) {
         const anchorYear = new Date(activeCycle.anchor_date).getFullYear();
-        if (anchorYear !== currentYear && anchorYear >= new Date().getFullYear()) {
+        if (anchorYear >= new Date().getFullYear()) {
           setCurrentYear(anchorYear);
-          return;
+          setInitialYearSet(true);
+          return; // Will refetch with correct year
         }
+        setInitialYearSet(true);
       }
 
       const calendarResponse = await api.calendar.getYear(currentYear);

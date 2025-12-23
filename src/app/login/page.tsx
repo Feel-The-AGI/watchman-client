@@ -35,12 +35,15 @@ export default function LoginPage() {
       }
 
       if (mode === 'signin') {
-        await signIn(email, password);
+        const { error } = await signIn(email, password);
+        if (error) throw error;
       } else {
-        await signUp(email, password, name);
+        const { error } = await signUp(email, password, name);
+        if (error) throw error;
       }
       
-      router.push('/dashboard');
+      // Small delay to let session establish, then redirect
+      setTimeout(() => router.push('/dashboard'), 100);
     } catch (err: any) {
       setError(err.message || 'Authentication failed');
     }
