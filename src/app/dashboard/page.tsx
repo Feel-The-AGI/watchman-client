@@ -69,21 +69,24 @@ export default function DashboardPage() {
 
       const activeCycle = cyclesResponse.find((c: any) => c.is_active) || cyclesResponse[0];
       
+      // Determine which year to fetch
+      let yearToFetch = currentYear;
+      
       // Only set anchor year on FIRST load, not every navigation
       if (!initialYearSet && activeCycle?.anchor_date) {
         const anchorYear = new Date(activeCycle.anchor_date).getFullYear();
-        if (anchorYear >= new Date().getFullYear()) {
+        if (anchorYear >= new Date().getFullYear() && anchorYear !== currentYear) {
           setCurrentYear(anchorYear);
-          setInitialYearSet(true);
-          return; // Will refetch with correct year
+          yearToFetch = anchorYear;
         }
         setInitialYearSet(true);
       }
 
-      const calendarResponse = await api.calendar.getYear(currentYear);
+      // Always fetch calendar data
+      const calendarResponse = await api.calendar.getYear(yearToFetch);
       setCalendarDays(calendarResponse || []);
 
-      const statsResponse = await api.stats.getSummary(currentYear);
+      const statsResponse = await api.stats.getSummary(yearToFetch);
       setStats(statsResponse || null);
     } catch (err: any) {
       console.error('Failed to fetch calendar:', err);
@@ -91,7 +94,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentYear]);
+  }, [currentYear, initialYearSet]);
 
   useEffect(() => {
     fetchCalendarData();
