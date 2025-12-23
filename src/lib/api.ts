@@ -217,6 +217,55 @@ class APIService {
       method: 'POST',
     }),
   }
+
+  // New overhaul endpoints
+  chat = {
+    sendMessage: (content: string, autoExecute: boolean = false) =>
+      this.request<any>('/api/chat/message', {
+        method: 'POST',
+        body: JSON.stringify({ content, auto_execute: autoExecute }),
+      }),
+    getHistory: (limit: number = 50) =>
+      this.request<any>(`/api/chat/history?limit=${limit}`),
+    clearHistory: () =>
+      this.request<any>('/api/chat/history', {
+        method: 'DELETE',
+      }),
+  }
+
+  commands = {
+    list: (limit: number = 50, status?: string) => {
+      let query = `?limit=${limit}`
+      if (status) query += `&status=${status}`
+      return this.request<any>(`/api/commands${query}`)
+    },
+    get: (id: string) => this.request<any>(`/api/commands/${id}`),
+    undo: (commandId?: string) =>
+      this.request<any>('/api/commands/undo', {
+        method: 'POST',
+        body: JSON.stringify({ command_id: commandId }),
+      }),
+    redo: (commandId?: string) =>
+      this.request<any>('/api/commands/redo', {
+        method: 'POST',
+        body: JSON.stringify({ command_id: commandId }),
+      }),
+  }
+
+  masterSettings = {
+    get: () => this.request<any>('/api/master-settings'),
+    update: (settings: any, expectedVersion?: number) =>
+      this.request<any>('/api/master-settings', {
+        method: 'PUT',
+        body: JSON.stringify({ settings, expected_version: expectedVersion }),
+      }),
+    updateSection: (section: string, value: any) =>
+      this.request<any>(`/api/master-settings/${section}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ value }),
+      }),
+    getSnapshot: () => this.request<any>('/api/master-settings/snapshot'),
+  }
 }
 
 export const api = new APIService()

@@ -18,6 +18,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { CalendarGrid, YearOverview, DayInspector, type CalendarDay } from '@/components/calendar';
+import { ChatPanel } from '@/components/chat';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { useAuth } from '@/hooks/useAuth';
@@ -221,7 +222,7 @@ export default function DashboardPage() {
 
       {/* Main Content */}
       {!loading && !error && (
-        <div className="grid lg:grid-cols-[1fr,340px] gap-6">
+        <div className="grid lg:grid-cols-[1fr,380px] gap-6">
           {/* Calendar */}
           <div>
             {viewMode === 'month' ? (
@@ -242,8 +243,14 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
+          {/* Sidebar - Chat + Inspector */}
+          <div className="space-y-4">
+            {/* Chat Panel - Always visible */}
+            <ChatPanel 
+              onCalendarUpdate={fetchCalendarData}
+              className="h-[400px]"
+            />
+
             {/* Day Inspector or Quick Stats */}
             <AnimatePresence mode="wait">
               {selectedDate ? (
@@ -319,18 +326,12 @@ export default function DashboardPage() {
                   )}
 
                   {/* Tip Card */}
-                  <Card className="mt-6">
-                    <CardContent className="pt-6">
-                      <p className="text-sm text-watchman-muted mb-3">
-                        <span className="font-medium text-white">Pro tip:</span> Click on any 
-                        day to see details and manage commitments.
+                  <Card className="mt-4">
+                    <CardContent className="pt-4">
+                      <p className="text-sm text-watchman-muted">
+                        <span className="font-medium text-white">Tip:</span> Click on any 
+                        day to see details, or chat with the agent above.
                       </p>
-                      <Link href="/dashboard/proposals">
-                        <Button variant="primary" size="sm" className="w-full gap-2">
-                          <Sparkles className="w-4 h-4" />
-                          Propose a Change
-                        </Button>
-                      </Link>
                     </CardContent>
                   </Card>
                 </motion.div>
