@@ -13,7 +13,9 @@ import {
   Sun,
   Moon,
   Coffee,
-  TrendingUp
+  TrendingUp,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { CalendarGrid, YearOverview, DayInspector, type CalendarDay } from '@/components/calendar';
 import { Button } from '@/components/ui/Button';
@@ -38,7 +40,7 @@ export default function DashboardPage() {
   const { profile } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [currentYear] = useState(new Date().getFullYear());
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   const [stats, setStats] = useState<CalendarStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,6 +60,17 @@ export default function DashboardPage() {
         return;
       }
       setHasSetup(true);
+
+      // If we're on the first load, use the cycle's anchor year
+      const activeCycle = cyclesResponse.find((c: any) => c.is_active) || cyclesResponse[0];
+      if (activeCycle?.anchor_date) {
+        const anchorYear = new Date(activeCycle.anchor_date).getFullYear();
+        // Only auto-set year if it's different and we haven't manually changed it
+        if (anchorYear !== currentYear && anchorYear >= new Date().getFullYear()) {
+          setCurrentYear(anchorYear);
+          return; // Will re-fetch with new year
+        }
+      }
 
       // Fetch calendar for current year
       // After unwrapping, this is the days array directly
@@ -118,13 +131,28 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* Header Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">
-            {currentYear} Calendar
-          </h1>
-          <p className="text-watchman-muted">
-            {profile?.name ? `${profile.name}'s schedule` : 'Your schedule overview'}
-          </p>
+        <div className="flex items-center gap-4">
+          {/* Year Navigation */}
+          <button
+            onClick={() => setCurrentYear(y => y - 1)}
+            className="p-2 rounded-lg hover:bg-white/5 transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold">
+              {currentYear} Calendar
+            </h1>
+            <p className="text-watchman-muted">
+              {profile?.name ? `${profile.name}'s schedule` : 'Your schedule overview'}
+            </p>
+          </div>
+          <button
+            onClick={() => setCurrentYear(y => y + 1)}
+            className="p-2 rounded-lg hover:bg-white/5 transition-colors"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
         </div>
 
         <div className="flex items-center gap-3">

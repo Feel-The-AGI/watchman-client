@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils';
 export interface CalendarDay {
   date: string;
   cycle_day: number;
-  work_type: 'day' | 'night' | 'off' | null;
+  work_type: 'work_day' | 'work_night' | 'off' | null;
   is_leave: boolean;
   commitments: {
     id: string;
@@ -41,13 +41,13 @@ interface CalendarGridProps {
 }
 
 const workTypeConfig = {
-  day: { 
+  work_day: { 
     bg: 'bg-work-day', 
     border: 'border-work-day/30',
     icon: Sun,
     label: 'Day Shift'
   },
-  night: { 
+  work_night: { 
     bg: 'bg-work-night', 
     border: 'border-work-night/30',
     icon: Moon,
@@ -315,8 +315,8 @@ export function YearOverview({ days, year, onSelectMonth }: YearOverviewProps) {
                   key={format(date, 'yyyy-MM-dd')}
                   className={cn(
                     'w-2 h-2 rounded-sm',
-                    workType === 'day' && 'bg-work-day',
-                    workType === 'night' && 'bg-work-night',
+                    workType === 'work_day' && 'bg-work-day',
+                    workType === 'work_night' && 'bg-work-night',
                     workType === 'off' && 'bg-work-off',
                     day?.is_leave && 'bg-watchman-mint',
                     !workType && !day?.is_leave && 'bg-white/10'
