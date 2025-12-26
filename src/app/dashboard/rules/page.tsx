@@ -488,14 +488,14 @@ export default function MasterSettingsPage() {
                   <div>
                     <p className="font-semibold">Day Shift</p>
                     <p className="text-xs text-watchman-muted">
-                      {calculateShiftDuration(settings.work.day_hours?.start, settings.work.day_hours?.end)} hours
+                      {calculateShiftDuration(settings.work?.day_hours?.start, settings.work?.day_hours?.end)} hours
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center justify-between text-lg">
-                  <span className="font-bold text-amber-400">{settings.work.day_hours?.start || '06:00'}</span>
+                  <span className="font-bold text-amber-400">{settings.work?.day_hours?.start || '06:00'}</span>
                   <span className="text-watchman-muted">→</span>
-                  <span className="font-bold text-amber-400">{settings.work.day_hours?.end || '18:00'}</span>
+                  <span className="font-bold text-amber-400">{settings.work?.day_hours?.end || '18:00'}</span>
                 </div>
               </motion.div>
 
@@ -514,14 +514,14 @@ export default function MasterSettingsPage() {
                   <div>
                     <p className="font-semibold">Night Shift</p>
                     <p className="text-xs text-watchman-muted">
-                      {calculateShiftDuration(settings.work.night_hours?.start, settings.work.night_hours?.end)} hours
+                      {calculateShiftDuration(settings.work?.night_hours?.start, settings.work?.night_hours?.end)} hours
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center justify-between text-lg">
-                  <span className="font-bold text-indigo-400">{settings.work.night_hours?.start || '18:00'}</span>
+                  <span className="font-bold text-indigo-400">{settings.work?.night_hours?.start || '18:00'}</span>
                   <span className="text-watchman-muted">→</span>
-                  <span className="font-bold text-indigo-400">{settings.work.night_hours?.end || '06:00'}</span>
+                  <span className="font-bold text-indigo-400">{settings.work?.night_hours?.end || '06:00'}</span>
                 </div>
               </motion.div>
             </div>
@@ -533,14 +533,14 @@ export default function MasterSettingsPage() {
                   <Coffee className="w-5 h-5 text-emerald-400" />
                   <span className="text-sm text-watchman-muted">Available hours on off days</span>
                 </div>
-                <span className="font-bold text-emerald-400">{settings.work.available_hours_on_off ?? 12}h</span>
+                <span className="font-bold text-emerald-400">{settings.work?.available_hours_on_off ?? 12}h</span>
               </div>
               <div className="p-4 glass rounded-xl border border-white/5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <BookOpen className="w-5 h-5 text-blue-400" />
                   <span className="text-sm text-watchman-muted">Available hours on work days</span>
                 </div>
-                <span className="font-bold text-blue-400">{settings.work.available_hours_on_work ?? 2}h</span>
+                <span className="font-bold text-blue-400">{settings.work?.available_hours_on_work ?? 2}h</span>
               </div>
             </div>
           </div>

@@ -111,6 +111,18 @@ const calculateShiftHours = (start?: string, end?: string): number => {
   }
 };
 
+// Safe date formatter that handles invalid dates
+const safeFormatDate = (dateStr: string | undefined, formatStr: string, fallback = 'N/A'): string => {
+  if (!dateStr) return fallback;
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return fallback;
+    return format(date, formatStr);
+  } catch {
+    return fallback;
+  }
+};
+
 export default function StatsPage() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [stats, setStats] = useState<YearStats | null>(null);
@@ -142,16 +154,18 @@ export default function StatsPage() {
         api.masterSettings.get().catch(() => null),
       ]);
 
-      // Handle work settings
-      if (settingsResponse?.settings?.work) {
-        setWorkSettings(settingsResponse.settings.work);
-      } else {
-        // Default 12-hour shifts
-        setWorkSettings({
-          day_hours: { start: '06:00', end: '18:00' },
-          night_hours: { start: '18:00', end: '06:00' },
-        });
-      }
+      // Handle work settings - deep merge with defaults
+      const work = settingsResponse?.settings?.work || {};
+      setWorkSettings({
+        day_hours: {
+          start: work.day_hours?.start || '06:00',
+          end: work.day_hours?.end || '18:00',
+        },
+        night_hours: {
+          start: work.night_hours?.start || '18:00',
+          end: work.night_hours?.end || '06:00',
+        },
+      });
 
       if (statsResponse) {
         // Map API response keys (API uses total_work_days, etc.) to our interface
@@ -217,8 +231,8 @@ export default function StatsPage() {
   // Calculate total work hours
   const totalWorkHours = useMemo(() => {
     if (!stats || !workSettings) return 0;
-    const dayShiftHours = calculateShiftHours(workSettings.day_hours.start, workSettings.day_hours.end);
-    const nightShiftHours = calculateShiftHours(workSettings.night_hours.start, workSettings.night_hours.end);
+    const dayShiftHours = calculateShiftHours(workSettings?.day_hours?.start, workSettings?.day_hours?.end);
+    const nightShiftHours = calculateShiftHours(workSettings?.night_hours?.start, workSettings?.night_hours?.end);
     return (stats.work_days * dayShiftHours) + (stats.work_nights * nightShiftHours);
   }, [stats, workSettings]);
 
@@ -236,19 +250,19 @@ export default function StatsPage() {
   const monthlyChartData = useMemo(() => {
     if (!stats?.monthly_breakdown) return [];
     return stats.monthly_breakdown.map(m => ({
-      month: format(new Date(m.month), 'MMM'),
-      'Day Shifts': m.work_days,
-      'Night Shifts': m.work_nights,
-      'Off Days': m.off_days,
-      'Study Hours': m.study_hours,
+      month: safeFormatDate(m.month, 'MMM', 'N/A'),
+      'Day Shifts': m.work_days || 0,
+      'Night Shifts': m.work_nights || 0,
+      'Off Days': m.off_days || 0,
+      'Study Hours': m.study_hours || 0,
     }));
   }, [stats]);
 
   const studyHoursData = useMemo(() => {
     if (!stats?.monthly_breakdown) return [];
     return stats.monthly_breakdown.map(m => ({
-      month: format(new Date(m.month), 'MMM'),
-      hours: m.study_hours,
+      month: safeFormatDate(m.month, 'MMM', 'N/A'),
+      hours: m.study_hours || 0,
     }));
   }, [stats]);
 
@@ -572,7 +586,7 @@ export default function StatsPage() {
                         )}
                         <div>
                           <p className="font-medium">
-                            {format(new Date(week.week_start), 'MMM d')} - {format(new Date(week.week_end), 'MMM d')}
+                            {safeFormatDate(week.week_start, 'MMM d')} - {safeFormatDate(week.week_end, 'MMM d')}
                           </p>
                           {week.is_overloaded && (
                             <p className="text-xs text-red-400">High workload</p>
@@ -580,7 +594,7 @@ export default function StatsPage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-2xl font-bold">{week.total_hours}h</p>
+                        <p className="text-2xl font-bold">{week.total_hours ?? 0}h</p>
                         <p className="text-xs text-watchman-muted">study</p>
                       </div>
                     </motion.div>
@@ -611,7 +625,7 @@ export default function StatsPage() {
                 <div className="space-y-4">
                   {stats.commitment_breakdown.map((commitment, i) => (
                     <motion.div
-                      key={commitment.id}
+                      key={commitment.id || `commitment-${i}`}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.8 + i * 0.05 }}
@@ -620,18 +634,18 @@ export default function StatsPage() {
                     >
                       <div className="flex items-center justify-between mb-3">
                         <div>
-                          <p className="font-semibold">{commitment.name}</p>
-                          <p className="text-xs text-watchman-muted capitalize">{commitment.type}</p>
+                          <p className="font-semibold">{commitment.name || 'Unnamed'}</p>
+                          <p className="text-xs text-watchman-muted capitalize">{commitment.type || 'other'}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-watchman-accent">{commitment.total_hours}h</p>
-                          <p className="text-xs text-watchman-muted">{commitment.sessions_count} sessions</p>
+                          <p className="font-bold text-watchman-accent">{commitment.total_hours ?? 0}h</p>
+                          <p className="text-xs text-watchman-muted">{commitment.sessions_count ?? 0} sessions</p>
                         </div>
                       </div>
                       <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                         <motion.div
                           initial={{ width: 0 }}
-                          animate={{ width: `${Math.min((commitment.total_hours / (stats.study_hours || 1)) * 100, 100)}%` }}
+                          animate={{ width: `${Math.min(((commitment.total_hours || 0) / (stats.study_hours || 1)) * 100, 100)}%` }}
                           transition={{ delay: 1, duration: 0.8, ease: 'easeOut' }}
                           className="h-full bg-gradient-to-r from-watchman-accent to-watchman-purple rounded-full"
                         />
