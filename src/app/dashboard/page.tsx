@@ -280,6 +280,7 @@ export default function DashboardPage() {
                       setViewMode('month');
                       setSelectedDate(month);
                     }}
+                    userTier={profile?.tier as 'free' | 'pro' | 'admin' || 'free'}
                   />
                 </div>
               )}

@@ -401,9 +401,10 @@ interface YearOverviewProps {
   days: CalendarDay[];
   year: number;
   onSelectMonth: (month: Date) => void;
+  userTier?: 'free' | 'pro' | 'admin';
 }
 
-export function YearOverview({ days, year, onSelectMonth }: YearOverviewProps) {
+export function YearOverview({ days, year, onSelectMonth, userTier = 'free' }: YearOverviewProps) {
   const daysMap = useMemo(() => {
     const map = new Map<string, CalendarDay>();
     days.forEach((day) => {
@@ -435,64 +436,118 @@ export function YearOverview({ days, year, onSelectMonth }: YearOverviewProps) {
     });
   }, [year, daysMap]);
 
+  // Free users can only see first 6 months
+  const FREE_MONTH_LIMIT = 6;
+  const isFreeTier = userTier === 'free';
+
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      {months.map(({ month, days, stats }, index) => (
-        <motion.button
-          key={format(month, 'yyyy-MM')}
-          onClick={() => onSelectMonth(month)}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: index * 0.05 }}
-          whileHover={{ scale: 1.02, y: -4 }}
-          whileTap={{ scale: 0.98 }}
-          className="p-4 glass rounded-2xl border border-white/5 hover:border-watchman-accent/30 transition-all duration-300 text-left group"
-        >
-          <h3 className="text-sm font-semibold mb-3 group-hover:text-watchman-accent transition-colors">
-            {format(month, 'MMMM')}
-          </h3>
-          <div className="grid grid-cols-7 gap-0.5">
-            {days.map(({ date, day }) => {
-              const workType = day?.work_type;
-              return (
-                <div
-                  key={format(date, 'yyyy-MM-dd')}
-                  className={cn(
-                    'w-2.5 h-2.5 rounded-sm transition-transform group-hover:scale-110',
-                    workType === 'work_day' && 'bg-amber-500 shadow-sm shadow-amber-500/30',
-                    workType === 'work_night' && 'bg-indigo-500 shadow-sm shadow-indigo-500/30',
-                    workType === 'off' && 'bg-emerald-500 shadow-sm shadow-emerald-500/30',
-                    day?.is_leave && 'bg-teal-500 shadow-sm shadow-teal-500/30',
-                    !workType && !day?.is_leave && 'bg-white/10'
-                  )}
-                />
-              );
-            })}
-          </div>
+      {months.map(({ month, days, stats }, index) => {
+        const isLocked = isFreeTier && index >= FREE_MONTH_LIMIT;
 
-          {/* Enhanced Mini Stats */}
-          <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-3 text-[10px]">
-            <span className="flex items-center gap-1 text-amber-400">
-              <Sun className="w-3 h-3" />
-              {stats.dayShifts} days
-            </span>
-            <span className="flex items-center gap-1 text-indigo-400">
-              <Moon className="w-3 h-3" />
-              {stats.nightShifts} nights
-            </span>
-            <span className="flex items-center gap-1 text-emerald-400">
-              <Coffee className="w-3 h-3" />
-              {stats.offDays} off
-            </span>
-            {stats.leaveDays > 0 && (
-              <span className="flex items-center gap-1 text-teal-400">
-                <Plane className="w-3 h-3" />
-                {stats.leaveDays} leave
+        if (isLocked) {
+          return (
+            <motion.div
+              key={format(month, 'yyyy-MM')}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+              className="relative p-4 glass rounded-2xl border border-white/5 overflow-hidden"
+            >
+              {/* Blurred content */}
+              <div className="blur-sm pointer-events-none select-none">
+                <h3 className="text-sm font-semibold mb-3 text-watchman-muted">
+                  {format(month, 'MMMM')}
+                </h3>
+                <div className="grid grid-cols-7 gap-0.5">
+                  {days.slice(0, 28).map(({ date }) => (
+                    <div
+                      key={format(date, 'yyyy-MM-dd')}
+                      className="w-2.5 h-2.5 rounded-sm bg-white/10"
+                    />
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-3 text-[10px] opacity-50">
+                  <span className="flex items-center gap-1 text-watchman-muted">
+                    <Sun className="w-3 h-3" />
+                    -- days
+                  </span>
+                  <span className="flex items-center gap-1 text-watchman-muted">
+                    <Moon className="w-3 h-3" />
+                    -- nights
+                  </span>
+                </div>
+              </div>
+
+              {/* Lock overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-watchman-bg/95 via-watchman-bg/70 to-transparent flex flex-col items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-watchman-accent/20 to-watchman-purple/20 flex items-center justify-center mb-2 border border-white/10">
+                  <Sparkles className="w-5 h-5 text-watchman-accent" />
+                </div>
+                <p className="text-xs font-medium text-white mb-1">Upgrade to Pro</p>
+                <p className="text-[10px] text-watchman-muted">View full year</p>
+              </div>
+            </motion.div>
+          );
+        }
+
+        return (
+          <motion.button
+            key={format(month, 'yyyy-MM')}
+            onClick={() => onSelectMonth(month)}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.05 }}
+            whileHover={{ scale: 1.02, y: -4 }}
+            whileTap={{ scale: 0.98 }}
+            className="p-4 glass rounded-2xl border border-white/5 hover:border-watchman-accent/30 transition-all duration-300 text-left group"
+          >
+            <h3 className="text-sm font-semibold mb-3 group-hover:text-watchman-accent transition-colors">
+              {format(month, 'MMMM')}
+            </h3>
+            <div className="grid grid-cols-7 gap-0.5">
+              {days.map(({ date, day }) => {
+                const workType = day?.work_type;
+                return (
+                  <div
+                    key={format(date, 'yyyy-MM-dd')}
+                    className={cn(
+                      'w-2.5 h-2.5 rounded-sm transition-transform group-hover:scale-110',
+                      workType === 'work_day' && 'bg-amber-500 shadow-sm shadow-amber-500/30',
+                      workType === 'work_night' && 'bg-indigo-500 shadow-sm shadow-indigo-500/30',
+                      workType === 'off' && 'bg-emerald-500 shadow-sm shadow-emerald-500/30',
+                      day?.is_leave && 'bg-teal-500 shadow-sm shadow-teal-500/30',
+                      !workType && !day?.is_leave && 'bg-white/10'
+                    )}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Enhanced Mini Stats */}
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-3 text-[10px]">
+              <span className="flex items-center gap-1 text-amber-400">
+                <Sun className="w-3 h-3" />
+                {stats.dayShifts} days
               </span>
-            )}
-          </div>
-        </motion.button>
-      ))}
+              <span className="flex items-center gap-1 text-indigo-400">
+                <Moon className="w-3 h-3" />
+                {stats.nightShifts} nights
+              </span>
+              <span className="flex items-center gap-1 text-emerald-400">
+                <Coffee className="w-3 h-3" />
+                {stats.offDays} off
+              </span>
+              {stats.leaveDays > 0 && (
+                <span className="flex items-center gap-1 text-teal-400">
+                  <Plane className="w-3 h-3" />
+                  {stats.leaveDays} leave
+                </span>
+              )}
+            </div>
+          </motion.button>
+        );
+      })}
     </div>
   );
 }
