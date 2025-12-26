@@ -59,6 +59,11 @@ interface YearStats {
   commitment_breakdown: CommitmentStats[];
 }
 
+interface WorkSettings {
+  day_hours: { start: string; end: string };
+  night_hours: { start: string; end: string };
+}
+
 interface MonthlyStats {
   month: string;
   work_days: number;
@@ -92,9 +97,19 @@ const COLORS = {
   accent: '#3B82F6',
 };
 
+// Calculate hours between two time strings (e.g., "06:00" to "18:00")
+const calculateShiftHours = (start: string, end: string): number => {
+  const [startH] = start.split(':').map(Number);
+  const [endH] = end.split(':').map(Number);
+  let hours = endH - startH;
+  if (hours <= 0) hours += 24; // Handle overnight shifts
+  return hours;
+};
+
 export default function StatsPage() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [stats, setStats] = useState<YearStats | null>(null);
+  const [workSettings, setWorkSettings] = useState<WorkSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -115,21 +130,49 @@ export default function StatsPage() {
       setLoading(true);
       setError(null);
       setAnimateStats(false);
-      const response = await api.stats.getDetailed(year);
-      if (response) {
-        // Ensure all required properties have defaults
+
+      // Fetch stats and work settings in parallel
+      const [statsResponse, settingsResponse] = await Promise.all([
+        api.stats.getDetailed(year),
+        api.masterSettings.get().catch(() => null),
+      ]);
+
+      // Handle work settings
+      if (settingsResponse?.settings?.work) {
+        setWorkSettings(settingsResponse.settings.work);
+      } else {
+        // Default 12-hour shifts
+        setWorkSettings({
+          day_hours: { start: '06:00', end: '18:00' },
+          night_hours: { start: '18:00', end: '06:00' },
+        });
+      }
+
+      if (statsResponse) {
+        // Map API response keys (API uses total_work_days, etc.) to our interface
         setStats({
-          year: response.year || year,
-          total_days: response.total_days || 0,
-          work_days: response.work_days || 0,
-          work_nights: response.work_nights || 0,
-          off_days: response.off_days || 0,
-          leave_days: response.leave_days || 0,
-          study_hours: response.study_hours || 0,
-          commitment_count: response.commitment_count || 0,
-          monthly_breakdown: response.monthly_breakdown || [],
-          peak_weeks: response.peak_weeks || [],
-          commitment_breakdown: response.commitment_breakdown || [],
+          year: statsResponse.year || year,
+          total_days: statsResponse.total_days || 0,
+          work_days: statsResponse.total_work_days ?? statsResponse.work_days ?? 0,
+          work_nights: statsResponse.total_work_nights ?? statsResponse.work_nights ?? 0,
+          off_days: statsResponse.total_off_days ?? statsResponse.off_days ?? 0,
+          leave_days: statsResponse.total_leave_days ?? statsResponse.leave_days ?? 0,
+          study_hours: statsResponse.total_study_hours ?? statsResponse.study_hours ?? 0,
+          commitment_count: statsResponse.commitment_count || 0,
+          monthly_breakdown: statsResponse.monthly_breakdown || [],
+          peak_weeks: (statsResponse.peak_weeks || []).map((week: any) => {
+            // peak_weeks can be strings (week keys) or objects
+            if (typeof week === 'string') {
+              return {
+                week_start: week,
+                week_end: week,
+                total_hours: 0,
+                is_overloaded: false
+              };
+            }
+            return week;
+          }),
+          commitment_breakdown: statsResponse.commitment_breakdown || [],
         });
       } else {
         // Empty data is okay - just show empty state
@@ -165,6 +208,14 @@ export default function StatsPage() {
       setExporting(false);
     }
   };
+
+  // Calculate total work hours
+  const totalWorkHours = useMemo(() => {
+    if (!stats || !workSettings) return 0;
+    const dayShiftHours = calculateShiftHours(workSettings.day_hours.start, workSettings.day_hours.end);
+    const nightShiftHours = calculateShiftHours(workSettings.night_hours.start, workSettings.night_hours.end);
+    return (stats.work_days * dayShiftHours) + (stats.work_nights * nightShiftHours);
+  }, [stats, workSettings]);
 
   // Chart data transformations
   const pieData = useMemo(() => {
@@ -302,9 +353,10 @@ export default function StatsPage() {
       {!loading && stats && (
         <>
           {/* Summary Cards - Bento Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
             {[
               { icon: Calendar, label: 'Total Days', value: stats.total_days, color: 'from-watchman-accent to-watchman-purple', glow: 'shadow-watchman-accent/30' },
+              { icon: Clock, label: 'Work Hours', value: totalWorkHours, suffix: 'h', color: 'from-rose-500 to-pink-600', glow: 'shadow-rose-500/30' },
               { icon: Sun, label: 'Day Shifts', value: stats.work_days, color: 'from-amber-500 to-orange-600', glow: 'shadow-amber-500/30' },
               { icon: Moon, label: 'Night Shifts', value: stats.work_nights, color: 'from-indigo-500 to-purple-600', glow: 'shadow-indigo-500/30' },
               { icon: Coffee, label: 'Off Days', value: stats.off_days, color: 'from-emerald-500 to-teal-600', glow: 'shadow-emerald-500/30' },
@@ -605,6 +657,7 @@ export default function StatsPage() {
             <div className="flex flex-wrap items-center justify-center gap-12 text-center">
               {[
                 { value: stats.work_days + stats.work_nights, label: 'Total Work Days', color: 'text-watchman-accent' },
+                { value: totalWorkHours, label: 'Total Work Hours', suffix: 'h', color: 'text-rose-400' },
                 { value: stats.off_days + stats.leave_days, label: 'Total Rest Days', color: 'text-emerald-400' },
                 { value: stats.study_hours, label: 'Study Hours', suffix: 'h', color: 'text-blue-400' },
                 { value: stats.commitment_count, label: 'Active Commitments', color: 'text-purple-400' },

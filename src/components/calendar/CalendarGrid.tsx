@@ -184,11 +184,12 @@ export function CalendarGrid({
           <div
             key={day}
             className={cn(
-              'px-2 py-4 text-center text-xs font-semibold uppercase tracking-wider',
+              'px-1 sm:px-2 py-2 sm:py-4 text-center text-[10px] sm:text-xs font-semibold uppercase tracking-wider',
               i >= 5 ? 'text-watchman-muted/60' : 'text-watchman-muted'
             )}
           >
-            {day}
+            <span className="hidden sm:inline">{day}</span>
+            <span className="sm:hidden">{day.charAt(0)}</span>
           </div>
         ))}
       </div>
@@ -244,10 +245,10 @@ export function CalendarGrid({
               >
                 <div className="h-full flex flex-col relative">
                   {/* Date Number */}
-                  <div className="flex items-center justify-between px-1">
+                  <div className="flex items-center justify-between px-0.5 sm:px-1">
                     <span
                       className={cn(
-                        'text-sm font-medium transition-colors',
+                        'text-[10px] sm:text-sm font-medium transition-colors',
                         today && 'text-watchman-accent font-bold',
                         !inCurrentMonth && 'text-watchman-muted/50',
                         isSelected && 'text-watchman-accent'
@@ -256,10 +257,10 @@ export function CalendarGrid({
                       {format(day, 'd')}
                     </span>
                     {calendarDay?.cycle_day && calendarDay?.work_type && inCurrentMonth && (
-                      <span className="text-[9px] font-medium text-watchman-muted/70 bg-white/5 px-1.5 py-0.5 rounded">
-                        {calendarDay.work_type === 'off' 
-                          ? 'OFF' 
-                          : calendarDay.work_type === 'work_night' 
+                      <span className="hidden sm:inline text-[9px] font-medium text-watchman-muted/70 bg-white/5 px-1.5 py-0.5 rounded">
+                        {calendarDay.work_type === 'off'
+                          ? 'OFF'
+                          : calendarDay.work_type === 'work_night'
                             ? `N${((calendarDay.cycle_day - 1) % 5) + 1}`
                             : `D${((calendarDay.cycle_day - 1) % 5) + 1}`
                         }
@@ -268,30 +269,30 @@ export function CalendarGrid({
                   </div>
 
                   {/* Work Type Indicator */}
-                  <div className="flex-1 flex flex-col justify-center items-center gap-1.5 py-1">
+                  <div className="flex-1 flex flex-col justify-center items-center gap-0.5 sm:gap-1.5 py-0.5 sm:py-1">
                     {workConfig && inCurrentMonth && (
                       <motion.div
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                         className={cn(
-                          'w-8 h-8 rounded-xl flex items-center justify-center shadow-lg',
+                          'w-5 h-5 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg',
                           workConfig.bg,
                           workConfig.glow,
                           isPreview && 'opacity-60 ring-2 ring-dashed ring-white/30'
                         )}
                       >
-                        <workConfig.icon className="w-4 h-4 text-white" />
+                        <workConfig.icon className="w-2.5 h-2.5 sm:w-4 sm:h-4 text-white" />
                       </motion.div>
                     )}
 
                     {isLeave && inCurrentMonth && (
-                      <motion.div 
+                      <motion.div
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
-                        className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-lg shadow-teal-500/30"
+                        className="w-5 h-5 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-lg shadow-teal-500/30"
                       >
-                        <Plane className="w-4 h-4 text-white" />
+                        <Plane className="w-2.5 h-2.5 sm:w-4 sm:h-4 text-white" />
                       </motion.div>
                     )}
 
@@ -358,32 +359,32 @@ export function CalendarGrid({
       </AnimatePresence>
 
       {/* Legend */}
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 border-t border-white/5 text-xs bg-white/[0.02]">
-        <div className="flex items-center gap-2 group cursor-default">
-          <div className="w-5 h-5 rounded-lg bg-amber-500 shadow-md shadow-amber-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
-            <Sun className="w-3 h-3 text-white" />
+      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 sm:gap-x-6 gap-y-2 px-3 sm:px-6 py-3 sm:py-4 border-t border-white/5 text-[10px] sm:text-xs bg-white/[0.02]">
+        <div className="flex items-center gap-1.5 sm:gap-2 group cursor-default">
+          <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-md sm:rounded-lg bg-amber-500 shadow-md shadow-amber-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <Sun className="w-2 h-2 sm:w-3 sm:h-3 text-white" />
           </div>
-          <span className="text-watchman-muted group-hover:text-white transition-colors">Day Shift</span>
+          <span className="text-watchman-muted group-hover:text-white transition-colors">Day</span>
         </div>
-        <div className="flex items-center gap-2 group cursor-default">
-          <div className="w-5 h-5 rounded-lg bg-indigo-500 shadow-md shadow-indigo-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
-            <Moon className="w-3 h-3 text-white" />
+        <div className="flex items-center gap-1.5 sm:gap-2 group cursor-default">
+          <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-md sm:rounded-lg bg-indigo-500 shadow-md shadow-indigo-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <Moon className="w-2 h-2 sm:w-3 sm:h-3 text-white" />
           </div>
-          <span className="text-watchman-muted group-hover:text-white transition-colors">Night Shift</span>
+          <span className="text-watchman-muted group-hover:text-white transition-colors">Night</span>
         </div>
-        <div className="flex items-center gap-2 group cursor-default">
-          <div className="w-5 h-5 rounded-lg bg-emerald-500 shadow-md shadow-emerald-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
-            <Coffee className="w-3 h-3 text-white" />
+        <div className="flex items-center gap-1.5 sm:gap-2 group cursor-default">
+          <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-md sm:rounded-lg bg-emerald-500 shadow-md shadow-emerald-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <Coffee className="w-2 h-2 sm:w-3 sm:h-3 text-white" />
           </div>
           <span className="text-watchman-muted group-hover:text-white transition-colors">Off</span>
         </div>
-        <div className="flex items-center gap-2 group cursor-default">
-          <div className="w-5 h-5 rounded-lg bg-gradient-to-br from-teal-400 to-teal-600 shadow-md shadow-teal-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
-            <Plane className="w-3 h-3 text-white" />
+        <div className="flex items-center gap-1.5 sm:gap-2 group cursor-default">
+          <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-md sm:rounded-lg bg-gradient-to-br from-teal-400 to-teal-600 shadow-md shadow-teal-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <Plane className="w-2 h-2 sm:w-3 sm:h-3 text-white" />
           </div>
           <span className="text-watchman-muted group-hover:text-white transition-colors">Leave</span>
         </div>
-        <div className="flex items-center gap-2 group cursor-default">
+        <div className="hidden sm:flex items-center gap-2 group cursor-default">
           <div className="flex gap-0.5">
             <div className="w-2 h-2 rounded-full bg-watchman-accent shadow-sm shadow-watchman-accent/50" />
             <div className="w-2 h-2 rounded-full bg-watchman-accent shadow-sm shadow-watchman-accent/50" />
@@ -424,13 +425,19 @@ export function YearOverview({ days, year, onSelectMonth }: YearOverviewProps) {
         day = addDays(day, 1);
       }
 
-      return { month: monthStart, days: daysInMonth };
+      // Calculate stats for this month
+      const dayShifts = daysInMonth.filter(d => d.day?.work_type === 'work_day').length;
+      const nightShifts = daysInMonth.filter(d => d.day?.work_type === 'work_night').length;
+      const offDays = daysInMonth.filter(d => d.day?.work_type === 'off').length;
+      const leaveDays = daysInMonth.filter(d => d.day?.is_leave).length;
+
+      return { month: monthStart, days: daysInMonth, stats: { dayShifts, nightShifts, offDays, leaveDays } };
     });
   }, [year, daysMap]);
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      {months.map(({ month, days }, index) => (
+      {months.map(({ month, days, stats }, index) => (
         <motion.button
           key={format(month, 'yyyy-MM')}
           onClick={() => onSelectMonth(month)}
@@ -439,9 +446,9 @@ export function YearOverview({ days, year, onSelectMonth }: YearOverviewProps) {
           transition={{ delay: index * 0.05 }}
           whileHover={{ scale: 1.02, y: -4 }}
           whileTap={{ scale: 0.98 }}
-          className="p-5 glass rounded-2xl border border-white/5 hover:border-watchman-accent/30 transition-all duration-300 text-left group"
+          className="p-4 glass rounded-2xl border border-white/5 hover:border-watchman-accent/30 transition-all duration-300 text-left group"
         >
-          <h3 className="text-sm font-semibold mb-4 group-hover:text-watchman-accent transition-colors">
+          <h3 className="text-sm font-semibold mb-3 group-hover:text-watchman-accent transition-colors">
             {format(month, 'MMMM')}
           </h3>
           <div className="grid grid-cols-7 gap-0.5">
@@ -462,13 +469,27 @@ export function YearOverview({ days, year, onSelectMonth }: YearOverviewProps) {
               );
             })}
           </div>
-          
-          {/* Mini Stats */}
-          <div className="flex gap-3 mt-4 text-[10px] text-watchman-muted">
-            <span className="flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-emerald-400" />
-              {days.filter(d => d.day?.work_type === 'off').length} off
+
+          {/* Enhanced Mini Stats */}
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-3 text-[10px]">
+            <span className="flex items-center gap-1 text-amber-400">
+              <Sun className="w-3 h-3" />
+              {stats.dayShifts} days
             </span>
+            <span className="flex items-center gap-1 text-indigo-400">
+              <Moon className="w-3 h-3" />
+              {stats.nightShifts} nights
+            </span>
+            <span className="flex items-center gap-1 text-emerald-400">
+              <Coffee className="w-3 h-3" />
+              {stats.offDays} off
+            </span>
+            {stats.leaveDays > 0 && (
+              <span className="flex items-center gap-1 text-teal-400">
+                <Plane className="w-3 h-3" />
+                {stats.leaveDays} leave
+              </span>
+            )}
           </div>
         </motion.button>
       ))}

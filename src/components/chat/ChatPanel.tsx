@@ -30,7 +30,9 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
   const [pendingProposal, setPendingProposal] = useState<any>(null)
   const [historyLimitReached, setHistoryLimitReached] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false)
 
   // Message limit based on tier
   const messageLimit = userTier === 'pro' ? 500 : 50
@@ -39,9 +41,22 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
     loadHistory()
   }, [])
 
+  // Scroll within container only, not the whole page
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    if (messagesContainerRef.current && messages.length > 0) {
+      const container = messagesContainerRef.current
+      // Only animate scroll after initial load
+      if (initialLoadComplete) {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: 'smooth'
+        })
+      } else {
+        // Instant scroll on initial load (no animation)
+        container.scrollTop = container.scrollHeight
+      }
+    }
+  }, [messages, initialLoadComplete])
 
   const loadHistory = async () => {
     try {
@@ -53,8 +68,11 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
           setHistoryLimitReached(true)
         }
       }
+      // Mark initial load as complete after a small delay to ensure scroll happens first
+      setTimeout(() => setInitialLoadComplete(true), 100)
     } catch (error) {
       console.error('Failed to load chat history:', error)
+      setInitialLoadComplete(true)
     }
   }
 
@@ -217,43 +235,43 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       className
     )}>
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between px-3 sm:px-5 py-3 sm:py-4 border-b border-white/5">
+        <div className="flex items-center gap-2 sm:gap-3">
           <div className="relative">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-watchman-accent to-watchman-purple flex items-center justify-center shadow-lg shadow-watchman-accent/20">
-              <Command className="w-5 h-5 text-white" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-watchman-accent to-watchman-purple flex items-center justify-center shadow-lg shadow-watchman-accent/20">
+              <Command className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
-            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-watchman-success rounded-full border-2 border-watchman-surface" />
+            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-watchman-success rounded-full border-2 border-watchman-surface" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold">Watchman Agent</h2>
-            <p className="text-xs text-watchman-muted">Talk naturally about your schedule</p>
+            <h2 className="text-xs sm:text-sm font-semibold">Watchman Agent</h2>
+            <p className="text-[10px] sm:text-xs text-watchman-muted hidden sm:block">Talk naturally about your schedule</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <motion.button 
+          <motion.button
             onClick={handleUndo}
-            className="p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all text-watchman-muted hover:text-white"
+            className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all text-watchman-muted hover:text-white"
             title="Undo last change"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            <Undo2 className="w-4 h-4" />
+            <Undo2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </motion.button>
-          <motion.button 
+          <motion.button
             onClick={handleRedo}
-            className="p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all text-watchman-muted hover:text-white"
+            className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all text-watchman-muted hover:text-white"
             title="Redo last undone change"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            <Redo2 className="w-4 h-4" />
+            <Redo2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </motion.button>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth">
         {messages.length === 0 && (
           <motion.div 
             className="text-center py-8"
@@ -400,7 +418,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       )}
 
       {/* Input */}
-      <form onSubmit={sendMessage} className="p-4 border-t border-white/5">
+      <form onSubmit={sendMessage} className="p-3 sm:p-4 border-t border-white/5">
         <div className="flex gap-2">
           <div className="flex-1 relative">
             <textarea
@@ -410,15 +428,15 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
               onKeyDown={handleKeyDown}
               placeholder="Tell me about your schedule..."
               rows={1}
-              className="w-full px-4 py-3 glass border border-white/10 rounded-xl text-sm text-watchman-text placeholder-watchman-muted focus:outline-none focus:ring-2 focus:ring-watchman-accent focus:border-transparent resize-none transition-all"
-              style={{ minHeight: '48px', maxHeight: '120px' }}
+              className="w-full px-3 sm:px-4 py-2.5 sm:py-3 glass border border-white/10 rounded-xl text-xs sm:text-sm text-watchman-text placeholder-watchman-muted focus:outline-none focus:ring-2 focus:ring-watchman-accent focus:border-transparent resize-none transition-all"
+              style={{ minHeight: '44px', maxHeight: '120px' }}
             />
           </div>
           <motion.button
             type="submit"
             disabled={!input.trim() || isLoading}
             className={cn(
-              'px-4 py-3 rounded-xl transition-all flex items-center justify-center',
+              'px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all flex items-center justify-center',
               input.trim() && !isLoading
                 ? 'bg-watchman-accent hover:bg-watchman-accent-hover text-white shadow-lg shadow-watchman-accent/20'
                 : 'glass border border-white/10 text-watchman-muted cursor-not-allowed'
@@ -427,13 +445,13 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
             whileTap={input.trim() && !isLoading ? { scale: 0.95 } : {}}
           >
             {isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
             ) : (
-              <Send className="w-5 h-5" />
+              <Send className="w-4 h-4 sm:w-5 sm:h-5" />
             )}
           </motion.button>
         </div>
-        <p className="text-[10px] text-watchman-muted mt-2 text-center opacity-70">
+        <p className="text-[9px] sm:text-[10px] text-watchman-muted mt-1.5 sm:mt-2 text-center opacity-70 hidden sm:block">
           Enter to send · Shift+Enter for new line
         </p>
       </form>

@@ -99,6 +99,14 @@ export default function MasterSettingsPage() {
   const [editAnchorDate, setEditAnchorDate] = useState(settings.cycle.anchor_date || '');
   const [editAnchorDay, setEditAnchorDay] = useState(settings.cycle.anchor_cycle_day);
 
+  // Work hours editing state
+  const [editDayStart, setEditDayStart] = useState(settings.work.day_hours.start);
+  const [editDayEnd, setEditDayEnd] = useState(settings.work.day_hours.end);
+  const [editNightStart, setEditNightStart] = useState(settings.work.night_hours.start);
+  const [editNightEnd, setEditNightEnd] = useState(settings.work.night_hours.end);
+  const [editOffHours, setEditOffHours] = useState(settings.work.available_hours_on_off);
+  const [editWorkHours, setEditWorkHours] = useState(settings.work.available_hours_on_work);
+
   useEffect(() => {
     fetchSettings();
   }, []);
@@ -168,6 +176,38 @@ export default function MasterSettingsPage() {
       },
     };
     saveSettings(newSettings);
+  };
+
+  const handleSaveWorkHours = () => {
+    const newSettings = {
+      ...settings,
+      work: {
+        day_hours: { start: editDayStart, end: editDayEnd },
+        night_hours: { start: editNightStart, end: editNightEnd },
+        available_hours_on_off: editOffHours,
+        available_hours_on_work: editWorkHours,
+      },
+    };
+    saveSettings(newSettings);
+  };
+
+  const openWorkHoursEditor = () => {
+    setEditDayStart(settings.work.day_hours.start);
+    setEditDayEnd(settings.work.day_hours.end);
+    setEditNightStart(settings.work.night_hours.start);
+    setEditNightEnd(settings.work.night_hours.end);
+    setEditOffHours(settings.work.available_hours_on_off);
+    setEditWorkHours(settings.work.available_hours_on_work);
+    setEditingSection('work');
+  };
+
+  // Calculate shift durations for display
+  const calculateShiftDuration = (start: string, end: string) => {
+    const [startH] = start.split(':').map(Number);
+    const [endH] = end.split(':').map(Number);
+    let hours = endH - startH;
+    if (hours <= 0) hours += 24;
+    return hours;
   };
 
   const handleRegenerateCalendar = async () => {
@@ -385,6 +425,112 @@ export default function MasterSettingsPage() {
         </div>
       </motion.div>
 
+      {/* Work Hours Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        className="glass rounded-3xl border border-white/10 overflow-hidden"
+      >
+        <div className="p-6 border-b border-white/5 bg-gradient-to-r from-amber-500/10 to-transparent">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                <Clock className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Work Hours</h2>
+                <p className="text-sm text-watchman-muted">
+                  Your shift times and available study hours
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={openWorkHoursEditor}
+              className="gap-2"
+            >
+              <Edit2 className="w-4 h-4" />
+              Edit
+            </Button>
+          </div>
+        </div>
+
+        <div className="p-6">
+          <div className="grid sm:grid-cols-2 gap-6">
+            {/* Day Shift Hours */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              whileHover={{ scale: 1.02, y: -2 }}
+              className="p-5 glass rounded-2xl border border-white/5 cursor-default group"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30 transition-transform group-hover:scale-110">
+                  <Sun className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold">Day Shift</p>
+                  <p className="text-xs text-watchman-muted">
+                    {calculateShiftDuration(settings.work.day_hours.start, settings.work.day_hours.end)} hours
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-lg">
+                <span className="font-bold text-amber-400">{settings.work.day_hours.start}</span>
+                <span className="text-watchman-muted">→</span>
+                <span className="font-bold text-amber-400">{settings.work.day_hours.end}</span>
+              </div>
+            </motion.div>
+
+            {/* Night Shift Hours */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.05 }}
+              whileHover={{ scale: 1.02, y: -2 }}
+              className="p-5 glass rounded-2xl border border-white/5 cursor-default group"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 transition-transform group-hover:scale-110">
+                  <Moon className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold">Night Shift</p>
+                  <p className="text-xs text-watchman-muted">
+                    {calculateShiftDuration(settings.work.night_hours.start, settings.work.night_hours.end)} hours
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-lg">
+                <span className="font-bold text-indigo-400">{settings.work.night_hours.start}</span>
+                <span className="text-watchman-muted">→</span>
+                <span className="font-bold text-indigo-400">{settings.work.night_hours.end}</span>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Available Study Hours */}
+          <div className="mt-6 grid sm:grid-cols-2 gap-4">
+            <div className="p-4 glass rounded-xl border border-white/5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Coffee className="w-5 h-5 text-emerald-400" />
+                <span className="text-sm text-watchman-muted">Available hours on off days</span>
+              </div>
+              <span className="font-bold text-emerald-400">{settings.work.available_hours_on_off}h</span>
+            </div>
+            <div className="p-4 glass rounded-xl border border-white/5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <BookOpen className="w-5 h-5 text-blue-400" />
+                <span className="text-sm text-watchman-muted">Available hours on work days</span>
+              </div>
+              <span className="font-bold text-blue-400">{settings.work.available_hours_on_work}h</span>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Grid of Settings Cards */}
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Constraints Section */}
@@ -587,9 +733,9 @@ export default function MasterSettingsPage() {
                       />
                       <span className="text-sm text-watchman-muted w-12">days</span>
                       {editPattern.length > 1 && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => setEditPattern(editPattern.filter((_, i) => i !== index))}
                         >
                           <X className="w-4 h-4" />
@@ -637,6 +783,115 @@ export default function MasterSettingsPage() {
               <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
                 <Button variant="ghost" onClick={() => setEditingSection(null)}>Cancel</Button>
                 <Button variant="gradient" onClick={handleSaveCycle} disabled={saving} className="gap-2">
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
+
+      {/* Work Hours Edit Modal */}
+      <AnimatePresence>
+        {editingSection === 'work' && (
+          <Modal isOpen onClose={() => setEditingSection(null)} title="Edit Work Hours">
+            <div className="space-y-6">
+              {/* Day Shift Hours */}
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                    <Sun className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="font-semibold">Day Shift Hours</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Start Time"
+                    type="time"
+                    value={editDayStart}
+                    onChange={(e) => setEditDayStart(e.target.value)}
+                  />
+                  <Input
+                    label="End Time"
+                    type="time"
+                    value={editDayEnd}
+                    onChange={(e) => setEditDayEnd(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Night Shift Hours */}
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                    <Moon className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="font-semibold">Night Shift Hours</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Start Time"
+                    type="time"
+                    value={editNightStart}
+                    onChange={(e) => setEditNightStart(e.target.value)}
+                  />
+                  <Input
+                    label="End Time"
+                    type="time"
+                    value={editNightEnd}
+                    onChange={(e) => setEditNightEnd(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Available Study Hours */}
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                    <BookOpen className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="font-semibold">Available Study Hours</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-watchman-muted mb-2">On Off Days</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max="24"
+                        value={editOffHours}
+                        onChange={(e) => setEditOffHours(Math.min(24, Math.max(0, parseInt(e.target.value) || 0)))}
+                        className="flex-1 px-4 py-3 glass border border-white/10 rounded-xl focus:border-watchman-accent focus:outline-none text-center"
+                      />
+                      <span className="text-watchman-muted">hours</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-watchman-muted mb-2">On Work Days</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max="12"
+                        value={editWorkHours}
+                        onChange={(e) => setEditWorkHours(Math.min(12, Math.max(0, parseInt(e.target.value) || 0)))}
+                        className="flex-1 px-4 py-3 glass border border-white/10 rounded-xl focus:border-watchman-accent focus:outline-none text-center"
+                      />
+                      <span className="text-watchman-muted">hours</span>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-watchman-muted mt-2">
+                  This determines how many hours you can dedicate to study/commitments on different day types.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
+                <Button variant="ghost" onClick={() => setEditingSection(null)}>Cancel</Button>
+                <Button variant="gradient" onClick={handleSaveWorkHours} disabled={saving} className="gap-2">
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Save Changes
                 </Button>

@@ -149,65 +149,40 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          {/* Year Navigation */}
-          <motion.button
-            onClick={() => setCurrentYear(y => y - 1)}
-            className="p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </motion.button>
-          
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              <span className="text-gradient">{currentYear}</span> Calendar
-            </h1>
-            <p className="text-watchman-text-secondary text-sm">
-              {profile?.name ? `${profile.name}'s schedule` : 'Your schedule overview'}
-            </p>
-          </div>
-          
-          <motion.button
-            onClick={() => setCurrentYear(y => y + 1)}
-            className="p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <ChevronRight className="w-5 h-5" />
-          </motion.button>
-        </div>
+      <div className="flex flex-col gap-4">
+        {/* Top row: Year navigation and title */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-4">
+            {/* Year Navigation */}
+            <motion.button
+              onClick={() => setCurrentYear(y => y - 1)}
+              className="p-2 sm:p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+            </motion.button>
 
-        <div className="flex items-center gap-3">
-          {/* View Mode Toggle */}
-          <div className="flex items-center glass rounded-xl p-1 border border-white/5">
-            <button
-              onClick={() => setViewMode('month')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                viewMode === 'month'
-                  ? 'bg-watchman-accent text-white shadow-lg shadow-watchman-accent/30'
-                  : 'text-watchman-muted hover:text-white'
-              }`}
+            <div className="text-center sm:text-left">
+              <h1 className="text-lg sm:text-2xl font-bold tracking-tight">
+                <span className="text-gradient">{currentYear}</span> <span className="hidden sm:inline">Calendar</span>
+              </h1>
+              <p className="text-watchman-text-secondary text-xs sm:text-sm hidden sm:block">
+                {profile?.name ? `${profile.name}'s schedule` : 'Your schedule overview'}
+              </p>
+            </div>
+
+            <motion.button
+              onClick={() => setCurrentYear(y => y + 1)}
+              className="p-2 sm:p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
-              <CalendarIcon className="w-4 h-4" />
-              Month
-            </button>
-            <button
-              onClick={() => setViewMode('year')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                viewMode === 'year'
-                  ? 'bg-watchman-accent text-white shadow-lg shadow-watchman-accent/30'
-                  : 'text-watchman-muted hover:text-white'
-              }`}
-            >
-              <Grid3X3 className="w-4 h-4" />
-              Year
-            </button>
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+            </motion.button>
           </div>
 
-          {/* Refresh Button */}
+          {/* Refresh Button - always visible on the right */}
           <Button
             variant="glass"
             size="sm"
@@ -218,6 +193,34 @@ export default function DashboardPage() {
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">Refresh</span>
           </Button>
+        </div>
+
+        {/* Bottom row: View Mode Toggle - full width on mobile */}
+        <div className="flex items-center justify-center sm:justify-start">
+          <div className="flex items-center glass rounded-xl p-1 border border-white/5 w-full sm:w-auto">
+            <button
+              onClick={() => setViewMode('month')}
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 ${
+                viewMode === 'month'
+                  ? 'bg-watchman-accent text-white shadow-lg shadow-watchman-accent/30'
+                  : 'text-watchman-muted hover:text-white'
+              }`}
+            >
+              <CalendarIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              Month
+            </button>
+            <button
+              onClick={() => setViewMode('year')}
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 ${
+                viewMode === 'year'
+                  ? 'bg-watchman-accent text-white shadow-lg shadow-watchman-accent/30'
+                  : 'text-watchman-muted hover:text-white'
+              }`}
+            >
+              <Grid3X3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              Year
+            </button>
+          </div>
         </div>
       </div>
 
