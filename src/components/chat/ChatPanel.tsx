@@ -19,15 +19,21 @@ interface Message {
 interface ChatPanelProps {
   onCalendarUpdate?: () => void
   className?: string
+  autoExecute?: boolean  // If false, shows approval popup for commands
+  userTier?: 'free' | 'pro'
 }
 
-export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
+export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, userTier = 'free' }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [pendingProposal, setPendingProposal] = useState<any>(null)
+  const [historyLimitReached, setHistoryLimitReached] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Message limit based on tier
+  const messageLimit = userTier === 'pro' ? 500 : 50
 
   useEffect(() => {
     loadHistory()
@@ -39,9 +45,13 @@ export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
 
   const loadHistory = async () => {
     try {
-      const response = await api.chat.getHistory(50)
+      const response = await api.chat.getHistory(messageLimit)
       if (response.messages) {
         setMessages(response.messages.reverse())
+        // Check if we've hit the limit (for free users)
+        if (userTier === 'free' && response.messages.length >= messageLimit) {
+          setHistoryLimitReached(true)
+        }
       }
     } catch (error) {
       console.error('Failed to load chat history:', error)
@@ -66,7 +76,7 @@ export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
     setMessages(prev => [...prev, tempUserMessage])
 
     try {
-      const response = await api.chat.sendMessage(userMessage, true) // auto_execute=true
+      const response = await api.chat.sendMessage(userMessage, autoExecute)
       
       if (response.user_message) {
         setMessages(prev => prev.map(m => 
@@ -83,11 +93,13 @@ export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
         setMessages(prev => [...prev, assistantMessage])
       }
       
-      // Refresh calendar if a command was executed
-      if (response.execution?.success || response.is_command) {
+      // Refresh calendar if a command was actually executed (not just proposed)
+      if (response.execution?.success) {
+        // Small delay to ensure database write completes
+        await new Promise(resolve => setTimeout(resolve, 500))
         onCalendarUpdate?.()
       }
-      
+
       if (response.proposal) {
         setPendingProposal(response.proposal)
       }
@@ -109,24 +121,42 @@ export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
     try {
       const proposal = pendingProposal
       if (proposal?.command) {
-        const response = await api.chat.sendMessage(
-          `Execute: ${JSON.stringify(proposal.command)}`,
-          true
-        )
-        
-        if (response.execution?.success) {
+        // Use the direct command execution endpoint
+        const result = await api.commands.execute({
+          action: proposal.command.action,
+          payload: proposal.command.payload,
+          explanation: proposal.command.explanation
+        })
+
+        if (result.success) {
           setMessages(prev => [...prev, {
             id: `success-${Date.now()}`,
             role: 'assistant',
             content: `Done! ${proposal.command.explanation || 'Changes applied successfully.'}`,
             created_at: new Date().toISOString()
           }])
+          // Small delay to ensure database write completes
+          await new Promise(resolve => setTimeout(resolve, 500))
           onCalendarUpdate?.()
+        } else {
+          setMessages(prev => [...prev, {
+            id: `error-${Date.now()}`,
+            role: 'assistant',
+            content: `There was an issue: ${result.error || 'Unknown error'}`,
+            created_at: new Date().toISOString()
+          }])
         }
       }
       setPendingProposal(null)
     } catch (error) {
       console.error('Failed to approve proposal:', error)
+      setMessages(prev => [...prev, {
+        id: `error-${Date.now()}`,
+        role: 'assistant',
+        content: 'Sorry, I had trouble applying that change. Please try again.',
+        created_at: new Date().toISOString()
+      }])
+      setPendingProposal(null)
     }
   }
 
@@ -349,6 +379,25 @@ export function ChatPanel({ onCalendarUpdate, className }: ChatPanelProps) {
         
         <div ref={messagesEndRef} />
       </div>
+
+      {/* History Limit Notice for Free Users */}
+      {historyLimitReached && userTier === 'free' && (
+        <motion.div
+          className="mx-4 mb-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="flex items-start gap-2 text-amber-400 text-xs">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <div>
+              <span className="font-medium">Context limit reached.</span>
+              <span className="text-amber-400/80"> You can keep chatting, but the agent may lose older context. </span>
+              <span className="text-watchman-accent hover:underline cursor-pointer">Upgrade to Pro</span>
+              <span className="text-amber-400/80"> for unlimited history.</span>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Input */}
       <form onSubmit={sendMessage} className="p-4 border-t border-white/5">

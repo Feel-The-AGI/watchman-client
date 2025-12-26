@@ -104,11 +104,11 @@ class APIService {
 
   calendar = {
     getDays: (startDate: string, endDate: string) =>
-      this.request<any>(`/api/calendar?start_date=${startDate}&end_date=${endDate}`),
-    getYear: (year: number) => this.request<any>(`/api/calendar/year/${year}`),
+      this.request<any>(`/api/calendar?start_date=${startDate}&end_date=${endDate}&_t=${Date.now()}`),
+    getYear: (year: number) => this.request<any>(`/api/calendar/year/${year}?_t=${Date.now()}`),
     getMonth: (year: number, month: number) =>
-      this.request<any>(`/api/calendar/month/${year}/${month}`),
-    getDay: (date: string) => this.request<any>(`/api/calendar/day/${date}`),
+      this.request<any>(`/api/calendar/month/${year}/${month}?_t=${Date.now()}`),
+    getDay: (date: string) => this.request<any>(`/api/calendar/day/${date}?_t=${Date.now()}`),
     regenerate: (year: number) => this.request<any>('/api/calendar/generate', {
       method: 'POST',
       body: JSON.stringify({ year, regenerate: true }),
@@ -125,12 +125,12 @@ class APIService {
 
   stats = {
     getSummary: (year?: number) => {
-      const query = year ? `?year=${year}` : ''
+      const query = year ? `?year=${year}&_t=${Date.now()}` : `?_t=${Date.now()}`
       return this.request<any>(`/api/stats/summary${query}`)
     },
-    getDetailed: (year: number) => this.request<any>(`/api/stats/year/${year}`),
+    getDetailed: (year: number) => this.request<any>(`/api/stats/year/${year}?_t=${Date.now()}`),
     getMonthly: (year: number, month: number) =>
-      this.request<any>(`/api/stats/month/${year}/${month}`),
+      this.request<any>(`/api/stats/month/${year}/${month}?_t=${Date.now()}`),
     getCommitments: () => this.request<any>('/api/stats/commitments'),
     getDashboard: () => this.request<any>('/api/stats/dashboard'),
     export: (year: number, format: 'csv' | 'pdf') =>
@@ -197,6 +197,11 @@ class APIService {
       return this.request<any>(`/api/commands${query}`)
     },
     get: (id: string) => this.request<any>(`/api/commands/${id}`),
+    execute: (command: { action: string; payload: any; explanation?: string }) =>
+      this.request<any>('/api/commands/execute', {
+        method: 'POST',
+        body: JSON.stringify(command),
+      }),
     undo: (commandId?: string) =>
       this.request<any>('/api/commands/undo', {
         method: 'POST',

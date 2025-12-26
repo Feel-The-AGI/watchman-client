@@ -291,9 +291,11 @@ export default function DashboardPage() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
             >
-              <ChatPanel 
+              <ChatPanel
                 onCalendarUpdate={fetchCalendarData}
                 className="h-[420px]"
+                autoExecute={false}
+                userTier={profile?.tier as 'free' | 'pro' || 'free'}
               />
             </motion.div>
 
