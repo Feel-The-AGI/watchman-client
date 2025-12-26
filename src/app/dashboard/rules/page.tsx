@@ -118,6 +118,7 @@ export default function MasterSettingsPage() {
       const response = await api.masterSettings.get();
       if (response?.settings) {
         // Deep merge to handle null/undefined nested objects
+        const work = response.settings.work || {};
         const merged: MasterSettings = {
           cycle: {
             ...defaultSettings.cycle,
@@ -125,8 +126,16 @@ export default function MasterSettingsPage() {
             pattern: response.settings.cycle?.pattern || defaultSettings.cycle.pattern,
           },
           work: {
-            ...defaultSettings.work,
-            ...(response.settings.work || {}),
+            day_hours: {
+              start: work.day_hours?.start || defaultSettings.work.day_hours.start,
+              end: work.day_hours?.end || defaultSettings.work.day_hours.end,
+            },
+            night_hours: {
+              start: work.night_hours?.start || defaultSettings.work.night_hours.start,
+              end: work.night_hours?.end || defaultSettings.work.night_hours.end,
+            },
+            available_hours_on_off: work.available_hours_on_off ?? defaultSettings.work.available_hours_on_off,
+            available_hours_on_work: work.available_hours_on_work ?? defaultSettings.work.available_hours_on_work,
           },
           constraints: response.settings.constraints || defaultSettings.constraints,
           commitments: response.settings.commitments || defaultSettings.commitments,
@@ -192,22 +201,27 @@ export default function MasterSettingsPage() {
   };
 
   const openWorkHoursEditor = () => {
-    setEditDayStart(settings.work.day_hours.start);
-    setEditDayEnd(settings.work.day_hours.end);
-    setEditNightStart(settings.work.night_hours.start);
-    setEditNightEnd(settings.work.night_hours.end);
-    setEditOffHours(settings.work.available_hours_on_off);
-    setEditWorkHours(settings.work.available_hours_on_work);
+    setEditDayStart(settings.work?.day_hours?.start || '06:00');
+    setEditDayEnd(settings.work?.day_hours?.end || '18:00');
+    setEditNightStart(settings.work?.night_hours?.start || '18:00');
+    setEditNightEnd(settings.work?.night_hours?.end || '06:00');
+    setEditOffHours(settings.work?.available_hours_on_off ?? 12);
+    setEditWorkHours(settings.work?.available_hours_on_work ?? 2);
     setEditingSection('work');
   };
 
   // Calculate shift durations for display
-  const calculateShiftDuration = (start: string, end: string) => {
-    const [startH] = start.split(':').map(Number);
-    const [endH] = end.split(':').map(Number);
-    let hours = endH - startH;
-    if (hours <= 0) hours += 24;
-    return hours;
+  const calculateShiftDuration = (start?: string, end?: string) => {
+    if (!start || !end) return 12; // Default fallback
+    try {
+      const [startH] = start.split(':').map(Number);
+      const [endH] = end.split(':').map(Number);
+      let hours = endH - startH;
+      if (hours <= 0) hours += 24;
+      return hours;
+    } catch {
+      return 12;
+    }
   };
 
   const handleRegenerateCalendar = async () => {
@@ -426,110 +440,112 @@ export default function MasterSettingsPage() {
       </motion.div>
 
       {/* Work Hours Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-        className="glass rounded-3xl border border-white/10 overflow-hidden"
-      >
-        <div className="p-6 border-b border-white/5 bg-gradient-to-r from-amber-500/10 to-transparent">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
-                <Clock className="w-7 h-7 text-white" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold">Work Hours</h2>
-                <p className="text-sm text-watchman-muted">
-                  Your shift times and available study hours
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={openWorkHoursEditor}
-              className="gap-2"
-            >
-              <Edit2 className="w-4 h-4" />
-              Edit
-            </Button>
-          </div>
-        </div>
-
-        <div className="p-6">
-          <div className="grid sm:grid-cols-2 gap-6">
-            {/* Day Shift Hours */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              whileHover={{ scale: 1.02, y: -2 }}
-              className="p-5 glass rounded-2xl border border-white/5 cursor-default group"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30 transition-transform group-hover:scale-110">
-                  <Sun className="w-6 h-6 text-white" />
+      {settings?.work && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="glass rounded-3xl border border-white/10 overflow-hidden"
+        >
+          <div className="p-6 border-b border-white/5 bg-gradient-to-r from-amber-500/10 to-transparent">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                  <Clock className="w-7 h-7 text-white" />
                 </div>
                 <div>
-                  <p className="font-semibold">Day Shift</p>
-                  <p className="text-xs text-watchman-muted">
-                    {calculateShiftDuration(settings.work.day_hours.start, settings.work.day_hours.end)} hours
+                  <h2 className="text-xl font-bold">Work Hours</h2>
+                  <p className="text-sm text-watchman-muted">
+                    Your shift times and available study hours
                   </p>
                 </div>
               </div>
-              <div className="flex items-center justify-between text-lg">
-                <span className="font-bold text-amber-400">{settings.work.day_hours.start}</span>
-                <span className="text-watchman-muted">→</span>
-                <span className="font-bold text-amber-400">{settings.work.day_hours.end}</span>
-              </div>
-            </motion.div>
-
-            {/* Night Shift Hours */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.05 }}
-              whileHover={{ scale: 1.02, y: -2 }}
-              className="p-5 glass rounded-2xl border border-white/5 cursor-default group"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 transition-transform group-hover:scale-110">
-                  <Moon className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="font-semibold">Night Shift</p>
-                  <p className="text-xs text-watchman-muted">
-                    {calculateShiftDuration(settings.work.night_hours.start, settings.work.night_hours.end)} hours
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between text-lg">
-                <span className="font-bold text-indigo-400">{settings.work.night_hours.start}</span>
-                <span className="text-watchman-muted">→</span>
-                <span className="font-bold text-indigo-400">{settings.work.night_hours.end}</span>
-              </div>
-            </motion.div>
-          </div>
-
-          {/* Available Study Hours */}
-          <div className="mt-6 grid sm:grid-cols-2 gap-4">
-            <div className="p-4 glass rounded-xl border border-white/5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Coffee className="w-5 h-5 text-emerald-400" />
-                <span className="text-sm text-watchman-muted">Available hours on off days</span>
-              </div>
-              <span className="font-bold text-emerald-400">{settings.work.available_hours_on_off}h</span>
-            </div>
-            <div className="p-4 glass rounded-xl border border-white/5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <BookOpen className="w-5 h-5 text-blue-400" />
-                <span className="text-sm text-watchman-muted">Available hours on work days</span>
-              </div>
-              <span className="font-bold text-blue-400">{settings.work.available_hours_on_work}h</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={openWorkHoursEditor}
+                className="gap-2"
+              >
+                <Edit2 className="w-4 h-4" />
+                Edit
+              </Button>
             </div>
           </div>
-        </div>
-      </motion.div>
+
+          <div className="p-6">
+            <div className="grid sm:grid-cols-2 gap-6">
+              {/* Day Shift Hours */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                whileHover={{ scale: 1.02, y: -2 }}
+                className="p-5 glass rounded-2xl border border-white/5 cursor-default group"
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30 transition-transform group-hover:scale-110">
+                    <Sun className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">Day Shift</p>
+                    <p className="text-xs text-watchman-muted">
+                      {calculateShiftDuration(settings.work.day_hours?.start, settings.work.day_hours?.end)} hours
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-lg">
+                  <span className="font-bold text-amber-400">{settings.work.day_hours?.start || '06:00'}</span>
+                  <span className="text-watchman-muted">→</span>
+                  <span className="font-bold text-amber-400">{settings.work.day_hours?.end || '18:00'}</span>
+                </div>
+              </motion.div>
+
+              {/* Night Shift Hours */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.05 }}
+                whileHover={{ scale: 1.02, y: -2 }}
+                className="p-5 glass rounded-2xl border border-white/5 cursor-default group"
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 transition-transform group-hover:scale-110">
+                    <Moon className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">Night Shift</p>
+                    <p className="text-xs text-watchman-muted">
+                      {calculateShiftDuration(settings.work.night_hours?.start, settings.work.night_hours?.end)} hours
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-lg">
+                  <span className="font-bold text-indigo-400">{settings.work.night_hours?.start || '18:00'}</span>
+                  <span className="text-watchman-muted">→</span>
+                  <span className="font-bold text-indigo-400">{settings.work.night_hours?.end || '06:00'}</span>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Available Study Hours */}
+            <div className="mt-6 grid sm:grid-cols-2 gap-4">
+              <div className="p-4 glass rounded-xl border border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Coffee className="w-5 h-5 text-emerald-400" />
+                  <span className="text-sm text-watchman-muted">Available hours on off days</span>
+                </div>
+                <span className="font-bold text-emerald-400">{settings.work.available_hours_on_off ?? 12}h</span>
+              </div>
+              <div className="p-4 glass rounded-xl border border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <BookOpen className="w-5 h-5 text-blue-400" />
+                  <span className="text-sm text-watchman-muted">Available hours on work days</span>
+                </div>
+                <span className="font-bold text-blue-400">{settings.work.available_hours_on_work ?? 2}h</span>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Grid of Settings Cards */}
       <div className="grid lg:grid-cols-2 gap-6">

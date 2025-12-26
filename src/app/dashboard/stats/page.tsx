@@ -98,12 +98,17 @@ const COLORS = {
 };
 
 // Calculate hours between two time strings (e.g., "06:00" to "18:00")
-const calculateShiftHours = (start: string, end: string): number => {
-  const [startH] = start.split(':').map(Number);
-  const [endH] = end.split(':').map(Number);
-  let hours = endH - startH;
-  if (hours <= 0) hours += 24; // Handle overnight shifts
-  return hours;
+const calculateShiftHours = (start?: string, end?: string): number => {
+  if (!start || !end) return 12; // Default to 12 hours
+  try {
+    const [startH] = start.split(':').map(Number);
+    const [endH] = end.split(':').map(Number);
+    let hours = endH - startH;
+    if (hours <= 0) hours += 24; // Handle overnight shifts
+    return hours;
+  } catch {
+    return 12; // Default fallback
+  }
 };
 
 export default function StatsPage() {
