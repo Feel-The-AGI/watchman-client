@@ -470,22 +470,33 @@ export default function SettingsPage() {
                   <Card>
                     <CardHeader>
                       <CardTitle>Plan Features</CardTitle>
+                      <CardDescription>Compare what you get with each plan</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
+                        <div className="flex items-center justify-between py-2 border-b border-white/10">
+                          <span className="text-sm font-medium">Feature</span>
+                          <div className="flex items-center gap-8">
+                            <span className="text-sm font-medium text-watchman-muted w-24 text-center">Free</span>
+                            <span className="text-sm font-medium text-watchman-accent w-24 text-center">Pro</span>
+                          </div>
+                        </div>
                         {[
-                          { feature: 'Calendar years', free: '1', pro: 'Unlimited' },
+                          { feature: 'Calendar planning', free: '6 months', pro: 'Unlimited' },
                           { feature: 'Rotation cycles', free: '1', pro: 'Unlimited' },
                           { feature: 'Commitments', free: '2', pro: 'Unlimited' },
-                          { feature: 'LLM text parsing', free: '—', pro: '✓' },
-                          { feature: 'Full statistics', free: '—', pro: '✓' },
-                          { feature: 'Exports', free: 'Limited', pro: 'Full' },
+                          { feature: 'Watchman Agent', free: '100/mo', pro: 'Unlimited' },
+                          { feature: 'Weighted constraints', free: '—', pro: '✓' },
+                          { feature: 'Leave planning', free: '—', pro: '✓' },
+                          { feature: 'CSV/PDF exports', free: '—', pro: '✓' },
+                          { feature: 'Calendar sharing', free: '—', pro: 'Soon' },
+                          { feature: '3-day Pro trial', free: '✓', pro: '—' },
                         ].map((row) => (
                           <div key={row.feature} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
                             <span className="text-sm">{row.feature}</span>
                             <div className="flex items-center gap-8">
-                              <span className="text-sm text-watchman-muted w-20 text-center">{row.free}</span>
-                              <span className="text-sm text-watchman-accent w-20 text-center">{row.pro}</span>
+                              <span className="text-sm text-watchman-muted w-24 text-center">{row.free}</span>
+                              <span className="text-sm text-watchman-accent w-24 text-center">{row.pro}</span>
                             </div>
                           </div>
                         ))}

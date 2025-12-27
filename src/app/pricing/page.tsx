@@ -29,6 +29,7 @@ const tiers = [
       'No weighted constraints',
       'No leave planning',
       'No CSV/PDF exports',
+      'No calendar sharing',
     ],
     cta: 'Get Started Free',
     variant: 'glass' as const,
