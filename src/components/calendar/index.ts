@@ -1,2 +1,2 @@
-export { CalendarGrid, YearOverview, type CalendarDay } from './CalendarGrid';
+export { CalendarGrid, YearOverview, type CalendarDay, type DailyLog, type Incident } from './CalendarGrid';
 export { DayInspector, DayQuickStats } from './DayInspector';

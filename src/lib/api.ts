@@ -228,6 +228,99 @@ class APIService {
       }),
     getSnapshot: () => this.request<any>('/api/master-settings/snapshot'),
   }
+
+  // Daily Logs & Incidents
+  dailyLogs = {
+    // Get logs for a specific date
+    getByDate: (date: string) => this.request<any>(`/api/daily-logs/${date}`),
+
+    // Get all logs in a date range
+    getRange: (startDate: string, endDate: string) =>
+      this.request<any>(`/api/daily-logs?start_date=${startDate}&end_date=${endDate}`),
+
+    // Create a new daily log
+    create: (data: { date: string; note: string }) =>
+      this.request<any>('/api/daily-logs', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    // Update a log
+    update: (id: string, data: { note: string }) =>
+      this.request<any>(`/api/daily-logs/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+
+    // Delete a log
+    delete: (id: string) => this.request<void>(`/api/daily-logs/${id}`, {
+      method: 'DELETE',
+    }),
+
+    // Update actual hours worked for a day
+    updateHours: (date: string, data: { actual_hours: number; overtime_hours?: number }) =>
+      this.request<any>(`/api/daily-logs/${date}/hours`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    // Export logs as PDF or CSV
+    export: (startDate: string, endDate: string, format: 'csv' | 'pdf') =>
+      this.request<Blob>(`/api/daily-logs/export?start_date=${startDate}&end_date=${endDate}&format=${format}`),
+  }
+
+  incidents = {
+    // Get all incidents
+    list: (startDate?: string, endDate?: string) => {
+      let query = '?'
+      if (startDate) query += `start_date=${startDate}&`
+      if (endDate) query += `end_date=${endDate}`
+      return this.request<any[]>(`/api/incidents${query}`)
+    },
+
+    // Get incidents for a specific date
+    getByDate: (date: string) => this.request<any[]>(`/api/incidents/date/${date}`),
+
+    // Get single incident
+    get: (id: string) => this.request<any>(`/api/incidents/${id}`),
+
+    // Create an incident
+    create: (data: {
+      date: string;
+      type: string;
+      severity: string;
+      title: string;
+      description: string;
+      reported_to?: string;
+      witnesses?: string;
+      outcome?: string;
+    }) => this.request<any>('/api/incidents', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+    // Update an incident
+    update: (id: string, data: any) =>
+      this.request<any>(`/api/incidents/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+
+    // Delete an incident
+    delete: (id: string) => this.request<void>(`/api/incidents/${id}`, {
+      method: 'DELETE',
+    }),
+
+    // Get incident statistics
+    getStats: (year?: number) => {
+      const query = year ? `?year=${year}` : ''
+      return this.request<any>(`/api/incidents/stats${query}`)
+    },
+
+    // Export incidents as PDF or CSV
+    export: (startDate: string, endDate: string, format: 'csv' | 'pdf') =>
+      this.request<Blob>(`/api/incidents/export?start_date=${startDate}&end_date=${endDate}&format=${format}`),
+  }
 }
 
 export const api = new APIService()

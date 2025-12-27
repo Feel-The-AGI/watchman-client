@@ -18,6 +18,28 @@ import {
 import { ChevronLeft, ChevronRight, Sun, Moon, Coffee, Plane, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+export interface DailyLog {
+  id: string;
+  date: string;
+  note: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface Incident {
+  id: string;
+  date: string;
+  type: 'overtime' | 'safety' | 'equipment' | 'harassment' | 'injury' | 'policy_violation' | 'other';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  title: string;
+  description: string;
+  reported_to?: string;
+  witnesses?: string;
+  outcome?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
 export interface CalendarDay {
   date: string;
   cycle_day: number;
@@ -30,6 +52,11 @@ export interface CalendarDay {
     hours?: number;
   }[];
   is_preview?: boolean;
+  // New fields for daily logs
+  logs?: DailyLog[];
+  incidents?: Incident[];
+  actual_hours_worked?: number;
+  overtime_hours?: number;
 }
 
 interface CalendarGridProps {

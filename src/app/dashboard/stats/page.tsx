@@ -23,6 +23,10 @@ import {
   Clock,
   Target,
   Trophy,
+  Download,
+  FileSpreadsheet,
+  Shield,
+  X,
 } from 'lucide-react';
 import {
   BarChart,
@@ -131,6 +135,10 @@ export default function StatsPage() {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [animateStats, setAnimateStats] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportType, setExportType] = useState<'stats' | 'logs' | 'incidents' | 'all'>('all');
+  const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
+  const [exportProgress, setExportProgress] = useState('');
 
   useEffect(() => {
     fetchStats();
@@ -209,14 +217,14 @@ export default function StatsPage() {
     }
   };
 
-  const handleExport = async (exportFormat: 'csv' | 'pdf') => {
+  const handleExport = async (format: 'csv' | 'pdf') => {
     try {
       setExporting(true);
-      const blob = await api.stats.export(year, exportFormat);
+      const blob = await api.stats.export(year, format);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `watchman-stats-${year}.${exportFormat}`;
+      a.download = `watchman-stats-${year}.${format}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -225,6 +233,73 @@ export default function StatsPage() {
       setError(err.message || 'Failed to export');
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleComprehensiveExport = async () => {
+    try {
+      setExporting(true);
+      setExportProgress('');
+
+      const startDate = `${year}-01-01`;
+      const endDate = `${year}-12-31`;
+      const downloads: { name: string; blob: Blob }[] = [];
+
+      if (exportType === 'stats' || exportType === 'all') {
+        setExportProgress('Exporting statistics...');
+        try {
+          const statsBlob = await api.stats.export(year, exportFormat);
+          downloads.push({ name: `watchman-stats-${year}.${exportFormat}`, blob: statsBlob });
+        } catch (e) {
+          console.log('Stats export not available');
+        }
+      }
+
+      if (exportType === 'logs' || exportType === 'all') {
+        setExportProgress('Exporting daily logs...');
+        try {
+          const logsBlob = await api.dailyLogs.export(startDate, endDate, exportFormat);
+          downloads.push({ name: `watchman-daily-logs-${year}.${exportFormat}`, blob: logsBlob });
+        } catch (e) {
+          console.log('Logs export not available');
+        }
+      }
+
+      if (exportType === 'incidents' || exportType === 'all') {
+        setExportProgress('Exporting incidents...');
+        try {
+          const incidentsBlob = await api.incidents.export(startDate, endDate, exportFormat);
+          downloads.push({ name: `watchman-incidents-${year}.${exportFormat}`, blob: incidentsBlob });
+        } catch (e) {
+          console.log('Incidents export not available');
+        }
+      }
+
+      // Download all files
+      setExportProgress('Downloading files...');
+      for (const file of downloads) {
+        const url = window.URL.createObjectURL(file.blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        // Small delay between downloads
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+
+      if (downloads.length === 0) {
+        setError('No data available to export. The backend export endpoints may not be implemented yet.');
+      } else {
+        setShowExportModal(false);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to export data');
+    } finally {
+      setExporting(false);
+      setExportProgress('');
     }
   };
 
@@ -333,9 +408,165 @@ export default function StatsPage() {
               <FileText className="w-4 h-4" />
               PDF
             </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setShowExportModal(true)}
+              className="gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Export All
+            </Button>
           </div>
         </motion.div>
       </div>
+
+      {/* Export Modal */}
+      <AnimatePresence>
+        {showExportModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => !exporting && setShowExportModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="glass rounded-3xl border border-white/10 p-6 max-w-md w-full shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-watchman-accent to-watchman-purple flex items-center justify-center shadow-lg shadow-watchman-accent/30">
+                    <Download className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">Export Your Data</h2>
+                    <p className="text-sm text-watchman-muted">Download logs, incidents, and stats</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => !exporting && setShowExportModal(false)}
+                  className="p-2 rounded-xl hover:bg-white/10 transition-colors"
+                  disabled={exporting}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Export Type Selection */}
+              <div className="space-y-3 mb-6">
+                <label className="text-sm font-medium text-watchman-muted">What to export</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: 'all', label: 'Everything', icon: FileSpreadsheet, desc: 'All data' },
+                    { value: 'stats', label: 'Statistics', icon: BarChart3, desc: 'Schedule summary' },
+                    { value: 'logs', label: 'Daily Logs', icon: FileText, desc: 'Notes & hours' },
+                    { value: 'incidents', label: 'Incidents', icon: Shield, desc: 'Issues & reports' },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setExportType(option.value as typeof exportType)}
+                      className={cn(
+                        'p-3 rounded-xl border transition-all text-left',
+                        exportType === option.value
+                          ? 'border-watchman-accent bg-watchman-accent/10'
+                          : 'border-white/10 hover:border-white/20 hover:bg-white/5'
+                      )}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <option.icon className={cn(
+                          'w-4 h-4',
+                          exportType === option.value ? 'text-watchman-accent' : 'text-watchman-muted'
+                        )} />
+                        <span className="font-medium text-sm">{option.label}</span>
+                      </div>
+                      <p className="text-xs text-watchman-muted">{option.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Format Selection */}
+              <div className="space-y-3 mb-6">
+                <label className="text-sm font-medium text-watchman-muted">File format</label>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setExportFormat('csv')}
+                    className={cn(
+                      'flex-1 p-4 rounded-xl border transition-all',
+                      exportFormat === 'csv'
+                        ? 'border-watchman-accent bg-watchman-accent/10'
+                        : 'border-white/10 hover:border-white/20 hover:bg-white/5'
+                    )}
+                  >
+                    <Table className={cn(
+                      'w-6 h-6 mx-auto mb-2',
+                      exportFormat === 'csv' ? 'text-watchman-accent' : 'text-watchman-muted'
+                    )} />
+                    <p className="font-medium text-sm">CSV / Excel</p>
+                    <p className="text-xs text-watchman-muted">Spreadsheet format</p>
+                  </button>
+                  <button
+                    onClick={() => setExportFormat('pdf')}
+                    className={cn(
+                      'flex-1 p-4 rounded-xl border transition-all',
+                      exportFormat === 'pdf'
+                        ? 'border-watchman-accent bg-watchman-accent/10'
+                        : 'border-white/10 hover:border-white/20 hover:bg-white/5'
+                    )}
+                  >
+                    <FileText className={cn(
+                      'w-6 h-6 mx-auto mb-2',
+                      exportFormat === 'pdf' ? 'text-watchman-accent' : 'text-watchman-muted'
+                    )} />
+                    <p className="font-medium text-sm">PDF</p>
+                    <p className="text-xs text-watchman-muted">Document format</p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Year Info */}
+              <div className="p-3 glass rounded-xl mb-6">
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="w-4 h-4 text-watchman-muted" />
+                  <span className="text-watchman-muted">Exporting data for</span>
+                  <span className="font-bold text-watchman-accent">{year}</span>
+                </div>
+              </div>
+
+              {/* Export Button */}
+              <Button
+                variant="gradient"
+                size="lg"
+                className="w-full gap-2"
+                onClick={handleComprehensiveExport}
+                disabled={exporting}
+              >
+                {exporting ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    {exportProgress || 'Exporting...'}
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-5 h-5" />
+                    Export {exportType === 'all' ? 'All Data' : exportType.charAt(0).toUpperCase() + exportType.slice(1)}
+                  </>
+                )}
+              </Button>
+
+              {/* Info note */}
+              <p className="text-xs text-watchman-muted text-center mt-4">
+                Your data is private and secure. Export to keep records for documentation or dispute resolution.
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Error State */}
       <AnimatePresence>
@@ -661,6 +892,55 @@ export default function StatsPage() {
               )}
             </motion.div>
           </div>
+
+          {/* Export & Documentation Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8 }}
+            className="glass rounded-3xl border border-white/10 p-6 bg-gradient-to-r from-watchman-accent/5 to-watchman-purple/5"
+          >
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-watchman-accent to-watchman-purple flex items-center justify-center shadow-lg shadow-watchman-accent/30">
+                  <Shield className="w-7 h-7 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold mb-1">Document Your Work Life</h3>
+                  <p className="text-sm text-watchman-muted max-w-md">
+                    Track daily logs, record incidents, and export everything.
+                    Keep records for performance reviews, dispute resolution, or personal documentation.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  variant="glass"
+                  size="lg"
+                  onClick={() => {
+                    setExportType('incidents');
+                    setShowExportModal(true);
+                  }}
+                  className="gap-2"
+                >
+                  <AlertTriangle className="w-5 h-5" />
+                  Export Incidents
+                </Button>
+                <Button
+                  variant="gradient"
+                  size="lg"
+                  onClick={() => {
+                    setExportType('all');
+                    setShowExportModal(true);
+                  }}
+                  className="gap-2"
+                >
+                  <Download className="w-5 h-5" />
+                  Export All Data
+                </Button>
+              </div>
+            </div>
+          </motion.div>
 
           {/* Summary Footer */}
           <motion.div
