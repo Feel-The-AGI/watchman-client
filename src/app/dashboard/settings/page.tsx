@@ -20,6 +20,12 @@ import {
   Zap,
   ExternalLink,
   Star,
+  Share2,
+  Copy,
+  Link,
+  Eye,
+  EyeOff,
+  Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -43,7 +49,19 @@ interface Subscription {
   cancel_at_period_end?: boolean;
 }
 
-type SettingsTab = 'profile' | 'subscription' | 'notifications' | 'preferences' | 'danger';
+type SettingsTab = 'profile' | 'subscription' | 'sharing' | 'notifications' | 'preferences' | 'danger';
+
+interface CalendarShare {
+  id: string;
+  share_code: string;
+  name: string;
+  share_url: string;
+  is_active: boolean;
+  show_commitments: boolean;
+  show_work_types: boolean;
+  created_at: string;
+  view_count: number;
+}
 
 export default function SettingsPage() {
   const { user, profile, signOut } = useAuth();
@@ -64,6 +82,13 @@ export default function SettingsPage() {
     weighted_mode: false,
   });
   const [subscription, setSubscription] = useState<Subscription | null>(null);
+
+  // Sharing states
+  const [shares, setShares] = useState<CalendarShare[]>([]);
+  const [creatingShare, setCreatingShare] = useState(false);
+  const [shareName, setShareName] = useState('My Shared Calendar');
+  const [showCommitments, setShowCommitments] = useState(false);
+  const [copiedShareId, setCopiedShareId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSettings();
@@ -184,9 +209,68 @@ export default function SettingsPage() {
     }
   };
 
+  // Sharing functions
+  const fetchShares = async () => {
+    try {
+      const response = await api.sharing.list();
+      setShares(response?.data || []);
+    } catch (err) {
+      console.error('Failed to fetch shares:', err);
+    }
+  };
+
+  const handleCreateShare = async () => {
+    try {
+      setCreatingShare(true);
+      const response = await api.sharing.create({
+        name: shareName,
+        show_commitments: showCommitments,
+        show_work_types: true,
+      });
+      if (response?.data) {
+        setShares([response.data, ...shares]);
+        setShareName('My Shared Calendar');
+        setShowCommitments(false);
+        setSuccess('Share link created!');
+        setTimeout(() => setSuccess(null), 3000);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to create share link');
+    } finally {
+      setCreatingShare(false);
+    }
+  };
+
+  const handleRevokeShare = async (shareId: string) => {
+    if (!confirm('Are you sure you want to revoke this share link?')) return;
+    try {
+      await api.sharing.revoke(shareId);
+      setShares(shares.filter(s => s.id !== shareId));
+      setSuccess('Share link revoked');
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to revoke share');
+    }
+  };
+
+  const copyShareLink = (share: CalendarShare) => {
+    const fullUrl = `${window.location.origin}${share.share_url}`;
+    navigator.clipboard.writeText(fullUrl);
+    setCopiedShareId(share.id);
+    setTimeout(() => setCopiedShareId(null), 2000);
+  };
+
+  // Fetch shares when switching to sharing tab
+  useEffect(() => {
+    if (activeTab === 'sharing') {
+      fetchShares();
+    }
+  }, [activeTab]);
+
   const tabs = [
     { id: 'profile' as const, label: 'Profile', icon: User },
     { id: 'subscription' as const, label: 'Subscription', icon: CreditCard },
+    { id: 'sharing' as const, label: 'Sharing', icon: Share2, isPro: true },
     { id: 'notifications' as const, label: 'Notifications', icon: Bell },
     { id: 'preferences' as const, label: 'Preferences', icon: Palette },
     { id: 'danger' as const, label: 'Danger Zone', icon: AlertTriangle },
@@ -521,6 +605,152 @@ export default function SettingsPage() {
                         Save Preferences
                       </Button>
                     </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Sharing Tab */}
+              {activeTab === 'sharing' && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Share2 className="w-5 h-5 text-watchman-accent" />
+                      Calendar Sharing
+                    </CardTitle>
+                    <CardDescription>
+                      Share your calendar with others. They can view your schedule without needing an account.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Check if user has Pro access */}
+                    {profile?.tier === 'free' && (
+                      <div className="p-4 rounded-xl bg-watchman-accent/5 border border-watchman-accent/20">
+                        <div className="flex items-center gap-3 mb-2">
+                          <Crown className="w-5 h-5 text-watchman-accent" />
+                          <span className="font-medium">Pro Feature</span>
+                        </div>
+                        <p className="text-sm text-watchman-muted mb-4">
+                          Calendar sharing is available for Pro users. Share your schedule with family, friends, or colleagues.
+                        </p>
+                        <Button variant="gradient" size="sm" onClick={handleUpgrade}>
+                          Upgrade to Pro
+                        </Button>
+                      </div>
+                    )}
+
+                    {profile?.tier !== 'free' && (
+                      <>
+                        {/* Create new share */}
+                        <div className="p-4 rounded-xl bg-watchman-bg">
+                          <h4 className="font-medium mb-4 flex items-center gap-2">
+                            <Plus className="w-4 h-4" />
+                            Create Share Link
+                          </h4>
+                          <div className="space-y-4">
+                            <div>
+                              <label className="text-sm text-watchman-muted mb-2 block">Share Name</label>
+                              <Input
+                                value={shareName}
+                                onChange={(e) => setShareName(e.target.value)}
+                                placeholder="My Shared Calendar"
+                              />
+                            </div>
+                            <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
+                              <div className="flex items-center gap-3">
+                                {showCommitments ? (
+                                  <Eye className="w-5 h-5 text-watchman-muted" />
+                                ) : (
+                                  <EyeOff className="w-5 h-5 text-watchman-muted" />
+                                )}
+                                <div>
+                                  <p className="text-sm font-medium">Show Commitments</p>
+                                  <p className="text-xs text-watchman-muted">Include commitment names in shared view</p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => setShowCommitments(!showCommitments)}
+                                className={cn(
+                                  'relative w-12 h-6 rounded-full transition-colors',
+                                  showCommitments ? 'bg-watchman-accent' : 'bg-white/10'
+                                )}
+                              >
+                                <motion.div
+                                  animate={{ x: showCommitments ? 24 : 4 }}
+                                  className="absolute top-1 w-4 h-4 rounded-full bg-white"
+                                />
+                              </button>
+                            </div>
+                            <Button
+                              variant="gradient"
+                              className="w-full gap-2"
+                              onClick={handleCreateShare}
+                              disabled={creatingShare}
+                            >
+                              {creatingShare ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Link className="w-4 h-4" />
+                              )}
+                              Create Share Link
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Existing shares */}
+                        {shares.length > 0 && (
+                          <div className="space-y-3">
+                            <h4 className="font-medium">Active Share Links</h4>
+                            {shares.map((share) => (
+                              <div
+                                key={share.id}
+                                className="p-4 rounded-xl bg-watchman-bg flex items-center justify-between"
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium truncate">{share.name}</p>
+                                  <p className="text-xs text-watchman-muted mt-1">
+                                    {share.view_count} views • Created {new Date(share.created_at).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2 ml-4">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => copyShareLink(share)}
+                                    className="gap-1"
+                                  >
+                                    {copiedShareId === share.id ? (
+                                      <>
+                                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                                        <span className="text-emerald-400">Copied!</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Copy className="w-4 h-4" />
+                                        Copy
+                                      </>
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRevokeShare(share.id)}
+                                    className="text-watchman-error hover:text-watchman-error hover:bg-watchman-error/10"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {shares.length === 0 && (
+                          <p className="text-center text-watchman-muted py-8">
+                            No share links yet. Create one above to share your calendar.
+                          </p>
+                        )}
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   format,
@@ -15,7 +15,7 @@ import {
   addMonths,
   subMonths,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Sun, Moon, Coffee, Plane, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Sun, Moon, Coffee, Plane, Sparkles, Lock, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface DailyLog {
@@ -65,6 +65,8 @@ interface CalendarGridProps {
   onSelectDate: (date: Date) => void;
   onMonthChange?: (date: Date) => void;
   view?: 'month' | 'year';
+  initialMonth?: Date;
+  userTier?: 'free' | 'pro' | 'admin';
 }
 
 const workTypeConfig: Record<string, {
@@ -105,16 +107,37 @@ const workTypeConfig: Record<string, {
   },
 };
 
-export function CalendarGrid({ 
-  days, 
-  selectedDate, 
-  onSelectDate, 
+export function CalendarGrid({
+  days,
+  selectedDate,
+  onSelectDate,
   onMonthChange,
-  view: _view = 'month'
+  view: _view = 'month',
+  initialMonth,
+  userTier = 'free'
 }: CalendarGridProps) {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(initialMonth || new Date());
   const [direction, setDirection] = useState(0);
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
+
+  // Update currentMonth when initialMonth changes (e.g., from year view)
+  useEffect(() => {
+    if (initialMonth) {
+      setCurrentMonth(initialMonth);
+    }
+  }, [initialMonth]);
+
+  // Calculate max allowed month for free users (6 months from now)
+  const FREE_MONTH_LIMIT = 6;
+  const isFreeTier = userTier === 'free';
+  const today = new Date();
+  const maxFreeMonth = new Date(today.getFullYear(), today.getMonth() + FREE_MONTH_LIMIT, 1);
+
+  // Check if a month is beyond the free tier limit
+  const isMonthLocked = (month: Date) => {
+    if (!isFreeTier) return false;
+    return month >= maxFreeMonth;
+  };
 
   const daysMap = useMemo(() => {
     const map = new Map<string, CalendarDay>();
@@ -142,13 +165,23 @@ export function CalendarGrid({
   }, [currentMonth]);
 
   const navigateMonth = useCallback((dir: 'prev' | 'next') => {
-    setDirection(dir === 'prev' ? -1 : 1);
-    const newMonth = dir === 'prev' 
-      ? subMonths(currentMonth, 1) 
+    const newMonth = dir === 'prev'
+      ? subMonths(currentMonth, 1)
       : addMonths(currentMonth, 1);
+
+    // Check if next month is locked for free users
+    if (dir === 'next' && isMonthLocked(newMonth)) {
+      return; // Don't navigate to locked month
+    }
+
+    setDirection(dir === 'prev' ? -1 : 1);
     setCurrentMonth(newMonth);
     onMonthChange?.(newMonth);
-  }, [currentMonth, onMonthChange]);
+  }, [currentMonth, onMonthChange, isMonthLocked]);
+
+  // Check if next month navigation should be disabled
+  const isNextMonthLocked = isMonthLocked(addMonths(currentMonth, 1));
+  const isCurrentMonthLocked = isMonthLocked(currentMonth);
 
   const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -197,11 +230,22 @@ export function CalendarGrid({
         
         <motion.button
           onClick={() => navigateMonth('next')}
-          whileHover={{ scale: 1.1, x: 2 }}
-          whileTap={{ scale: 0.95 }}
-          className="p-3 rounded-xl glass hover:bg-white/10 transition-colors group"
+          whileHover={!isNextMonthLocked ? { scale: 1.1, x: 2 } : {}}
+          whileTap={!isNextMonthLocked ? { scale: 0.95 } : {}}
+          disabled={isNextMonthLocked}
+          className={cn(
+            "p-3 rounded-xl glass transition-colors group",
+            isNextMonthLocked
+              ? "cursor-not-allowed opacity-60"
+              : "hover:bg-white/10"
+          )}
+          title={isNextMonthLocked ? "Upgrade to Pro to view more months" : "Next month"}
         >
-          <ChevronRight className="w-5 h-5 group-hover:text-watchman-accent transition-colors" />
+          {isNextMonthLocked ? (
+            <Lock className="w-5 h-5 text-watchman-muted" />
+          ) : (
+            <ChevronRight className="w-5 h-5 group-hover:text-watchman-accent transition-colors" />
+          )}
         </motion.button>
       </div>
 

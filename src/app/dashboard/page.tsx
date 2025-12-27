@@ -270,6 +270,8 @@ export default function DashboardPage() {
                   days={calendarDays}
                   selectedDate={selectedDate}
                   onSelectDate={setSelectedDate}
+                  initialMonth={selectedDate || undefined}
+                  userTier={profile?.tier as 'free' | 'pro' | 'admin' || 'free'}
                 />
               ) : (
                 <div className="p-6">

@@ -321,6 +321,31 @@ class APIService {
     export: (startDate: string, endDate: string, format: 'csv' | 'pdf') =>
       this.request<Blob>(`/api/incidents/export?start_date=${startDate}&end_date=${endDate}&format=${format}`),
   }
+
+  // ==================== SHARING ====================
+  sharing = {
+    // Create a new share link
+    create: (data: {
+      name?: string;
+      show_commitments?: boolean;
+      show_work_types?: boolean;
+    }) => this.request<any>('/api/sharing', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+    // List all share links
+    list: () => this.request<any[]>('/api/sharing'),
+
+    // Revoke a share link
+    revoke: (shareId: string) => this.request<void>(`/api/sharing/${shareId}`, {
+      method: 'DELETE',
+    }),
+
+    // Get public shared calendar (no auth required)
+    getPublic: (shareCode: string) =>
+      this.request<any>(`/api/sharing/public/${shareCode}`),
+  }
 }
 
 export const api = new APIService()

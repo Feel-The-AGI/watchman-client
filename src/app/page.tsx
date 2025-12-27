@@ -3,13 +3,13 @@
 import { motion, useScroll, useTransform } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
-import { 
-  Calendar, 
-  BarChart3, 
-  Shield, 
-  Clock, 
-  Sparkles, 
-  ArrowRight, 
+import {
+  Calendar,
+  BarChart3,
+  Shield,
+  Clock,
+  Sparkles,
+  ArrowRight,
   MessageSquare,
   Zap,
   Check,
@@ -20,9 +20,11 @@ import {
   Target,
   Layers,
   Command,
+  User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useRef } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 
 // Bento Grid Features
 const bentoFeatures = [
@@ -100,6 +102,7 @@ const industries = [
 
 export default function LandingPage() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { user, profile, loading } = useAuth();
   const { scrollYProgress } = useScroll({
     target: containerRef,
     offset: ["start start", "end end"]
@@ -107,6 +110,8 @@ export default function LandingPage() {
 
   const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
   const heroScale = useTransform(scrollYProgress, [0, 0.2], [1, 0.95]);
+
+  const isLoggedIn = !!user && !loading;
 
   return (
     <div ref={containerRef} className="min-h-screen bg-watchman-bg text-white overflow-hidden">
@@ -135,11 +140,32 @@ export default function LandingPage() {
             <Link href="/pricing" className="text-watchman-text-secondary hover:text-white transition-colors hidden sm:block">
               Pricing
             </Link>
-            <Link href="/login">
-              <Button variant="glass" size="sm">
-                Sign In
-              </Button>
-            </Link>
+            {isLoggedIn ? (
+              <div className="flex items-center gap-3">
+                <Link href="/dashboard">
+                  <Button variant="primary" size="sm">
+                    Go to Dashboard
+                  </Button>
+                </Link>
+                <Link href="/dashboard/settings" className="flex items-center gap-2 group">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-watchman-accent to-watchman-purple flex items-center justify-center">
+                    {profile?.name ? (
+                      <span className="text-sm font-semibold text-white">
+                        {profile.name.charAt(0).toUpperCase()}
+                      </span>
+                    ) : (
+                      <User className="w-4 h-4 text-white" />
+                    )}
+                  </div>
+                </Link>
+              </div>
+            ) : (
+              <Link href="/login">
+                <Button variant="glass" size="sm">
+                  Sign In
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </nav>

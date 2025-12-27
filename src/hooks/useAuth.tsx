@@ -40,9 +40,9 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 // Pages that don't require redirect after auth
-const PUBLIC_PATHS = ['/', '/login', '/auth/callback']
-// Pages where logged-in users should NOT be redirected away from
-const NO_REDIRECT_PATHS = ['/pricing']
+const PUBLIC_PATHS = ['/login', '/auth/callback']
+// Pages where logged-in users should NOT be redirected away from (can browse freely)
+const NO_REDIRECT_PATHS = ['/', '/pricing']
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()

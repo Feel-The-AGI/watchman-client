@@ -21,12 +21,13 @@ const tiers = [
       '1 rotation cycle',
       '2 commitments max',
       'Binary constraints only',
-      'Manual input only',
+      '100 Watchman messages/month',
       'Basic dashboard stats',
+      '3-day Pro trial included',
     ],
     limitations: [
-      'No LLM parsing',
-      'No PDF parsing',
+      'No weighted constraints',
+      'No leave planning',
       'No CSV/PDF exports',
     ],
     cta: 'Get Started Free',
@@ -46,11 +47,11 @@ const tiers = [
       'Unlimited rotations',
       'Unlimited commitments',
       'Binary + weighted constraints',
-      'LLM text parsing (Gemini)',
-      'PDF text extraction',
+      'Unlimited Watchman Agent',
       'Full statistics & analytics',
       'CSV & PDF exports',
       'Leave planning',
+      'Calendar sharing (coming soon)',
     ],
     limitations: [],
     cta: 'Start Pro Trial',
@@ -61,8 +62,12 @@ const tiers = [
 
 const faqs = [
   {
-    question: 'What is LLM text parsing?',
-    answer: 'Paste any unstructured text (emails, WhatsApp messages, PDFs) and our AI will parse it into structured calendar changes. You always approve before anything applies.',
+    question: 'What is the Watchman Agent?',
+    answer: 'Watchman is your AI scheduling assistant. Chat naturally to add commitments, plan study sessions, or modify your calendar. Free users get 100 messages/month, Pro users get unlimited access.',
+  },
+  {
+    question: 'What is the 3-day Pro trial?',
+    answer: 'Every new user gets 3 days of full Pro features (except exports) to experience weighted constraints, unlimited Watchman Agent, and leave planning. No credit card required.',
   },
   {
     question: 'Can I upgrade or downgrade anytime?',
@@ -75,10 +80,6 @@ const faqs = [
   {
     question: 'Is my data secure?',
     answer: 'Yes. All data is encrypted at rest and in transit. We use Supabase with Row-Level Security. Your calendar is yours.',
-  },
-  {
-    question: 'What if I need more features?',
-    answer: 'Contact us if you need custom integrations or have specific requirements. We can discuss your needs.',
   },
 ];
 
@@ -131,7 +132,7 @@ export default function PricingPage() {
               Simple, <span className="text-gradient">Honest</span> Pricing
             </h1>
             <p className="text-xl text-watchman-muted max-w-2xl mx-auto">
-              Start free. Upgrade when you need intelligent parsing and full statistics.
+              Start free with a 3-day Pro trial. Upgrade when you need unlimited access.
               No hidden fees. Cancel anytime.
             </p>
           </motion.div>
@@ -261,12 +262,12 @@ export default function PricingPage() {
                   { feature: 'Calendar planning', free: '6 months', pro: 'Unlimited' },
                   { feature: 'Rotation cycles', free: '1', pro: 'Unlimited' },
                   { feature: 'Commitments', free: '2', pro: 'Unlimited' },
-                  { feature: 'LLM text parsing', free: false, pro: true },
-                  { feature: 'PDF parsing', free: false, pro: true },
+                  { feature: 'Watchman Agent', free: '100/month', pro: 'Unlimited' },
                   { feature: 'Weighted constraints', free: false, pro: true },
-                  { feature: 'Full statistics', free: false, pro: true },
-                  { feature: 'Exports (CSV/PDF)', free: false, pro: true },
                   { feature: 'Leave planning', free: false, pro: true },
+                  { feature: 'Exports (CSV/PDF)', free: false, pro: true },
+                  { feature: 'Calendar sharing', free: false, pro: 'Coming soon' },
+                  { feature: '3-day Pro trial', free: true, pro: '—' },
                 ].map((row, i) => (
                   <motion.tr
                     key={row.feature}
