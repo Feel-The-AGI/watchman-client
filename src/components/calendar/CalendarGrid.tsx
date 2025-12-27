@@ -29,7 +29,7 @@ export interface DailyLog {
 export interface Incident {
   id: string;
   date: string;
-  type: 'overtime' | 'safety' | 'equipment' | 'harassment' | 'injury' | 'policy_violation' | 'other';
+  type: 'overtime' | 'safety' | 'equipment' | 'harassment' | 'injury' | 'policy_violation' | 'health' | 'discrimination' | 'workload' | 'compensation' | 'scheduling' | 'communication' | 'retaliation' | 'environment' | 'other';
   severity: 'low' | 'medium' | 'high' | 'critical';
   title: string;
   description: string;
