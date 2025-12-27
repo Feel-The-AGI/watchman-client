@@ -49,11 +49,16 @@ class APIService {
     // Handle blob responses for exports
     const contentType = response.headers.get('content-type')
     const contentDisposition = response.headers.get('content-disposition')
-    // Check if it's a file download - Content-Disposition: attachment is the reliable indicator
+    // Check if it's a file download:
+    // 1. Content-Disposition: attachment header (requires CORS expose_headers)
+    // 2. Known file content types
+    // 3. URL contains /export (fallback when header not exposed via CORS)
+    const isExportEndpoint = endpoint.includes('/export')
     if (contentDisposition?.includes('attachment') ||
         contentType?.includes('application/octet-stream') ||
         contentType?.includes('text/csv') ||
-        contentType?.includes('application/pdf')) {
+        contentType?.includes('application/pdf') ||
+        (isExportEndpoint && (contentType?.includes('text/plain') || contentType?.includes('text/')))) {
       return response.blob() as Promise<T>
     }
 
