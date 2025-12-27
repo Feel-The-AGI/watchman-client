@@ -27,6 +27,21 @@ import {
   FileSpreadsheet,
   Shield,
   X,
+  Eye,
+  Timer,
+  Wrench,
+  UserX,
+  Siren,
+  FileWarning,
+  MoreHorizontal,
+  HeartPulse,
+  Ban,
+  Weight,
+  DollarSign,
+  CalendarClock,
+  MessageSquareWarning,
+  ShieldAlert,
+  Building2,
 } from 'lucide-react';
 import {
   BarChart,
@@ -47,6 +62,7 @@ import {
 } from 'recharts';
 import { Button } from '@/components/ui/Button';
 import { toast } from '@/components/ui/Toast';
+import { IncidentModal, LogModal } from '@/components/ui/IncidentModal';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -100,6 +116,53 @@ interface IncidentStats {
   by_month: Record<string, number>;
 }
 
+interface Incident {
+  id: string;
+  date: string;
+  type: string;
+  severity: string;
+  title: string;
+  description: string;
+  reported_to?: string;
+  witnesses?: string;
+  outcome?: string;
+  created_at: string;
+}
+
+interface DailyLog {
+  id: string;
+  date: string;
+  note: string;
+  actual_hours?: number;
+  overtime_hours?: number;
+  created_at: string;
+}
+
+const incidentTypeIcons: Record<string, { icon: typeof Timer; label: string; color: string; bg: string }> = {
+  overtime: { icon: Timer, label: 'Overtime', color: 'text-amber-400', bg: 'bg-amber-500/20' },
+  safety: { icon: Shield, label: 'Safety Issue', color: 'text-red-400', bg: 'bg-red-500/20' },
+  equipment: { icon: Wrench, label: 'Equipment Failure', color: 'text-orange-400', bg: 'bg-orange-500/20' },
+  harassment: { icon: UserX, label: 'Harassment', color: 'text-purple-400', bg: 'bg-purple-500/20' },
+  injury: { icon: Siren, label: 'Injury', color: 'text-red-500', bg: 'bg-red-600/20' },
+  policy_violation: { icon: FileWarning, label: 'Policy Violation', color: 'text-yellow-400', bg: 'bg-yellow-500/20' },
+  health: { icon: HeartPulse, label: 'Health / Sick', color: 'text-pink-400', bg: 'bg-pink-500/20' },
+  discrimination: { icon: Ban, label: 'Discrimination', color: 'text-fuchsia-400', bg: 'bg-fuchsia-500/20' },
+  workload: { icon: Weight, label: 'Excessive Workload', color: 'text-blue-400', bg: 'bg-blue-500/20' },
+  compensation: { icon: DollarSign, label: 'Pay / Compensation', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
+  scheduling: { icon: CalendarClock, label: 'Scheduling Issue', color: 'text-cyan-400', bg: 'bg-cyan-500/20' },
+  communication: { icon: MessageSquareWarning, label: 'Communication Issue', color: 'text-sky-400', bg: 'bg-sky-500/20' },
+  retaliation: { icon: ShieldAlert, label: 'Retaliation', color: 'text-rose-400', bg: 'bg-rose-500/20' },
+  environment: { icon: Building2, label: 'Work Environment', color: 'text-slate-400', bg: 'bg-slate-500/20' },
+  other: { icon: MoreHorizontal, label: 'Other', color: 'text-gray-400', bg: 'bg-gray-500/20' },
+};
+
+const severityStyleColors: Record<string, { text: string; bg: string; label: string }> = {
+  low: { text: 'text-green-400', bg: 'bg-green-500/20', label: 'Low' },
+  medium: { text: 'text-yellow-400', bg: 'bg-yellow-500/20', label: 'Medium' },
+  high: { text: 'text-orange-400', bg: 'bg-orange-500/20', label: 'High' },
+  critical: { text: 'text-red-400', bg: 'bg-red-500/20', label: 'Critical' },
+};
+
 const COLORS = {
   work_day: '#F59E0B',
   work_night: '#6366F1',
@@ -148,10 +211,15 @@ export default function StatsPage() {
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
   const [exportProgress, setExportProgress] = useState('');
   const [incidentStats, setIncidentStats] = useState<IncidentStats | null>(null);
+  const [recentIncidents, setRecentIncidents] = useState<Incident[]>([]);
+  const [recentLogs, setRecentLogs] = useState<DailyLog[]>([]);
+  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
+  const [selectedLog, setSelectedLog] = useState<DailyLog | null>(null);
 
   useEffect(() => {
     fetchStats();
     fetchIncidentStats();
+    fetchRecentData();
   }, [year]);
 
   const fetchIncidentStats = async () => {
@@ -161,6 +229,28 @@ export default function StatsPage() {
     } catch (err) {
       // Incidents stats not critical - just log it
       console.log('Incident stats not available yet');
+    }
+  };
+
+  const fetchRecentData = async () => {
+    const startDate = `${year}-01-01`;
+    const endDate = `${year}-12-31`;
+
+    try {
+      // Fetch recent incidents
+      const incidents = await api.incidents.list(startDate, endDate);
+      setRecentIncidents(Array.isArray(incidents) ? incidents.slice(0, 10) : []);
+    } catch (err) {
+      console.log('Could not fetch recent incidents');
+    }
+
+    try {
+      // Fetch recent logs
+      const logs = await api.dailyLogs.getRange(startDate, endDate);
+      const logsArray = Array.isArray(logs) ? logs : (logs?.logs || []);
+      setRecentLogs(logsArray.slice(0, 10));
+    } catch (err) {
+      console.log('Could not fetch recent logs');
     }
   };
 
@@ -989,6 +1079,128 @@ export default function StatsPage() {
             </motion.div>
           )}
 
+          {/* Recent Incidents & Logs Grid */}
+          {(recentIncidents.length > 0 || recentLogs.length > 0) && (
+            <div className="grid lg:grid-cols-2 gap-6">
+              {/* Recent Incidents */}
+              {recentIncidents.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.8 }}
+                  className="glass rounded-3xl border border-white/10 p-6"
+                >
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500/20 to-orange-500/20 flex items-center justify-center">
+                      <AlertTriangle className="w-5 h-5 text-red-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold">Recent Incidents</h3>
+                  </div>
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                    {recentIncidents.map((incident, i) => {
+                      const typeInfo = incidentTypeIcons[incident.type] || incidentTypeIcons.other;
+                      const sevInfo = severityStyleColors[incident.severity] || severityStyleColors.medium;
+                      const TypeIcon = typeInfo.icon;
+
+                      return (
+                        <motion.div
+                          key={incident.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.85 + i * 0.05 }}
+                          whileHover={{ scale: 1.01, x: 4 }}
+                          onClick={() => setSelectedIncident(incident)}
+                          className="p-4 glass rounded-2xl cursor-pointer hover:bg-white/5 transition-all group"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', typeInfo.bg)}>
+                              <TypeIcon className={cn('w-5 h-5', typeInfo.color)} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="font-medium text-sm truncate">{incident.title}</p>
+                                <span className={cn('px-2 py-0.5 rounded-full text-xs flex-shrink-0', sevInfo.bg, sevInfo.text)}>
+                                  {sevInfo.label}
+                                </span>
+                              </div>
+                              <p className="text-xs text-watchman-muted line-clamp-1">{incident.description}</p>
+                              <p className="text-xs text-watchman-muted mt-1">
+                                {safeFormatDate(incident.date, 'MMM d, yyyy')}
+                              </p>
+                            </div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setSelectedIncident(incident); }}
+                              className="p-2 rounded-lg hover:bg-white/10 text-watchman-muted hover:text-watchman-accent transition-colors opacity-0 group-hover:opacity-100"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Recent Logs */}
+              {recentLogs.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.85 }}
+                  className="glass rounded-3xl border border-white/10 p-6"
+                >
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
+                      <FileText className="w-5 h-5 text-purple-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold">Recent Daily Notes</h3>
+                  </div>
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                    {recentLogs.map((log, i) => (
+                      <motion.div
+                        key={log.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.9 + i * 0.05 }}
+                        whileHover={{ scale: 1.01, x: 4 }}
+                        onClick={() => setSelectedLog(log)}
+                        className="p-4 glass rounded-2xl cursor-pointer hover:bg-white/5 transition-all group"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center flex-shrink-0">
+                            <FileText className="w-5 h-5 text-purple-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm line-clamp-2">{log.note}</p>
+                            <div className="flex items-center gap-3 mt-2 text-xs text-watchman-muted">
+                              <span>{safeFormatDate(log.date, 'MMM d, yyyy')}</span>
+                              {log.actual_hours && (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {log.actual_hours}h worked
+                                </span>
+                              )}
+                              {log.overtime_hours && log.overtime_hours > 0 && (
+                                <span className="text-amber-400">+{log.overtime_hours}h OT</span>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedLog(log); }}
+                            className="p-2 rounded-lg hover:bg-white/10 text-watchman-muted hover:text-watchman-accent transition-colors opacity-0 group-hover:opacity-100"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </div>
+          )}
+
           {/* Export & Documentation Card */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -1094,6 +1306,18 @@ export default function StatsPage() {
           </Button>
         </motion.div>
       )}
+
+      {/* Modals */}
+      <IncidentModal
+        incident={selectedIncident}
+        isOpen={!!selectedIncident}
+        onClose={() => setSelectedIncident(null)}
+      />
+      <LogModal
+        log={selectedLog}
+        isOpen={!!selectedLog}
+        onClose={() => setSelectedLog(null)}
+      />
     </div>
   );
 }

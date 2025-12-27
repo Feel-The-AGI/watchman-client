@@ -38,9 +38,11 @@ import {
   MessageSquareWarning,
   ShieldAlert,
   Building2,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from '@/components/ui/Toast';
+import { IncidentModal, LogModal } from '@/components/ui/IncidentModal';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import type { CalendarDay, DailyLog, Incident } from './CalendarGrid';
@@ -144,6 +146,10 @@ export function DayInspector({
   const [expandedSection, setExpandedSection] = useState<string | null>('hours');
   const [saving, setSaving] = useState(false);
   const [editingHours, setEditingHours] = useState(false);
+
+  // Modal state
+  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
+  const [selectedLog, setSelectedLog] = useState<DailyLog | null>(null);
 
   // Incident form state
   const [incidentForm, setIncidentForm] = useState({
@@ -564,16 +570,25 @@ export function DayInspector({
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: i * 0.05 }}
-                        className="p-3 glass rounded-xl group"
+                        className="p-3 glass rounded-xl group cursor-pointer hover:bg-white/5 transition-colors"
+                        onClick={() => setSelectedLog(log)}
                       >
                         <div className="flex justify-between items-start gap-2">
-                          <p className="text-sm flex-1">{log.note}</p>
-                          <button
-                            onClick={() => handleDeleteLog(log.id)}
-                            className="p-1 rounded-lg hover:bg-red-500/20 text-watchman-muted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <p className="text-sm flex-1 line-clamp-2">{log.note}</p>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setSelectedLog(log); }}
+                              className="p-1 rounded-lg hover:bg-white/10 text-watchman-muted hover:text-watchman-accent transition-colors opacity-0 group-hover:opacity-100"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteLog(log.id); }}
+                              className="p-1 rounded-lg hover:bg-red-500/20 text-watchman-muted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                         <p className="text-xs text-watchman-muted mt-2">
                           {format(new Date(log.created_at), 'h:mm a')}
@@ -659,7 +674,8 @@ export function DayInspector({
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: i * 0.05 }}
-                          className="p-3 glass rounded-xl group"
+                          className="p-3 glass rounded-xl group cursor-pointer hover:bg-white/5 transition-colors"
+                          onClick={() => setSelectedIncident(incident)}
                         >
                           <div className="flex items-start gap-3">
                             <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0', typeInfo.bg)}>
@@ -677,12 +693,20 @@ export function DayInspector({
                                 <p className="text-xs text-watchman-muted mt-1">Reported to: {incident.reported_to}</p>
                               )}
                             </div>
-                            <button
-                              onClick={() => handleDeleteIncident(incident.id)}
-                              className="p-1 rounded-lg hover:bg-red-500/20 text-watchman-muted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setSelectedIncident(incident); }}
+                                className="p-1 rounded-lg hover:bg-white/10 text-watchman-muted hover:text-watchman-accent transition-colors opacity-0 group-hover:opacity-100"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteIncident(incident.id); }}
+                                className="p-1 rounded-lg hover:bg-red-500/20 text-watchman-muted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         </motion.div>
                       );
@@ -944,6 +968,18 @@ export function DayInspector({
           )}
         </motion.div>
       )}
+
+      {/* Modals */}
+      <IncidentModal
+        incident={selectedIncident}
+        isOpen={!!selectedIncident}
+        onClose={() => setSelectedIncident(null)}
+      />
+      <LogModal
+        log={selectedLog}
+        isOpen={!!selectedLog}
+        onClose={() => setSelectedLog(null)}
+      />
     </motion.div>
   );
 }
