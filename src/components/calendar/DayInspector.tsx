@@ -32,6 +32,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { toast } from '@/components/ui/Toast';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import type { CalendarDay, DailyLog, Incident } from './CalendarGrid';
@@ -211,6 +212,7 @@ export function DayInspector({
       setNewLogNote('');
       setShowAddLog(false);
       onDataChange?.();
+      toast.success('Note saved', 'Your daily note has been recorded');
     } catch (err) {
       // For now, just add locally if API fails
       const localLog: DailyLog = {
@@ -222,6 +224,7 @@ export function DayInspector({
       setLogs(prev => [...prev, localLog]);
       setNewLogNote('');
       setShowAddLog(false);
+      toast.warning('Saved locally', 'Note saved locally - will sync when online');
     } finally {
       setSaving(false);
     }
@@ -235,8 +238,10 @@ export function DayInspector({
       }
       setLogs(prev => prev.filter(l => l.id !== logId));
       onDataChange?.();
+      toast.success('Note deleted');
     } catch (err) {
       setLogs(prev => prev.filter(l => l.id !== logId));
+      toast.info('Note removed locally');
     }
   };
 
@@ -250,9 +255,11 @@ export function DayInspector({
       });
       setEditingHours(false);
       onDataChange?.();
+      toast.success('Hours updated', `${actualHours}h worked${overtimeHours > 0 ? ` (+${overtimeHours}h OT)` : ''}`);
     } catch (err) {
       // Just close the editing state even if API fails
       setEditingHours(false);
+      toast.warning('Saved locally', 'Hours saved locally - will sync when online');
     } finally {
       setSaving(false);
     }
@@ -273,6 +280,7 @@ export function DayInspector({
       resetIncidentForm();
       setShowAddIncident(false);
       onDataChange?.();
+      toast.success('Incident logged', `${incidentForm.severity.toUpperCase()} severity incident recorded`);
     } catch (err) {
       // For now, add locally if API fails
       const localIncident: Incident = {
@@ -284,6 +292,7 @@ export function DayInspector({
       setIncidents(prev => [...prev, localIncident]);
       resetIncidentForm();
       setShowAddIncident(false);
+      toast.warning('Saved locally', 'Incident saved locally - will sync when online');
     } finally {
       setSaving(false);
     }
@@ -308,8 +317,10 @@ export function DayInspector({
       }
       setIncidents(prev => prev.filter(i => i.id !== incidentId));
       onDataChange?.();
+      toast.success('Incident deleted');
     } catch (err) {
       setIncidents(prev => prev.filter(i => i.id !== incidentId));
+      toast.info('Incident removed locally');
     }
   };
 

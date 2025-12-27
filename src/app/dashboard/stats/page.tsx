@@ -46,6 +46,7 @@ import {
   AreaChart,
 } from 'recharts';
 import { Button } from '@/components/ui/Button';
+import { toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -90,6 +91,13 @@ interface CommitmentStats {
   type: string;
   total_hours: number;
   sessions_count: number;
+}
+
+interface IncidentStats {
+  total_count: number;
+  by_type: Record<string, number>;
+  by_severity: Record<string, number>;
+  by_month: Record<string, number>;
 }
 
 const COLORS = {
@@ -139,10 +147,22 @@ export default function StatsPage() {
   const [exportType, setExportType] = useState<'stats' | 'logs' | 'incidents' | 'all'>('all');
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
   const [exportProgress, setExportProgress] = useState('');
+  const [incidentStats, setIncidentStats] = useState<IncidentStats | null>(null);
 
   useEffect(() => {
     fetchStats();
+    fetchIncidentStats();
   }, [year]);
+
+  const fetchIncidentStats = async () => {
+    try {
+      const stats = await api.incidents.getStats(year);
+      setIncidentStats(stats);
+    } catch (err) {
+      // Incidents stats not critical - just log it
+      console.log('Incident stats not available yet');
+    }
+  };
 
   useEffect(() => {
     if (stats) {
@@ -291,12 +311,13 @@ export default function StatsPage() {
       }
 
       if (downloads.length === 0) {
-        setError('No data available to export. The backend export endpoints may not be implemented yet.');
+        toast.error('Export failed', 'No data available to export. Run database migrations first.');
       } else {
         setShowExportModal(false);
+        toast.success('Export complete', `${downloads.length} file(s) downloaded`);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to export data');
+      toast.error('Export failed', err.message || 'Failed to export data');
     } finally {
       setExporting(false);
       setExportProgress('');
@@ -892,6 +913,81 @@ export default function StatsPage() {
               )}
             </motion.div>
           </div>
+
+          {/* Incident Stats Section */}
+          {incidentStats && incidentStats.total_count > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.75 }}
+              className="glass rounded-3xl border border-white/10 p-6"
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500/20 to-orange-500/20 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Incidents Logged</h3>
+                  <p className="text-sm text-watchman-muted">Workplace issues documented this year</p>
+                </div>
+                <div className="ml-auto text-right">
+                  <p className="text-2xl font-bold text-red-400">{incidentStats.total_count}</p>
+                  <p className="text-xs text-watchman-muted">Total incidents</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* By Severity */}
+                {Object.entries(incidentStats.by_severity).map(([severity, count]) => {
+                  const severityColors: Record<string, { bg: string; text: string; border: string }> = {
+                    critical: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/30' },
+                    high: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/30' },
+                    medium: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30' },
+                    low: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30' },
+                  };
+                  const colors = severityColors[severity] || severityColors.medium;
+                  return (
+                    <div
+                      key={severity}
+                      className={cn('p-4 rounded-xl border', colors.bg, colors.border)}
+                    >
+                      <p className={cn('text-2xl font-bold', colors.text)}>{count}</p>
+                      <p className="text-xs text-watchman-muted capitalize">{severity} severity</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* By Type - show if there are multiple types */}
+              {Object.keys(incidentStats.by_type).length > 0 && (
+                <div className="mt-6 pt-6 border-t border-white/5">
+                  <p className="text-sm font-medium text-watchman-muted mb-3">By Category</p>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(incidentStats.by_type).map(([type, count]) => {
+                      const typeLabels: Record<string, string> = {
+                        overtime: 'Overtime',
+                        safety: 'Safety',
+                        equipment: 'Equipment',
+                        harassment: 'Harassment',
+                        injury: 'Injury',
+                        policy_violation: 'Policy Violation',
+                        other: 'Other',
+                      };
+                      return (
+                        <div
+                          key={type}
+                          className="px-3 py-1.5 rounded-full glass border border-white/10 text-sm"
+                        >
+                          <span className="text-watchman-muted">{typeLabels[type] || type}:</span>
+                          <span className="ml-1 font-semibold">{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
 
           {/* Export & Documentation Card */}
           <motion.div
