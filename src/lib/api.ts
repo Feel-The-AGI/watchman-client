@@ -48,7 +48,10 @@ class APIService {
 
     // Handle blob responses for exports
     const contentType = response.headers.get('content-type')
-    if (contentType?.includes('application/octet-stream') || 
+    const contentDisposition = response.headers.get('content-disposition')
+    // Check if it's a file download - Content-Disposition: attachment is the reliable indicator
+    if (contentDisposition?.includes('attachment') ||
+        contentType?.includes('application/octet-stream') ||
         contentType?.includes('text/csv') ||
         contentType?.includes('application/pdf')) {
       return response.blob() as Promise<T>
