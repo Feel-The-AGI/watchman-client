@@ -234,8 +234,9 @@ export default function SettingsPage() {
   // Sharing functions
   const fetchShares = async () => {
     try {
-      const response = await api.sharing.list();
-      setShares(response?.data || []);
+      const sharesData = await api.sharing.list();
+      // API wrapper already unwraps { success, data } responses
+      setShares(Array.isArray(sharesData) ? sharesData : []);
     } catch (err) {
       console.error('Failed to fetch shares:', err);
     }
@@ -244,13 +245,13 @@ export default function SettingsPage() {
   const handleCreateShare = async () => {
     try {
       setCreatingShare(true);
-      const response = await api.sharing.create({
+      // API wrapper already unwraps { success, data } responses, so we get the share object directly
+      const createdShare = await api.sharing.create({
         name: shareName,
         show_commitments: showCommitments,
         show_work_types: true,
       });
-      if (response?.data) {
-        const createdShare = response.data;
+      if (createdShare && createdShare.id) {
         setShares([createdShare, ...shares]);
         setNewlyCreatedShare(createdShare);
         setShareName('My Shared Calendar');

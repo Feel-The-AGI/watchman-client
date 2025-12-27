@@ -324,18 +324,18 @@ class APIService {
 
   // ==================== SHARING ====================
   sharing = {
-    // Create a new share link
+    // Create a new share link (API wrapper unwraps { success, data } responses)
     create: (data: {
       name?: string;
       show_commitments?: boolean;
       show_work_types?: boolean;
-    }) => this.request<{ success: boolean; data: any }>('/api/sharing', {
+    }) => this.request<any>('/api/sharing', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-    // List all share links
-    list: () => this.request<{ success: boolean; data: any[] }>('/api/sharing'),
+    // List all share links (API wrapper unwraps { success, data } responses)
+    list: () => this.request<any[]>('/api/sharing'),
 
     // Revoke a share link
     revoke: (shareId: string) => this.request<void>(`/api/sharing/${shareId}`, {
