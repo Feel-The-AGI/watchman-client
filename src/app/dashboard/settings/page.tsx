@@ -30,6 +30,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
+import { Celebration } from '@/components/ui/Celebration';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -90,6 +91,9 @@ export default function SettingsPage() {
   const [showCommitments, setShowCommitments] = useState(false);
   const [copiedShareId, setCopiedShareId] = useState<string | null>(null);
 
+  // Celebration state
+  const [showCelebration, setShowCelebration] = useState(false);
+
   useEffect(() => {
     fetchSettings();
   }, []);
@@ -100,6 +104,23 @@ export default function SettingsPage() {
       setEmail(user?.email || '');
     }
   }, [profile, user]);
+
+  // Trigger celebration for Pro users who haven't seen it yet
+  useEffect(() => {
+    if (subscription && (subscription.tier === 'pro' || subscription.tier === 'admin')) {
+      const celebrationKey = `watchman_pro_celebration_${user?.id || 'user'}`;
+      const hasSeenCelebration = localStorage.getItem(celebrationKey);
+
+      if (!hasSeenCelebration) {
+        // Small delay to let the page render first
+        const timer = setTimeout(() => {
+          setShowCelebration(true);
+          localStorage.setItem(celebrationKey, 'true');
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [subscription, user?.id]);
 
   const fetchSettings = async () => {
     try {
@@ -291,6 +312,12 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
+      {/* Pro Celebration Animation */}
+      <Celebration
+        isActive={showCelebration}
+        onComplete={() => setShowCelebration(false)}
+      />
+
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold">Settings</h1>
