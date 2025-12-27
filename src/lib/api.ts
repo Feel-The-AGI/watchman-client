@@ -329,13 +329,13 @@ class APIService {
       name?: string;
       show_commitments?: boolean;
       show_work_types?: boolean;
-    }) => this.request<any>('/api/sharing', {
+    }) => this.request<{ success: boolean; data: any }>('/api/sharing', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
     // List all share links
-    list: () => this.request<any[]>('/api/sharing'),
+    list: () => this.request<{ success: boolean; data: any[] }>('/api/sharing'),
 
     // Revoke a share link
     revoke: (shareId: string) => this.request<void>(`/api/sharing/${shareId}`, {
