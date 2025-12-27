@@ -90,6 +90,7 @@ export default function SettingsPage() {
   const [shareName, setShareName] = useState('My Shared Calendar');
   const [showCommitments, setShowCommitments] = useState(false);
   const [copiedShareId, setCopiedShareId] = useState<string | null>(null);
+  const [newlyCreatedShare, setNewlyCreatedShare] = useState<CalendarShare | null>(null);
 
   // Celebration state
   const [showCelebration, setShowCelebration] = useState(false);
@@ -249,11 +250,20 @@ export default function SettingsPage() {
         show_work_types: true,
       });
       if (response?.data) {
-        setShares([response.data, ...shares]);
+        const createdShare = response.data;
+        setShares([createdShare, ...shares]);
+        setNewlyCreatedShare(createdShare);
         setShareName('My Shared Calendar');
         setShowCommitments(false);
-        setSuccess('Share link created!');
-        setTimeout(() => setSuccess(null), 3000);
+        // Auto-copy to clipboard
+        const fullUrl = `${window.location.origin}${createdShare.share_url}`;
+        navigator.clipboard.writeText(fullUrl);
+        setCopiedShareId(createdShare.id);
+        setSuccess('Share link created and copied!');
+        setTimeout(() => {
+          setSuccess(null);
+          setCopiedShareId(null);
+        }, 3000);
       }
     } catch (err: any) {
       setError(err.message || 'Failed to create share link');
@@ -516,7 +526,7 @@ export default function SettingsPage() {
                           { feature: 'Weighted constraints', free: '—', pro: '✓' },
                           { feature: 'Leave planning', free: '—', pro: '✓' },
                           { feature: 'CSV/PDF exports', free: '—', pro: '✓' },
-                          { feature: 'Calendar sharing', free: '—', pro: 'Soon' },
+                          { feature: 'Calendar sharing', free: '—', pro: '✓' },
                           { feature: '3-day Pro trial', free: '✓', pro: '—' },
                         ].map((row) => (
                           <div key={row.feature} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
@@ -718,19 +728,63 @@ export default function SettingsPage() {
                                 />
                               </button>
                             </div>
-                            <Button
-                              variant="gradient"
-                              className="w-full gap-2"
-                              onClick={handleCreateShare}
-                              disabled={creatingShare}
-                            >
-                              {creatingShare ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Link className="w-4 h-4" />
-                              )}
-                              Create Share Link
-                            </Button>
+                            {newlyCreatedShare ? (
+                              <div className="space-y-3">
+                                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <CheckCircle className="w-5 h-5 text-emerald-400" />
+                                    <span className="font-medium text-emerald-400">Link Created!</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 p-2 bg-watchman-bg rounded-lg">
+                                    <input
+                                      type="text"
+                                      readOnly
+                                      value={`${typeof window !== 'undefined' ? window.location.origin : ''}${newlyCreatedShare.share_url}`}
+                                      className="flex-1 bg-transparent text-sm text-white/80 outline-none"
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => copyShareLink(newlyCreatedShare)}
+                                      className="gap-1 shrink-0"
+                                    >
+                                      {copiedShareId === newlyCreatedShare.id ? (
+                                        <>
+                                          <CheckCircle className="w-4 h-4 text-emerald-400" />
+                                          <span className="text-emerald-400">Copied!</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Copy className="w-4 h-4" />
+                                          Copy
+                                        </>
+                                      )}
+                                    </Button>
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="secondary"
+                                  className="w-full"
+                                  onClick={() => setNewlyCreatedShare(null)}
+                                >
+                                  Create Another
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                variant="gradient"
+                                className="w-full gap-2"
+                                onClick={handleCreateShare}
+                                disabled={creatingShare}
+                              >
+                                {creatingShare ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Link className="w-4 h-4" />
+                                )}
+                                Create Share Link
+                              </Button>
+                            )}
                           </div>
                         </div>
 

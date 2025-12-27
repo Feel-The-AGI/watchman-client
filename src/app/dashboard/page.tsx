@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { 
@@ -54,10 +54,18 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [hasSetup, setHasSetup] = useState(false);
 
-  const fetchCalendarData = useCallback(async () => {
+  // Use ref to track current year to avoid stale closures
+  const currentYearRef = useRef(currentYear);
+  currentYearRef.current = currentYear;
+
+  const fetchCalendarData = useCallback(async (yearOverride?: number) => {
+    const yearToFetch = yearOverride ?? currentYearRef.current;
+
     try {
       setLoading(true);
       setError(null);
+      // Clear old data immediately to prevent stale data showing
+      setCalendarDays([]);
 
       const cyclesResponse = await api.cycles.list();
       if (!cyclesResponse || cyclesResponse.length === 0) {
@@ -68,25 +76,25 @@ export default function DashboardPage() {
       setHasSetup(true);
 
       const activeCycle = cyclesResponse.find((c: any) => c.is_active) || cyclesResponse[0];
-      
-      // Determine which year to fetch
-      let yearToFetch = currentYear;
-      
+
+      // Determine which year to fetch - only adjust on FIRST load
+      let fetchYear = yearToFetch;
+
       // Only set anchor year on FIRST load, not every navigation
       if (!initialYearSet && activeCycle?.anchor_date) {
         const anchorYear = new Date(activeCycle.anchor_date).getFullYear();
-        if (anchorYear >= new Date().getFullYear() && anchorYear !== currentYear) {
+        if (anchorYear >= new Date().getFullYear() && anchorYear !== yearToFetch) {
           setCurrentYear(anchorYear);
-          yearToFetch = anchorYear;
+          fetchYear = anchorYear;
         }
         setInitialYearSet(true);
       }
 
-      // Always fetch calendar data
-      const calendarResponse = await api.calendar.getYear(yearToFetch);
+      // Fetch calendar data for the correct year
+      const calendarResponse = await api.calendar.getYear(fetchYear);
       setCalendarDays(calendarResponse || []);
 
-      const statsResponse = await api.stats.getSummary(yearToFetch);
+      const statsResponse = await api.stats.getSummary(fetchYear);
       setStats(statsResponse || null);
     } catch (err: any) {
       console.error('Failed to fetch calendar:', err);
@@ -94,11 +102,13 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentYear, initialYearSet]);
+  }, [initialYearSet]);
 
+  // Initial fetch only
   useEffect(() => {
     fetchCalendarData();
-  }, [fetchCalendarData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selectedDayData = selectedDate 
     ? calendarDays.find(d => d.date === format(selectedDate, 'yyyy-MM-dd')) || null
@@ -155,10 +165,15 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2 sm:gap-4">
             {/* Year Navigation */}
             <motion.button
-              onClick={() => setCurrentYear(y => y - 1)}
+              onClick={() => {
+                const newYear = currentYear - 1;
+                setCurrentYear(newYear);
+                fetchCalendarData(newYear);
+              }}
               className="p-2 sm:p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
+              disabled={loading}
             >
               <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </motion.button>
@@ -173,10 +188,15 @@ export default function DashboardPage() {
             </div>
 
             <motion.button
-              onClick={() => setCurrentYear(y => y + 1)}
+              onClick={() => {
+                const newYear = currentYear + 1;
+                setCurrentYear(newYear);
+                fetchCalendarData(newYear);
+              }}
               className="p-2 sm:p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
+              disabled={loading}
             >
               <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
             </motion.button>
@@ -186,7 +206,7 @@ export default function DashboardPage() {
           <Button
             variant="glass"
             size="sm"
-            onClick={fetchCalendarData}
+            onClick={() => fetchCalendarData()}
             disabled={loading}
             className="gap-2"
           >
@@ -235,7 +255,7 @@ export default function DashboardPage() {
           >
             <AlertCircle className="w-5 h-5 text-watchman-error flex-shrink-0" />
             <p className="text-sm text-watchman-error">{error}</p>
-            <Button variant="ghost" size="sm" onClick={fetchCalendarData} className="ml-auto">
+            <Button variant="ghost" size="sm" onClick={() => fetchCalendarData()} className="ml-auto">
               Retry
             </Button>
           </motion.div>

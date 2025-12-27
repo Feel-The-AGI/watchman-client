@@ -52,7 +52,7 @@ const tiers = [
       'Full statistics & analytics',
       'CSV & PDF exports',
       'Leave planning',
-      'Calendar sharing (coming soon)',
+      'Calendar sharing',
     ],
     limitations: [],
     cta: 'Start Pro Trial',
@@ -267,7 +267,7 @@ export default function PricingPage() {
                   { feature: 'Weighted constraints', free: false, pro: true },
                   { feature: 'Leave planning', free: false, pro: true },
                   { feature: 'Exports (CSV/PDF)', free: false, pro: true },
-                  { feature: 'Calendar sharing', free: false, pro: 'Coming soon' },
+                  { feature: 'Calendar sharing', free: false, pro: true },
                   { feature: '3-day Pro trial', free: true, pro: '—' },
                 ].map((row, i) => (
                   <motion.tr
