@@ -30,6 +30,14 @@ import {
   MoreHorizontal,
   ChevronDown,
   ChevronUp,
+  HeartPulse,
+  Ban,
+  Weight,
+  DollarSign,
+  CalendarClock,
+  MessageSquareWarning,
+  ShieldAlert,
+  Building2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from '@/components/ui/Toast';
@@ -91,6 +99,14 @@ const incidentTypes = {
   harassment: { icon: UserX, label: 'Harassment', color: 'text-purple-400', bg: 'bg-purple-500/20' },
   injury: { icon: Siren, label: 'Injury', color: 'text-red-500', bg: 'bg-red-600/20' },
   policy_violation: { icon: FileWarning, label: 'Policy Violation', color: 'text-yellow-400', bg: 'bg-yellow-500/20' },
+  health: { icon: HeartPulse, label: 'Health / Sick', color: 'text-pink-400', bg: 'bg-pink-500/20' },
+  discrimination: { icon: Ban, label: 'Discrimination', color: 'text-fuchsia-400', bg: 'bg-fuchsia-500/20' },
+  workload: { icon: Weight, label: 'Excessive Workload', color: 'text-blue-400', bg: 'bg-blue-500/20' },
+  compensation: { icon: DollarSign, label: 'Pay / Compensation', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
+  scheduling: { icon: CalendarClock, label: 'Scheduling Issue', color: 'text-cyan-400', bg: 'bg-cyan-500/20' },
+  communication: { icon: MessageSquareWarning, label: 'Communication Issue', color: 'text-sky-400', bg: 'bg-sky-500/20' },
+  retaliation: { icon: ShieldAlert, label: 'Retaliation', color: 'text-rose-400', bg: 'bg-rose-500/20' },
+  environment: { icon: Building2, label: 'Work Environment', color: 'text-slate-400', bg: 'bg-slate-500/20' },
   other: { icon: MoreHorizontal, label: 'Other', color: 'text-gray-400', bg: 'bg-gray-500/20' },
 };
 
