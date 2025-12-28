@@ -31,40 +31,40 @@ const stats = [
   { value: '0', label: 'Silent Changes', suffix: '' },
 ];
 
-// Features with emotional copy
+// Features with tension-focused copy
 const features = [
   {
     title: 'Speak Your Pattern',
-    description: '"5 days, 5 nights, 5 off. January 1st is Day 4." That\'s it. Your entire year materializes.',
+    description: 'Just explain your rotation in plain language: "5 days, 5 nights, 5 off. Jan 1 is day 4." Watchman does the rest — forever.',
     icon: MessageSquare,
     gradient: 'from-cyan-500 to-emerald-500',
   },
   {
-    title: 'Rules That Never Break',
-    description: 'No study on night shifts. Max 2 commitments per day. Set them once. Trust them forever.',
+    title: 'Protect Your Boundaries',
+    description: 'No study during night shift. Never more than 2 commitments per day. Set them once. Trust them always.',
     icon: Shield,
     gradient: 'from-rose-500 to-orange-500',
   },
   {
-    title: 'Nothing Moves Silently',
-    description: 'Every change is proposed. Every change is explained. You approve, or it doesn\'t happen.',
+    title: 'No Silent Changes',
+    description: 'Every update to your schedule is proposed, not imposed. You approve it — or it doesn\'t happen.',
     icon: Eye,
     gradient: 'from-violet-500 to-purple-500',
   },
   {
-    title: 'See The Whole Truth',
-    description: '365 days at once. Patterns visible. Fatigue predictable. No more calendar amnesia.',
+    title: 'Life-State Simulator',
+    description: 'Not another productivity app. A deterministic engine that tracks who you are, where you are, and what\'s possible — every hour of every day.',
     icon: Layers,
     gradient: 'from-amber-500 to-yellow-500',
   },
 ];
 
-// How it works - simplified
+// How it works - Four steps. No surprises.
 const steps = [
-  { num: '01', title: 'Define Your Cycle', desc: 'Tell us your rotation. We remember it forever.', icon: Clock },
-  { num: '02', title: 'Set Your Boundaries', desc: 'Rules that never bend. Constraints that protect you.', icon: Shield },
-  { num: '03', title: 'Propose Changes', desc: 'Need leave? New commitment? Just ask.', icon: MessageSquare },
-  { num: '04', title: 'Approve & Move', desc: 'You decide. Nothing updates without your say.', icon: CheckCircle },
+  { num: '01', title: 'Define Your Cycle', desc: 'Tell us your shift pattern in natural language.', icon: Clock },
+  { num: '02', title: 'Set Your Rules', desc: 'Tell us what matters — sleep, study, max load.', icon: Shield },
+  { num: '03', title: 'Propose Changes', desc: 'Need leave? A new commitment? Just ask.', icon: MessageSquare },
+  { num: '04', title: 'Approve or Decline', desc: "You're in control. Nothing changes without you.", icon: CheckCircle },
 ];
 
 // Industries
@@ -273,43 +273,41 @@ export default function LandingPage() {
         <FloatingDays />
 
         <div className="relative max-w-5xl mx-auto text-center z-10">
-          {/* Problem Badge */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-rose-500/10 border border-rose-500/20 mb-8"
-          >
-            <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-            <span className="text-sm text-rose-400">Your calendar is lying to you</span>
-          </motion.div>
-
-          {/* Main Headline - Emotional */}
+          {/* Main Headline */}
           <motion.h1
-            className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold mb-8 leading-[0.9] tracking-tight"
+            className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold mb-6 leading-[0.9] tracking-tight"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.1 }}
           >
-            <span className="text-white">Your Life Isn't</span>
-            <br />
-            <span className="text-white/40">Event-Based.</span>
+            <span className="text-white">Time, finally</span>
             <br />
             <span className="bg-gradient-to-r from-cyan-400 via-emerald-400 to-green-400 bg-clip-text text-transparent">
-              It's Rule-Based.
+              under control.
             </span>
           </motion.h1>
 
-          {/* Subheadline - Pain Point */}
+          {/* Subheadline - The Ache */}
           <motion.p
-            className="text-lg sm:text-xl md:text-2xl text-white/50 mb-12 max-w-3xl mx-auto leading-relaxed"
+            className="text-xl sm:text-2xl md:text-3xl text-white/60 mb-6 max-w-3xl mx-auto leading-relaxed"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
           >
-            Rotating shifts. Night work. Cycles that repeat.
-            <br className="hidden sm:block" />
-            <span className="text-white/70">Most calendars don't understand. This one does.</span>
+            Your life runs on cycles.
+            <br />
+            <span className="text-white/40">Most calendars pretend it doesn't.</span>
+          </motion.p>
+
+          {/* Value Prop */}
+          <motion.p
+            className="text-base sm:text-lg text-white/50 mb-12 max-w-2xl mx-auto leading-relaxed"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.25 }}
+          >
+            Watchman is a rule-driven calendar built for rotating shifts, study schedules, and real constraints.
+            <span className="text-white/70"> It listens. It proposes. Nothing changes without your approval.</span>
           </motion.p>
 
           {/* CTA Buttons */}
@@ -481,16 +479,17 @@ export default function LandingPage() {
             viewport={{ once: true }}
           >
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-8 leading-tight">
-              <span className="text-white/40">You're not disorganized.</span>
+              Your calendar keeps
               <br />
-              <span className="text-white">Your tools are.</span>
+              <span className="bg-gradient-to-r from-rose-400 to-orange-400 bg-clip-text text-transparent">lying to you.</span>
             </h2>
             <p className="text-lg sm:text-xl text-white/50 max-w-2xl mx-auto leading-relaxed">
-              Most calendars are built for 9-to-5 office workers. They don't understand
-              <span className="text-cyan-400"> rotating patterns</span>,
-              <span className="text-emerald-400"> night shifts</span>, or
-              <span className="text-amber-400"> FIFO swings</span>.
-              They silently reschedule. They break your rules. They lie.
+              Rotating shifts. Nights. Leave. Study. Life.
+              <br className="hidden sm:block" />
+              Most tools force you to manually fix things every week — or
+              <span className="text-rose-400"> silently reschedule behind your back</span>.
+              <br className="hidden sm:block" />
+              <span className="text-white/70 font-medium">Watchman does neither.</span>
             </p>
           </motion.div>
         </div>
@@ -553,8 +552,8 @@ export default function LandingPage() {
             className="text-center mb-16"
           >
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
-              Four Steps.
-              <span className="text-white/40"> Zero Surprises.</span>
+              Four steps.
+              <span className="text-white/40"> No surprises.</span>
             </h2>
           </motion.div>
 
@@ -601,7 +600,7 @@ export default function LandingPage() {
             </h2>
           </motion.div>
 
-          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 mb-8">
             {industries.map((industry, i) => (
               <motion.div
                 key={industry.name}
@@ -617,6 +616,16 @@ export default function LandingPage() {
               </motion.div>
             ))}
           </div>
+
+          <motion.p
+            className="text-center text-white/40 text-sm sm:text-base"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.3 }}
+          >
+            And anyone tired of fighting their calendar every week.
+          </motion.p>
         </div>
       </section>
 
