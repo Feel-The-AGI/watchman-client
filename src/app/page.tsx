@@ -512,6 +512,9 @@ export default function LandingPage() {
 
   const heroY = useTransform(scrollYProgress, [0, 0.3], [0, -100]);
   const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
+  // Calendar starts faint and becomes fully visible as user scrolls
+  const calendarOpacity = useTransform(scrollYProgress, [0, 0.15], [0.4, 1]);
+  const calendarScale = useTransform(scrollYProgress, [0, 0.15], [0.95, 1]);
 
   const isLoggedIn = !!user && !loading;
 
@@ -696,33 +699,6 @@ export default function LandingPage() {
             </Link>
           </motion.div>
 
-          {/* Hero Product Preview - LIVE Calendar */}
-          <motion.div
-            className="relative max-w-4xl mx-auto"
-            initial={{ opacity: 0, y: 40, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 1, delay: 0.4 }}
-          >
-            {/* Glow effect behind */}
-            <div className="absolute -inset-4 bg-gradient-to-r from-cyan-500/20 via-emerald-500/20 to-green-500/20 rounded-3xl blur-2xl" />
-
-            {/* Live Calendar - Shows REAL current month with today highlighted */}
-            <div className="relative shadow-2xl">
-              <LiveCalendar />
-            </div>
-
-            {/* "Live" indicator badge */}
-            <motion.div
-              className="absolute -top-3 -right-3 px-3 py-1.5 rounded-full bg-cyan-500/20 border border-cyan-500/30 backdrop-blur-sm"
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                <span className="text-xs font-medium text-cyan-400">Live Preview</span>
-              </div>
-            </motion.div>
-          </motion.div>
         </div>
 
         {/* Scroll indicator */}
@@ -742,6 +718,39 @@ export default function LandingPage() {
               animate={{ opacity: [0.5, 1, 0.5] }}
               transition={{ duration: 2, repeat: Infinity }}
             />
+          </motion.div>
+        </motion.div>
+      </motion.section>
+
+      {/* Hero Product Preview - LIVE Calendar (Independent of hero opacity) */}
+      <motion.section
+        className="relative -mt-[420px] sm:-mt-[400px] md:-mt-[380px] pb-20 px-6 z-20 pointer-events-none"
+        style={{ opacity: calendarOpacity, scale: calendarScale }}
+      >
+        <motion.div
+          className="relative max-w-4xl mx-auto pointer-events-auto"
+          initial={{ opacity: 0, y: 40, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 1, delay: 0.4 }}
+        >
+          {/* Glow effect behind */}
+          <div className="absolute -inset-4 bg-gradient-to-r from-cyan-500/20 via-emerald-500/20 to-green-500/20 rounded-3xl blur-2xl" />
+
+          {/* Live Calendar - Shows REAL current month with today highlighted */}
+          <div className="relative shadow-2xl">
+            <LiveCalendar />
+          </div>
+
+          {/* "Live" indicator badge */}
+          <motion.div
+            className="absolute -top-3 -right-3 px-3 py-1.5 rounded-full bg-cyan-500/20 border border-cyan-500/30 backdrop-blur-sm"
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+              <span className="text-xs font-medium text-cyan-400">Live Preview</span>
+            </div>
           </motion.div>
         </motion.div>
       </motion.section>
