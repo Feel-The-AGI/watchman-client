@@ -273,41 +273,43 @@ export default function LandingPage() {
         <FloatingDays />
 
         <div className="relative max-w-5xl mx-auto text-center z-10">
-          {/* Main Headline */}
+          {/* Problem Badge */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-rose-500/10 border border-rose-500/20 mb-8"
+          >
+            <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+            <span className="text-sm text-rose-400">Your calendar is lying to you</span>
+          </motion.div>
+
+          {/* Main Headline - Emotional */}
           <motion.h1
-            className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold mb-6 leading-[0.9] tracking-tight"
+            className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold mb-8 leading-[0.9] tracking-tight"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.1 }}
           >
-            <span className="text-white">Your Year,</span>
+            <span className="text-white">Your Life Isn't</span>
+            <br />
+            <span className="text-white/40">Event-Based.</span>
             <br />
             <span className="bg-gradient-to-r from-cyan-400 via-emerald-400 to-green-400 bg-clip-text text-transparent">
-              Under Control.
+              It's Rule-Based.
             </span>
           </motion.h1>
 
-          {/* Subheadline */}
+          {/* Subheadline - Pain Point */}
           <motion.p
-            className="text-xl sm:text-2xl md:text-3xl text-white/60 mb-6 max-w-3xl mx-auto leading-relaxed"
+            className="text-lg sm:text-xl md:text-2xl text-white/50 mb-12 max-w-3xl mx-auto leading-relaxed"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
           >
-            See your schedule at a glance.
-            <br />
-            <span className="text-white/40">Define rules that never break. Change deliberately.</span>
-          </motion.p>
-
-          {/* Value Prop */}
-          <motion.p
-            className="text-base sm:text-lg text-white/50 mb-12 max-w-2xl mx-auto leading-relaxed"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.25 }}
-          >
-            Watchman is a deterministic calendar built for rotating shifts, night work, and complex schedules.
-            <span className="text-white/70"> Every change is proposed—nothing updates without your approval.</span>
+            Rotating shifts. Night work. Cycles that repeat.
+            <br className="hidden sm:block" />
+            <span className="text-white/70">Most calendars don't understand. This one does.</span>
           </motion.p>
 
           {/* CTA Buttons */}
