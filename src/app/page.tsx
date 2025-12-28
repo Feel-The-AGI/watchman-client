@@ -1,26 +1,26 @@
 'use client';
 
-import { motion, useScroll, useTransform, useMotionValue, useSpring, AnimatePresence } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
   ArrowRight,
   MessageSquare,
   Shield,
-  Check,
   Clock,
-  Zap,
-  Target,
   Layers,
-  User,
   Play,
-  Calendar,
   Lock,
   Eye,
   CheckCircle,
+  Sun,
+  Moon,
+  Coffee,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 
 // Stats for social proof
@@ -61,7 +61,7 @@ const features = [
 
 // How it works - simplified
 const steps = [
-  { num: '01', title: 'Define Your Cycle', desc: 'Tell us your rotation. We remember it forever.', icon: Clock },
+  { num: '01', title: 'Define Your Cycle', desc: 'Tell us your rotation. It becomes the foundation of your calendar.', icon: Clock },
   { num: '02', title: 'Set Your Boundaries', desc: 'Rules that never bend. Constraints that protect you.', icon: Shield },
   { num: '03', title: 'Propose Changes', desc: 'Need leave? New commitment? Just ask.', icon: MessageSquare },
   { num: '04', title: 'Approve & Move', desc: 'You decide. Nothing updates without your say.', icon: CheckCircle },
@@ -142,16 +142,161 @@ function AnimatedCounter({ value, suffix }: { value: string; suffix: string }) {
   return <span>{count}{suffix}</span>;
 }
 
-// Glowing orb component
-function GlowOrb({ className, color }: { className?: string; color: string }) {
+// Live Calendar Component - Shows REAL current month with today highlighted
+function LiveCalendar() {
+  const [currentDate] = useState(new Date());
+
+  const today = currentDate.getDate();
+  const currentMonth = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
+
+  // Get month details
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
+  // Convert Sunday=0 to Monday=0 format
+  const startDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
+
+  // Generate calendar days
+  const calendarDays = useMemo(() => {
+    const days = [];
+    // Empty cells before first day
+    for (let i = 0; i < startDay; i++) {
+      days.push({ day: null, type: 'empty' });
+    }
+    // Actual days with 5-5-5 rotation pattern
+    for (let day = 1; day <= daysInMonth; day++) {
+      const cycleDay = (day - 1) % 15;
+      let type: 'day_shift' | 'night_shift' | 'off';
+      if (cycleDay < 5) type = 'day_shift';
+      else if (cycleDay < 10) type = 'night_shift';
+      else type = 'off';
+      days.push({ day, type, isToday: day === today });
+    }
+    return days;
+  }, [daysInMonth, startDay, today]);
+
+  // Work type styles matching the actual app
+  const getWorkTypeStyle = (type: string, isToday: boolean) => {
+    const baseStyles = {
+      day_shift: 'bg-amber-500/20 border-amber-500/30',
+      night_shift: 'bg-indigo-500/20 border-indigo-500/30',
+      off: 'bg-emerald-500/20 border-emerald-500/30',
+      empty: 'bg-transparent border-transparent',
+    };
+
+    const todayRing = isToday ? 'ring-2 ring-cyan-400 ring-offset-2 ring-offset-[#0d1117]' : '';
+    return `${baseStyles[type as keyof typeof baseStyles] || baseStyles.empty} ${todayRing}`;
+  };
+
+  const getWorkTypeIcon = (type: string) => {
+    switch (type) {
+      case 'day_shift':
+        return <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />;
+      case 'night_shift':
+        return <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400" />;
+      case 'off':
+        return <Coffee className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />;
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className={`absolute rounded-full blur-[100px] opacity-30 ${className}`} style={{ background: color }} />
+    <div className="rounded-xl bg-[#0d1117] border border-white/10 overflow-hidden">
+      {/* Calendar Header - Like the app */}
+      <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-white/5">
+        <button className="p-2 rounded-lg hover:bg-white/5 transition-colors text-white/40">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <h3 className="text-lg sm:text-xl font-semibold text-white">
+          {monthNames[currentMonth]} {currentYear}
+        </h3>
+        <button className="p-2 rounded-lg hover:bg-white/5 transition-colors text-white/40">
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Day Headers */}
+      <div className="grid grid-cols-7 border-b border-white/5">
+        {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day) => (
+          <div key={day} className="py-3 text-center text-[10px] sm:text-xs font-medium text-white/40 uppercase tracking-wider">
+            {day}
+          </div>
+        ))}
+      </div>
+
+      {/* Calendar Grid */}
+      <div className="grid grid-cols-7 gap-px bg-white/5 p-px">
+        {calendarDays.map((item, i) => (
+          <motion.div
+            key={i}
+            className={`relative aspect-square bg-[#0d1117] flex flex-col items-center justify-center gap-1 transition-all duration-200 ${
+              item.day ? 'hover:bg-white/5 cursor-pointer' : ''
+            }`}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3 + i * 0.008, duration: 0.3 }}
+          >
+            {item.day && (
+              <>
+                {/* Day number and cycle indicator */}
+                <div className="absolute top-1 left-1 sm:top-2 sm:left-2 flex items-center gap-1">
+                  <span className={`text-xs sm:text-sm font-medium ${item.isToday ? 'text-cyan-400' : 'text-white/80'}`}>
+                    {item.day}
+                  </span>
+                </div>
+
+                {/* Work type icon button */}
+                <div
+                  className={`w-8 h-8 sm:w-10 sm:h-10 mt-2 rounded-xl border flex items-center justify-center transition-all duration-200 ${getWorkTypeStyle(item.type, item.isToday || false)}`}
+                >
+                  {getWorkTypeIcon(item.type)}
+                </div>
+
+                {/* Today indicator dot */}
+                {item.isToday && (
+                  <motion.div
+                    className="absolute bottom-1 right-1 sm:bottom-2 sm:right-2 w-1.5 h-1.5 rounded-full bg-cyan-400"
+                    animate={{ scale: [1, 1.2, 1], opacity: [1, 0.7, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  />
+                )}
+              </>
+            )}
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-4 sm:gap-8 py-4 border-t border-white/5 bg-white/[0.02]">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
+            <Sun className="w-3 h-3 text-amber-400" />
+          </div>
+          <span className="text-xs text-white/50">Day</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
+            <Moon className="w-3 h-3 text-indigo-400" />
+          </div>
+          <span className="text-xs text-white/50">Night</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
+            <Coffee className="w-3 h-3 text-emerald-400" />
+          </div>
+          <span className="text-xs text-white/50">Off</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
 export default function LandingPage() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { user, profile, loading } = useAuth();
+  const { user, loading } = useAuth();
   const { scrollYProgress } = useScroll();
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
@@ -338,7 +483,7 @@ export default function LandingPage() {
             </Link>
           </motion.div>
 
-          {/* Hero Product Preview */}
+          {/* Hero Product Preview - LIVE Calendar */}
           <motion.div
             className="relative max-w-4xl mx-auto"
             initial={{ opacity: 0, y: 40, scale: 0.95 }}
@@ -348,82 +493,22 @@ export default function LandingPage() {
             {/* Glow effect behind */}
             <div className="absolute -inset-4 bg-gradient-to-r from-cyan-500/20 via-emerald-500/20 to-green-500/20 rounded-3xl blur-2xl" />
 
-            {/* Product preview card */}
-            <div className="relative rounded-2xl bg-[#0d1117] border border-white/10 p-1 shadow-2xl">
-              <div className="rounded-xl bg-gradient-to-b from-white/[0.03] to-transparent p-6 sm:p-8">
-                {/* Mini calendar header */}
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center">
-                      <Calendar className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold">January 2025</div>
-                      <div className="text-xs text-white/40">5-5-5 Rotation Active</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-medium">
-                      All Rules Met
-                    </span>
-                  </div>
-                </div>
-
-                {/* Calendar grid */}
-                <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
-                  {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => (
-                    <div key={i} className="text-center text-[10px] sm:text-xs text-white/30 py-1 sm:py-2 font-medium">
-                      {day}
-                    </div>
-                  ))}
-                  {Array.from({ length: 35 }, (_, i) => {
-                    const dayNum = i - 2; // Offset for January starting on Wednesday
-                    const cycleDay = dayNum % 15;
-                    let type = 'empty';
-                    if (dayNum >= 1 && dayNum <= 31) {
-                      if (cycleDay >= 0 && cycleDay < 5) type = 'day';
-                      else if (cycleDay >= 5 && cycleDay < 10) type = 'night';
-                      else type = 'off';
-                    }
-
-                    const styles = {
-                      empty: 'bg-transparent',
-                      day: 'bg-gradient-to-br from-amber-500/30 to-orange-500/30 border-amber-500/40 text-amber-200',
-                      night: 'bg-gradient-to-br from-indigo-500/30 to-purple-500/30 border-indigo-500/40 text-indigo-200',
-                      off: 'bg-gradient-to-br from-emerald-500/30 to-green-500/30 border-emerald-500/40 text-emerald-200',
-                    };
-
-                    return (
-                      <motion.div
-                        key={i}
-                        className={`aspect-square rounded-lg border border-transparent flex items-center justify-center text-[10px] sm:text-xs font-medium ${styles[type as keyof typeof styles]}`}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.5 + i * 0.01 }}
-                      >
-                        {dayNum >= 1 && dayNum <= 31 ? dayNum : ''}
-                      </motion.div>
-                    );
-                  })}
-                </div>
-
-                {/* Legend */}
-                <div className="flex items-center justify-center gap-4 sm:gap-6 mt-6 pt-4 border-t border-white/5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-gradient-to-br from-amber-500 to-orange-500" />
-                    <span className="text-[10px] sm:text-xs text-white/50">Day</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500" />
-                    <span className="text-[10px] sm:text-xs text-white/50">Night</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-gradient-to-br from-emerald-500 to-green-500" />
-                    <span className="text-[10px] sm:text-xs text-white/50">Off</span>
-                  </div>
-                </div>
-              </div>
+            {/* Live Calendar - Shows REAL current month with today highlighted */}
+            <div className="relative shadow-2xl">
+              <LiveCalendar />
             </div>
+
+            {/* "Live" indicator badge */}
+            <motion.div
+              className="absolute -top-3 -right-3 px-3 py-1.5 rounded-full bg-cyan-500/20 border border-cyan-500/30 backdrop-blur-sm"
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                <span className="text-xs font-medium text-cyan-400">Live Preview</span>
+              </div>
+            </motion.div>
           </motion.div>
         </div>
 
@@ -490,7 +575,7 @@ export default function LandingPage() {
               <span className="text-cyan-400"> rotating patterns</span>,
               <span className="text-emerald-400"> night shifts</span>, or
               <span className="text-amber-400"> FIFO swings</span>.
-              They silently reschedule. They break your rules. They lie.
+              They silently reschedule. They break your rules.
             </p>
           </motion.div>
         </div>
@@ -587,12 +672,13 @@ export default function LandingPage() {
       </section>
 
       {/* Industries */}
-      <section className="py-24 sm:py-32 px-6">
+      <section className="py-24 sm:py-32 px-6 overflow-hidden">
         <div className="max-w-6xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.6 }}
             className="text-center mb-12"
           >
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
@@ -601,22 +687,45 @@ export default function LandingPage() {
             </h2>
           </motion.div>
 
-          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+          <motion.div
+            className="flex flex-wrap items-center justify-center gap-3 sm:gap-4"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{ duration: 0.5 }}
+          >
             {industries.map((industry, i) => (
               <motion.div
                 key={industry.name}
-                className="flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-full bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06] hover:border-white/[0.15] transition-all duration-300"
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.05 }}
-                whileHover={{ scale: 1.05 }}
+                className="flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-full bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06] hover:border-white/[0.15] transition-all duration-300 cursor-default"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{
+                  duration: 0.4,
+                  delay: i * 0.08,
+                  ease: "easeOut"
+                }}
+                whileHover={{
+                  scale: 1.05,
+                  transition: { duration: 0.2 }
+                }}
               >
                 <span className="text-lg sm:text-xl">{industry.icon}</span>
                 <span className="text-sm font-medium text-white/70">{industry.name}</span>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
+
+          <motion.p
+            className="text-center text-white/40 text-sm mt-8"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.5, duration: 0.5 }}
+          >
+            And anyone tired of fighting their calendar every week.
+          </motion.p>
         </div>
       </section>
 
