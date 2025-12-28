@@ -142,6 +142,216 @@ function AnimatedCounter({ value, suffix }: { value: string; suffix: string }) {
   return <span>{count}{suffix}</span>;
 }
 
+// New Year Celebration Component - Confetti & Fireworks on January 1st!
+function NewYearCelebration() {
+  const [particles, setParticles] = useState<Array<{
+    id: number;
+    x: number;
+    y: number;
+    color: string;
+    size: number;
+    velocity: { x: number; y: number };
+    type: 'confetti' | 'firework' | 'spark';
+    rotation: number;
+    rotationSpeed: number;
+    opacity: number;
+  }>>([]);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [fireworkBursts, setFireworkBursts] = useState<Array<{
+    id: number;
+    x: number;
+    y: number;
+    color: string;
+  }>>([]);
+
+  useEffect(() => {
+    // Check if it's January 1st
+    const now = new Date();
+    const isNewYear = now.getMonth() === 0 && now.getDate() === 1;
+
+    if (!isNewYear) return;
+
+    setShowCelebration(true);
+
+    const colors = [
+      '#22d3ee', // cyan
+      '#4ade80', // green
+      '#f59e0b', // amber
+      '#ec4899', // pink
+      '#8b5cf6', // violet
+      '#ef4444', // red
+      '#fbbf24', // yellow
+      '#ffffff', // white
+    ];
+
+    // Create initial confetti burst
+    const createConfetti = () => {
+      const newParticles = [];
+      for (let i = 0; i < 150; i++) {
+        newParticles.push({
+          id: Math.random(),
+          x: Math.random() * window.innerWidth,
+          y: -20 - Math.random() * 100,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          size: 8 + Math.random() * 8,
+          velocity: {
+            x: (Math.random() - 0.5) * 8,
+            y: 2 + Math.random() * 4,
+          },
+          type: 'confetti' as const,
+          rotation: Math.random() * 360,
+          rotationSpeed: (Math.random() - 0.5) * 15,
+          opacity: 1,
+        });
+      }
+      setParticles(prev => [...prev, ...newParticles]);
+    };
+
+    // Create firework burst
+    const createFirework = (x: number, y: number) => {
+      const burstColor = colors[Math.floor(Math.random() * colors.length)];
+      const burstId = Math.random();
+
+      setFireworkBursts(prev => [...prev, { id: burstId, x, y, color: burstColor }]);
+
+      const sparks = [];
+      for (let i = 0; i < 30; i++) {
+        const angle = (i / 30) * Math.PI * 2;
+        const speed = 3 + Math.random() * 5;
+        sparks.push({
+          id: Math.random(),
+          x,
+          y,
+          color: burstColor,
+          size: 3 + Math.random() * 3,
+          velocity: {
+            x: Math.cos(angle) * speed,
+            y: Math.sin(angle) * speed,
+          },
+          type: 'spark' as const,
+          rotation: 0,
+          rotationSpeed: 0,
+          opacity: 1,
+        });
+      }
+      setParticles(prev => [...prev, ...sparks]);
+
+      // Remove burst after animation
+      setTimeout(() => {
+        setFireworkBursts(prev => prev.filter(b => b.id !== burstId));
+      }, 500);
+    };
+
+    // Initial burst
+    createConfetti();
+
+    // Create multiple firework bursts over 10 seconds
+    const fireworkInterval = setInterval(() => {
+      createFirework(
+        100 + Math.random() * (window.innerWidth - 200),
+        100 + Math.random() * 300
+      );
+    }, 400);
+
+    // Add more confetti waves
+    const confettiInterval = setInterval(createConfetti, 2000);
+
+    // Animate particles
+    const animationInterval = setInterval(() => {
+      setParticles(prev =>
+        prev
+          .map(p => ({
+            ...p,
+            x: p.x + p.velocity.x,
+            y: p.y + p.velocity.y,
+            velocity: {
+              x: p.velocity.x * 0.99,
+              y: p.type === 'confetti' ? p.velocity.y + 0.1 : p.velocity.y + 0.15,
+            },
+            rotation: p.rotation + p.rotationSpeed,
+            opacity: p.type === 'spark' ? p.opacity * 0.96 : p.opacity,
+          }))
+          .filter(p => p.y < window.innerHeight + 50 && p.opacity > 0.1)
+      );
+    }, 16);
+
+    // Stop celebration after 10 seconds
+    const timeout = setTimeout(() => {
+      clearInterval(fireworkInterval);
+      clearInterval(confettiInterval);
+      setTimeout(() => {
+        clearInterval(animationInterval);
+        setShowCelebration(false);
+      }, 3000);
+    }, 10000);
+
+    return () => {
+      clearInterval(fireworkInterval);
+      clearInterval(confettiInterval);
+      clearInterval(animationInterval);
+      clearTimeout(timeout);
+    };
+  }, []);
+
+  if (!showCelebration) return null;
+
+  return (
+    <div className="fixed inset-0 pointer-events-none z-[100] overflow-hidden">
+      {/* Firework bursts */}
+      {fireworkBursts.map(burst => (
+        <motion.div
+          key={burst.id}
+          className="absolute rounded-full"
+          style={{
+            left: burst.x,
+            top: burst.y,
+            background: `radial-gradient(circle, ${burst.color} 0%, transparent 70%)`,
+          }}
+          initial={{ width: 0, height: 0, opacity: 1 }}
+          animate={{ width: 200, height: 200, opacity: 0 }}
+          transition={{ duration: 0.5 }}
+        />
+      ))}
+
+      {/* Confetti and sparks */}
+      {particles.map(particle => (
+        <div
+          key={particle.id}
+          className="absolute"
+          style={{
+            left: particle.x,
+            top: particle.y,
+            width: particle.size,
+            height: particle.type === 'confetti' ? particle.size * 0.6 : particle.size,
+            backgroundColor: particle.color,
+            borderRadius: particle.type === 'spark' ? '50%' : '2px',
+            transform: `rotate(${particle.rotation}deg)`,
+            opacity: particle.opacity,
+            boxShadow: particle.type === 'spark' ? `0 0 ${particle.size * 2}px ${particle.color}` : 'none',
+          }}
+        />
+      ))}
+
+      {/* Happy New Year message */}
+      <motion.div
+        className="absolute top-1/4 left-1/2 -translate-x-1/2 text-center"
+        initial={{ opacity: 0, scale: 0.5, y: 50 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ delay: 0.5, duration: 0.8, type: "spring" }}
+      >
+        <h2 className="text-4xl sm:text-6xl md:text-7xl font-bold mb-4">
+          <span className="bg-gradient-to-r from-cyan-400 via-emerald-400 to-amber-400 bg-clip-text text-transparent">
+            Happy New Year!
+          </span>
+        </h2>
+        <p className="text-xl sm:text-2xl text-white/80">
+          🎉 {new Date().getFullYear()} 🎉
+        </p>
+      </motion.div>
+    </div>
+  );
+}
+
 // Live Calendar Component - Shows REAL current month with today highlighted
 function LiveCalendar() {
   const [currentDate] = useState(new Date());
@@ -319,6 +529,9 @@ export default function LandingPage() {
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#0a0a0f] text-white overflow-hidden">
+      {/* New Year Celebration - Only on January 1st */}
+      <NewYearCelebration />
+
       {/* Dynamic Background */}
       <div className="fixed inset-0 pointer-events-none">
         {/* Base gradient */}
