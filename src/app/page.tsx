@@ -142,20 +142,23 @@ function AnimatedCounter({ value, suffix }: { value: string; suffix: string }) {
   return <span>{count}{suffix}</span>;
 }
 
+// Particle type for New Year celebration
+type CelebrationParticle = {
+  id: number;
+  x: number;
+  y: number;
+  color: string;
+  size: number;
+  velocity: { x: number; y: number };
+  type: 'confetti' | 'firework' | 'spark';
+  rotation: number;
+  rotationSpeed: number;
+  opacity: number;
+};
+
 // New Year Celebration Component - Confetti & Fireworks on January 1st!
 function NewYearCelebration() {
-  const [particles, setParticles] = useState<Array<{
-    id: number;
-    x: number;
-    y: number;
-    color: string;
-    size: number;
-    velocity: { x: number; y: number };
-    type: 'confetti' | 'firework' | 'spark';
-    rotation: number;
-    rotationSpeed: number;
-    opacity: number;
-  }>>([]);
+  const [particles, setParticles] = useState<CelebrationParticle[]>([]);
   const [showCelebration, setShowCelebration] = useState(false);
   const [fireworkBursts, setFireworkBursts] = useState<Array<{
     id: number;
@@ -186,7 +189,7 @@ function NewYearCelebration() {
 
     // Create initial confetti burst
     const createConfetti = () => {
-      const newParticles = [];
+      const newParticles: CelebrationParticle[] = [];
       for (let i = 0; i < 150; i++) {
         newParticles.push({
           id: Math.random(),
@@ -214,7 +217,7 @@ function NewYearCelebration() {
 
       setFireworkBursts(prev => [...prev, { id: burstId, x, y, color: burstColor }]);
 
-      const sparks = [];
+      const sparks: CelebrationParticle[] = [];
       for (let i = 0; i < 30; i++) {
         const angle = (i / 30) * Math.PI * 2;
         const speed = 3 + Math.random() * 5;
@@ -354,17 +357,34 @@ function NewYearCelebration() {
 
 // Live Calendar Component - Shows REAL current month with today highlighted
 function LiveCalendar() {
-  const [currentDate] = useState(new Date());
+  // Track the actual "today" date (never changes)
+  const realToday = useMemo(() => new Date(), []);
+  const todayDate = realToday.getDate();
+  const todayMonth = realToday.getMonth();
+  const todayYear = realToday.getFullYear();
 
-  const today = currentDate.getDate();
-  const currentMonth = currentDate.getMonth();
-  const currentYear = currentDate.getFullYear();
+  // Track the currently viewed month (can be navigated)
+  const [viewDate, setViewDate] = useState(new Date());
+  const viewMonth = viewDate.getMonth();
+  const viewYear = viewDate.getFullYear();
+
+  // Navigation functions
+  const goToPreviousMonth = () => {
+    setViewDate(new Date(viewYear, viewMonth - 1, 1));
+  };
+
+  const goToNextMonth = () => {
+    setViewDate(new Date(viewYear, viewMonth + 1, 1));
+  };
+
+  // Check if we're viewing the current month (to show "today" highlight)
+  const isCurrentMonth = viewMonth === todayMonth && viewYear === todayYear;
 
   // Get month details
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
                       'July', 'August', 'September', 'October', 'November', 'December'];
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
   // Convert Sunday=0 to Monday=0 format
   const startDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
 
@@ -382,10 +402,12 @@ function LiveCalendar() {
       if (cycleDay < 5) type = 'day_shift';
       else if (cycleDay < 10) type = 'night_shift';
       else type = 'off';
-      days.push({ day, type, isToday: day === today });
+      // Only mark as "today" if viewing current month and it's the actual today
+      const isToday = isCurrentMonth && day === todayDate;
+      days.push({ day, type, isToday });
     }
     return days;
-  }, [daysInMonth, startDay, today]);
+  }, [daysInMonth, startDay, todayDate, isCurrentMonth]);
 
   // Work type styles matching the actual app
   const getWorkTypeStyle = (type: string, isToday: boolean) => {
@@ -417,13 +439,30 @@ function LiveCalendar() {
     <div className="rounded-xl bg-[#0d1117] border border-white/10 overflow-hidden">
       {/* Calendar Header - Like the app */}
       <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-white/5">
-        <button className="p-2 rounded-lg hover:bg-white/5 transition-colors text-white/40">
+        <button
+          onClick={goToPreviousMonth}
+          className="p-2 rounded-lg hover:bg-white/10 transition-colors text-white/60 hover:text-white"
+        >
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <h3 className="text-lg sm:text-xl font-semibold text-white">
-          {monthNames[currentMonth]} {currentYear}
-        </h3>
-        <button className="p-2 rounded-lg hover:bg-white/5 transition-colors text-white/40">
+        <div className="flex items-center gap-3">
+          <h3 className="text-lg sm:text-xl font-semibold text-white">
+            {monthNames[viewMonth]} {viewYear}
+          </h3>
+          {/* "Today" button - only show when not viewing current month */}
+          {!isCurrentMonth && (
+            <button
+              onClick={() => setViewDate(new Date())}
+              className="px-2 py-1 text-xs font-medium rounded-md bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors"
+            >
+              Today
+            </button>
+          )}
+        </div>
+        <button
+          onClick={goToNextMonth}
+          className="p-2 rounded-lg hover:bg-white/10 transition-colors text-white/60 hover:text-white"
+        >
           <ChevronRight className="w-5 h-5" />
         </button>
       </div>
@@ -438,10 +477,10 @@ function LiveCalendar() {
       </div>
 
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7 gap-px bg-white/5 p-px">
+      <div key={`${viewMonth}-${viewYear}`} className="grid grid-cols-7 gap-px bg-white/5 p-px">
         {calendarDays.map((item, i) => (
           <motion.div
-            key={i}
+            key={`${viewMonth}-${viewYear}-${i}`}
             className={`relative aspect-square bg-[#0d1117] flex flex-col items-center justify-center gap-1 transition-all duration-200 ${
               item.day ? 'hover:bg-white/5 cursor-pointer' : ''
             }`}
