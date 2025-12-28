@@ -367,8 +367,8 @@ export default function PricingPage() {
           </div>
           <div className="flex items-center gap-6 text-sm text-watchman-muted">
             <Link href="/" className="hover:text-white transition-colors">Home</Link>
-            <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
-            <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
+            <Link href="/legal/privacy" className="hover:text-white transition-colors">Privacy</Link>
+            <Link href="/legal/terms" className="hover:text-white transition-colors">Terms</Link>
           </div>
           <p className="text-sm text-watchman-muted">
             © {new Date().getFullYear()} Watchman

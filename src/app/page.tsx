@@ -1315,7 +1315,7 @@ export default function LandingPage() {
       </section>
 
       {/* Industries - Infinite Scrolling Marquee */}
-      <section className="py-20 sm:py-28 overflow-hidden">
+      <section className="py-[25px] overflow-hidden">
         <div className="text-center mb-10 px-6">
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">
             If Your Life Runs on Cycles,
