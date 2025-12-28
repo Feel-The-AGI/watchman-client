@@ -18,7 +18,17 @@ import {
   Coffee,
   ChevronLeft,
   ChevronRight,
+  X,
+  FileText,
+  AlertTriangle,
+  Calendar,
+  Plus,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  BookOpen,
 } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
@@ -355,8 +365,326 @@ function NewYearCelebration() {
   );
 }
 
+// Types for localStorage data
+interface LandingNote {
+  id: string;
+  note: string;
+  created_at: string;
+}
+
+interface LandingDayData {
+  notes: LandingNote[];
+}
+
+// Helper to get localStorage key for a date
+const getStorageKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `watchman_landing_${year}-${month}-${day}`;
+};
+
+// Landing Page Day Inspector - Simplified version with localStorage
+interface LandingDayInspectorProps {
+  date: Date;
+  workType: 'day_shift' | 'night_shift' | 'off';
+  onClose: () => void;
+}
+
+function LandingDayInspector({ date, workType, onClose }: LandingDayInspectorProps) {
+  const [notes, setNotes] = useState<LandingNote[]>([]);
+  const [showAddNote, setShowAddNote] = useState(false);
+  const [newNote, setNewNote] = useState('');
+  const [expandedSection, setExpandedSection] = useState<string | null>('notes');
+
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+
+  const workTypeInfo = {
+    day_shift: {
+      icon: Sun,
+      label: 'Day Shift',
+      color: 'text-amber-400',
+      bg: 'bg-gradient-to-br from-amber-500 to-orange-600',
+      gradient: 'from-amber-500/20 to-transparent',
+    },
+    night_shift: {
+      icon: Moon,
+      label: 'Night Shift',
+      color: 'text-indigo-400',
+      bg: 'bg-gradient-to-br from-indigo-500 to-purple-600',
+      gradient: 'from-indigo-500/20 to-transparent',
+    },
+    off: {
+      icon: Coffee,
+      label: 'Off Day',
+      color: 'text-emerald-400',
+      bg: 'bg-gradient-to-br from-emerald-500 to-teal-600',
+      gradient: 'from-emerald-500/20 to-transparent',
+    },
+  };
+
+  const info = workTypeInfo[workType];
+
+  // Load data from localStorage
+  useEffect(() => {
+    const key = getStorageKey(date);
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      try {
+        const data: LandingDayData = JSON.parse(stored);
+        setNotes(data.notes || []);
+      } catch {
+        setNotes([]);
+      }
+    } else {
+      setNotes([]);
+    }
+  }, [date]);
+
+  // Save to localStorage
+  const saveToStorage = (newNotes: LandingNote[]) => {
+    const key = getStorageKey(date);
+    const data: LandingDayData = { notes: newNotes };
+    localStorage.setItem(key, JSON.stringify(data));
+  };
+
+  const handleAddNote = () => {
+    if (!newNote.trim()) return;
+    const note: LandingNote = {
+      id: `note-${Date.now()}`,
+      note: newNote.trim(),
+      created_at: new Date().toISOString(),
+    };
+    const updated = [...notes, note];
+    setNotes(updated);
+    saveToStorage(updated);
+    setNewNote('');
+    setShowAddNote(false);
+  };
+
+  const handleDeleteNote = (noteId: string) => {
+    const updated = notes.filter(n => n.id !== noteId);
+    setNotes(updated);
+    saveToStorage(updated);
+  };
+
+  const formatTime = (isoString: string) => {
+    const d = new Date(isoString);
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 30, scale: 0.95 }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      exit={{ opacity: 0, x: 30, scale: 0.95 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      className="w-full max-w-sm rounded-2xl bg-[#0d1117] border border-white/10 overflow-hidden flex flex-col"
+    >
+      {/* Header */}
+      <div className={`relative px-5 py-4 border-b border-white/5 bg-gradient-to-r ${info.gradient}`}>
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="text-lg font-bold tracking-tight text-white">
+              {dayNames[date.getDay()]}
+            </h3>
+            <p className="text-sm text-white/50 mt-0.5 flex items-center gap-2">
+              <Calendar className="w-3.5 h-3.5" />
+              {monthNames[date.getMonth()]} {date.getDate()}, {date.getFullYear()}
+            </p>
+          </div>
+          <motion.button
+            onClick={onClose}
+            whileHover={{ scale: 1.1, rotate: 90 }}
+            whileTap={{ scale: 0.9 }}
+            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+          >
+            <X className="w-4 h-4 text-white/60" />
+          </motion.button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {/* Work Type Display */}
+        <div className={`flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r ${info.gradient}`}>
+          <div className={`w-10 h-10 rounded-xl ${info.bg} flex items-center justify-center shadow-lg`}>
+            <info.icon className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="font-semibold text-white">{info.label}</p>
+            <p className="text-xs text-white/50">5-5-5 rotation pattern</p>
+          </div>
+        </div>
+
+        {/* Daily Notes Section */}
+        <div className="rounded-xl bg-white/5 border border-white/5 overflow-hidden">
+          <button
+            onClick={() => setExpandedSection(expandedSection === 'notes' ? null : 'notes')}
+            className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
+                <FileText className="w-4 h-4 text-purple-400" />
+              </div>
+              <div className="text-left">
+                <p className="font-medium text-sm text-white">Daily Notes</p>
+                <p className="text-xs text-white/40">{notes.length} note{notes.length !== 1 ? 's' : ''} recorded</p>
+              </div>
+            </div>
+            {expandedSection === 'notes' ? (
+              <ChevronUp className="w-4 h-4 text-white/40" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-white/40" />
+            )}
+          </button>
+
+          <AnimatePresence>
+            {expandedSection === 'notes' && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="border-t border-white/5"
+              >
+                <div className="p-3 space-y-2">
+                  {notes.length > 0 ? (
+                    notes.map((note) => (
+                      <motion.div
+                        key={note.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="p-2.5 bg-white/5 rounded-lg group"
+                      >
+                        <div className="flex justify-between items-start gap-2">
+                          <p className="text-sm text-white/80 flex-1">{note.note}</p>
+                          <button
+                            onClick={() => handleDeleteNote(note.id)}
+                            className="p-1 rounded hover:bg-red-500/20 text-white/30 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-white/30 mt-1.5">{formatTime(note.created_at)}</p>
+                      </motion.div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-white/30 text-center py-3">No notes yet</p>
+                  )}
+
+                  {showAddNote ? (
+                    <div className="space-y-2 pt-2">
+                      <textarea
+                        value={newNote}
+                        onChange={(e) => setNewNote(e.target.value)}
+                        placeholder="What's on your mind for this day?"
+                        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-white/30 focus:border-cyan-500/50 focus:outline-none resize-none"
+                        rows={3}
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleAddNote}
+                          disabled={!newNote.trim()}
+                          className="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Save Note
+                        </button>
+                        <button
+                          onClick={() => { setShowAddNote(false); setNewNote(''); }}
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-white/5 text-white/60 hover:bg-white/10 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowAddNote(true)}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium rounded-lg bg-white/5 text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add Note
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Incidents Section (Display Only) */}
+        <div className="rounded-xl bg-white/5 border border-white/5 overflow-hidden">
+          <button
+            onClick={() => setExpandedSection(expandedSection === 'incidents' ? null : 'incidents')}
+            className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500/20 to-orange-500/20 flex items-center justify-center">
+                <AlertTriangle className="w-4 h-4 text-red-400" />
+              </div>
+              <div className="text-left">
+                <p className="font-medium text-sm text-white">Incidents & Issues</p>
+                <p className="text-xs text-white/40">0 incidents logged</p>
+              </div>
+            </div>
+            {expandedSection === 'incidents' ? (
+              <ChevronUp className="w-4 h-4 text-white/40" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-white/40" />
+            )}
+          </button>
+
+          <AnimatePresence>
+            {expandedSection === 'incidents' && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="border-t border-white/5"
+              >
+                <div className="p-3 text-center py-6">
+                  <p className="text-sm text-white/30">No incidents logged</p>
+                  <p className="text-xs text-white/20 mt-1">Sign up to track incidents</p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Commitments Section (Display Only) */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-white/40 uppercase tracking-wider px-1">
+            Commitments
+          </h4>
+          <div className="p-4 bg-white/5 rounded-xl text-center">
+            <BookOpen className="w-5 h-5 text-white/20 mx-auto mb-2" />
+            <p className="text-sm text-white/30">No commitments</p>
+          </div>
+        </div>
+      </div>
+
+      {/* CTA Footer */}
+      <div className="px-4 py-3 border-t border-white/5 bg-white/[0.02]">
+        <Link href="/login">
+          <button className="w-full px-4 py-2.5 text-sm font-medium rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-white hover:from-cyan-400 hover:to-emerald-400 transition-all shadow-lg shadow-cyan-500/20">
+            Sign Up to Track Everything
+          </button>
+        </Link>
+      </div>
+    </motion.div>
+  );
+}
+
 // Live Calendar Component - Shows REAL current month with today highlighted
-function LiveCalendar() {
+interface LiveCalendarProps {
+  selectedDate: Date | null;
+  onDayClick: (date: Date, workType: 'day_shift' | 'night_shift' | 'off') => void;
+}
+
+function LiveCalendar({ selectedDate, onDayClick }: LiveCalendarProps) {
   // Track the actual "today" date (never changes)
   const realToday = useMemo(() => new Date(), []);
   const todayDate = realToday.getDate();
@@ -478,33 +806,48 @@ function LiveCalendar() {
 
       {/* Calendar Grid */}
       <div key={`${viewMonth}-${viewYear}`} className="grid grid-cols-7 gap-px bg-white/5 p-px">
-        {calendarDays.map((item, i) => (
-          <motion.div
-            key={`${viewMonth}-${viewYear}-${i}`}
-            className={`relative py-2 sm:py-3 bg-[#0d1117] flex flex-col items-center justify-center gap-0.5 transition-all duration-200 ${
-              item.day ? 'hover:bg-white/5 cursor-pointer' : ''
-            }`}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: i * 0.005, duration: 0.2 }}
-          >
-            {item.day && (
-              <>
-                {/* Day number */}
-                <span className={`text-[10px] sm:text-xs font-medium ${item.isToday ? 'text-cyan-400' : 'text-white/60'}`}>
-                  {item.day}
-                </span>
+        {calendarDays.map((item, i) => {
+          // Check if this day is selected
+          const dayDate = item.day ? new Date(viewYear, viewMonth, item.day) : null;
+          const isSelected = selectedDate && dayDate &&
+            selectedDate.getDate() === dayDate.getDate() &&
+            selectedDate.getMonth() === dayDate.getMonth() &&
+            selectedDate.getFullYear() === dayDate.getFullYear();
 
-                {/* Work type icon */}
-                <div
-                  className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg border flex items-center justify-center transition-all duration-200 ${getWorkTypeStyle(item.type, item.isToday || false)}`}
-                >
-                  {getWorkTypeIcon(item.type)}
-                </div>
-              </>
-            )}
-          </motion.div>
-        ))}
+          return (
+            <motion.div
+              key={`${viewMonth}-${viewYear}-${i}`}
+              className={`relative py-2 sm:py-3 bg-[#0d1117] flex flex-col items-center justify-center gap-0.5 transition-all duration-200 ${
+                item.day ? 'hover:bg-white/5 cursor-pointer' : ''
+              } ${isSelected ? 'bg-cyan-500/10 ring-1 ring-cyan-500/50' : ''}`}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: i * 0.005, duration: 0.2 }}
+              onClick={() => {
+                if (item.day && item.type !== 'empty') {
+                  const clickedDate = new Date(viewYear, viewMonth, item.day);
+                  onDayClick(clickedDate, item.type as 'day_shift' | 'night_shift' | 'off');
+                }
+              }}
+            >
+              {item.day && (
+                <>
+                  {/* Day number */}
+                  <span className={`text-[10px] sm:text-xs font-medium ${item.isToday ? 'text-cyan-400' : isSelected ? 'text-cyan-300' : 'text-white/60'}`}>
+                    {item.day}
+                  </span>
+
+                  {/* Work type icon */}
+                  <div
+                    className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg border flex items-center justify-center transition-all duration-200 ${getWorkTypeStyle(item.type, item.isToday || false)}`}
+                  >
+                    {getWorkTypeIcon(item.type)}
+                  </div>
+                </>
+              )}
+            </motion.div>
+          );
+        })}
       </div>
 
       {/* Legend */}
@@ -538,10 +881,26 @@ export default function LandingPage() {
   const { scrollYProgress } = useScroll();
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
+  // State for day inspector
+  const [selectedDay, setSelectedDay] = useState<{ date: Date; workType: 'day_shift' | 'night_shift' | 'off' } | null>(null);
+
   const heroY = useTransform(scrollYProgress, [0, 0.3], [0, -100]);
   const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
 
   const isLoggedIn = !!user && !loading;
+
+  // Handle day click from calendar
+  const handleDayClick = (date: Date, workType: 'day_shift' | 'night_shift' | 'off') => {
+    // Toggle selection if clicking same day
+    if (selectedDay &&
+        selectedDay.date.getDate() === date.getDate() &&
+        selectedDay.date.getMonth() === date.getMonth() &&
+        selectedDay.date.getFullYear() === date.getFullYear()) {
+      setSelectedDay(null);
+    } else {
+      setSelectedDay({ date, workType });
+    }
+  };
 
   // Track mouse for subtle parallax
   useEffect(() => {
@@ -556,7 +915,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-[#0a0a0f] text-white overflow-hidden">
+    <div ref={containerRef} className="min-h-screen bg-[#0a0a0f] text-white overflow-x-hidden">
       {/* New Year Celebration - Only on January 1st */}
       <NewYearCelebration />
 
@@ -747,35 +1106,74 @@ export default function LandingPage() {
         </motion.div>
       </motion.section>
 
-      {/* Hero Product Preview - LIVE Calendar (Own section below hero) */}
+      {/* Hero Product Preview - LIVE Calendar with Day Inspector */}
       <section className="relative py-16 sm:py-20 px-6">
-        <motion.div
-          className="relative max-w-2xl mx-auto"
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8 }}
-        >
-          {/* Glow effect behind */}
-          <div className="absolute -inset-4 bg-gradient-to-r from-cyan-500/20 via-emerald-500/20 to-green-500/20 rounded-3xl blur-2xl" />
+        <div className="max-w-5xl mx-auto">
+          <div className="flex flex-col lg:flex-row items-start justify-center gap-6">
+            {/* Calendar */}
+            <motion.div
+              className="relative w-full lg:w-auto lg:flex-1 max-w-xl"
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8 }}
+            >
+              {/* Glow effect behind */}
+              <div className="absolute -inset-4 bg-gradient-to-r from-cyan-500/20 via-emerald-500/20 to-green-500/20 rounded-3xl blur-2xl" />
 
-          {/* Live Calendar - Shows REAL current month with today highlighted */}
-          <div className="relative shadow-2xl">
-            <LiveCalendar />
+              {/* Live Calendar - Shows REAL current month with today highlighted */}
+              <div className="relative shadow-2xl">
+                <LiveCalendar
+                  selectedDate={selectedDay?.date || null}
+                  onDayClick={handleDayClick}
+                />
+              </div>
+
+              {/* "Live" indicator badge */}
+              <motion.div
+                className="absolute -top-3 -right-3 px-3 py-1.5 rounded-full bg-cyan-500/20 border border-cyan-500/30 backdrop-blur-sm"
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                  <span className="text-xs font-medium text-cyan-400">Live Preview</span>
+                </div>
+              </motion.div>
+
+              {/* Click hint - show when no day selected */}
+              {!selectedDay && (
+                <motion.p
+                  className="text-center text-xs text-white/40 mt-4"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 1 }}
+                >
+                  Click any day to explore
+                </motion.p>
+              )}
+            </motion.div>
+
+            {/* Day Inspector - Shows when a day is selected */}
+            <AnimatePresence>
+              {selectedDay && (
+                <motion.div
+                  className="w-full lg:w-auto"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                >
+                  <LandingDayInspector
+                    date={selectedDay.date}
+                    workType={selectedDay.workType}
+                    onClose={() => setSelectedDay(null)}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-
-          {/* "Live" indicator badge */}
-          <motion.div
-            className="absolute -top-3 -right-3 px-3 py-1.5 rounded-full bg-cyan-500/20 border border-cyan-500/30 backdrop-blur-sm"
-            animate={{ scale: [1, 1.05, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-              <span className="text-xs font-medium text-cyan-400">Live Preview</span>
-            </div>
-          </motion.div>
-        </motion.div>
+        </div>
       </section>
 
       {/* Stats Bar */}
@@ -1046,7 +1444,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-6 border-t border-white/5">
+      <footer className="relative z-10 py-12 px-6 border-t border-white/5 bg-[#0a0a0f]">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
@@ -1057,14 +1455,14 @@ export default function LandingPage() {
                 height={32}
                 className="object-contain rounded-full"
               />
-              <span className="font-semibold">Watchman</span>
+              <span className="font-semibold text-white">Watchman</span>
             </div>
-            <div className="flex items-center gap-6 text-sm text-white/40">
+            <div className="flex items-center gap-6 text-sm text-white/50">
               <Link href="/pricing" className="hover:text-white transition-colors">Pricing</Link>
               <Link href="/legal/privacy" className="hover:text-white transition-colors">Privacy</Link>
               <Link href="/legal/terms" className="hover:text-white transition-colors">Terms</Link>
             </div>
-            <p className="text-sm text-white/40">
+            <p className="text-sm text-white/50">
               © {new Date().getFullYear()} Watchman. Time under control.
             </p>
           </div>
