@@ -916,61 +916,51 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Industries */}
-      <section className="py-24 sm:py-32 px-6 overflow-hidden">
-        <div className="max-w-6xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              If Your Life Runs on Cycles,
-              <span className="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent"> Watchman Fits.</span>
-            </h2>
-          </motion.div>
-
-          <motion.div
-            className="flex flex-wrap items-center justify-center gap-3 sm:gap-4"
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true, margin: "-50px" }}
-            transition={{ duration: 0.5 }}
-          >
-            {industries.map((industry, i) => (
-              <motion.div
-                key={industry.name}
-                className="flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-full bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06] hover:border-white/[0.15] transition-all duration-300 cursor-default"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{
-                  duration: 0.4,
-                  delay: i * 0.08,
-                  ease: "easeOut"
-                }}
-                whileHover={{
-                  scale: 1.05,
-                  transition: { duration: 0.2 }
-                }}
-              >
-                <span className="text-lg sm:text-xl">{industry.icon}</span>
-                <span className="text-sm font-medium text-white/70">{industry.name}</span>
-              </motion.div>
-            ))}
-          </motion.div>
-
-          <motion.p
-            className="text-center text-white/40 text-sm mt-8"
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.5, duration: 0.5 }}
-          >
+      {/* Industries - Infinite Scrolling Marquee */}
+      <section className="py-20 sm:py-28 overflow-hidden">
+        <div className="text-center mb-10 px-6">
+          <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+            If Your Life Runs on Cycles,
+            <span className="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent"> Watchman Fits.</span>
+          </h2>
+          <p className="text-white/40 text-sm">
             And anyone tired of fighting their calendar every week.
-          </motion.p>
+          </p>
+        </div>
+
+        {/* Infinite scrolling marquee */}
+        <div className="relative">
+          {/* Gradient fade edges */}
+          <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-[#0a0a0f] to-transparent z-10 pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-[#0a0a0f] to-transparent z-10 pointer-events-none" />
+
+          {/* Scrolling container */}
+          <div className="flex animate-marquee">
+            {/* First set */}
+            {[...industries, ...industries].map((industry, i) => (
+              <div
+                key={`${industry.name}-${i}`}
+                className="flex-shrink-0 mx-3"
+              >
+                <div className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all duration-300 cursor-default group">
+                  <span className="text-2xl group-hover:scale-110 transition-transform">{industry.icon}</span>
+                  <span className="text-sm font-medium text-white/70 group-hover:text-white/90 transition-colors whitespace-nowrap">{industry.name}</span>
+                </div>
+              </div>
+            ))}
+            {/* Duplicate for seamless loop */}
+            {[...industries, ...industries].map((industry, i) => (
+              <div
+                key={`${industry.name}-dup-${i}`}
+                className="flex-shrink-0 mx-3"
+              >
+                <div className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all duration-300 cursor-default group">
+                  <span className="text-2xl group-hover:scale-110 transition-transform">{industry.icon}</span>
+                  <span className="text-sm font-medium text-white/70 group-hover:text-white/90 transition-colors whitespace-nowrap">{industry.name}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
