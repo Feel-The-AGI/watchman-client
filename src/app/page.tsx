@@ -425,11 +425,11 @@ function LiveCalendar() {
   const getWorkTypeIcon = (type: string) => {
     switch (type) {
       case 'day_shift':
-        return <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />;
+        return <Sun className="w-3 h-3 sm:w-4 sm:h-4 text-amber-400" />;
       case 'night_shift':
-        return <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400" />;
+        return <Moon className="w-3 h-3 sm:w-4 sm:h-4 text-indigo-400" />;
       case 'off':
-        return <Coffee className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />;
+        return <Coffee className="w-3 h-3 sm:w-4 sm:h-4 text-emerald-400" />;
       default:
         return null;
     }
@@ -438,22 +438,22 @@ function LiveCalendar() {
   return (
     <div className="rounded-xl bg-[#0d1117] border border-white/10 overflow-hidden">
       {/* Calendar Header - Like the app */}
-      <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-white/5">
+      <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-b border-white/5">
         <button
           onClick={goToPreviousMonth}
-          className="p-2 rounded-lg hover:bg-white/10 transition-colors text-white/60 hover:text-white"
+          className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white/60 hover:text-white"
         >
-          <ChevronLeft className="w-5 h-5" />
+          <ChevronLeft className="w-4 h-4" />
         </button>
-        <div className="flex items-center gap-3">
-          <h3 className="text-lg sm:text-xl font-semibold text-white">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm sm:text-base font-semibold text-white">
             {monthNames[viewMonth]} {viewYear}
           </h3>
           {/* "Today" button - only show when not viewing current month */}
           {!isCurrentMonth && (
             <button
               onClick={() => setViewDate(new Date())}
-              className="px-2 py-1 text-xs font-medium rounded-md bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors"
+              className="px-2 py-0.5 text-[10px] font-medium rounded-md bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors"
             >
               Today
             </button>
@@ -461,16 +461,16 @@ function LiveCalendar() {
         </div>
         <button
           onClick={goToNextMonth}
-          className="p-2 rounded-lg hover:bg-white/10 transition-colors text-white/60 hover:text-white"
+          className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white/60 hover:text-white"
         >
-          <ChevronRight className="w-5 h-5" />
+          <ChevronRight className="w-4 h-4" />
         </button>
       </div>
 
       {/* Day Headers */}
       <div className="grid grid-cols-7 border-b border-white/5">
-        {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day) => (
-          <div key={day} className="py-3 text-center text-[10px] sm:text-xs font-medium text-white/40 uppercase tracking-wider">
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => (
+          <div key={i} className="py-2 text-center text-[10px] font-medium text-white/40">
             {day}
           </div>
         ))}
@@ -481,37 +481,26 @@ function LiveCalendar() {
         {calendarDays.map((item, i) => (
           <motion.div
             key={`${viewMonth}-${viewYear}-${i}`}
-            className={`relative aspect-square bg-[#0d1117] flex flex-col items-center justify-center gap-1 transition-all duration-200 ${
+            className={`relative py-2 sm:py-3 bg-[#0d1117] flex flex-col items-center justify-center gap-0.5 transition-all duration-200 ${
               item.day ? 'hover:bg-white/5 cursor-pointer' : ''
             }`}
-            initial={{ opacity: 0, scale: 0.8 }}
+            initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3 + i * 0.008, duration: 0.3 }}
+            transition={{ delay: i * 0.005, duration: 0.2 }}
           >
             {item.day && (
               <>
-                {/* Day number and cycle indicator */}
-                <div className="absolute top-1 left-1 sm:top-2 sm:left-2 flex items-center gap-1">
-                  <span className={`text-xs sm:text-sm font-medium ${item.isToday ? 'text-cyan-400' : 'text-white/80'}`}>
-                    {item.day}
-                  </span>
-                </div>
+                {/* Day number */}
+                <span className={`text-[10px] sm:text-xs font-medium ${item.isToday ? 'text-cyan-400' : 'text-white/60'}`}>
+                  {item.day}
+                </span>
 
-                {/* Work type icon button */}
+                {/* Work type icon */}
                 <div
-                  className={`w-8 h-8 sm:w-10 sm:h-10 mt-2 rounded-xl border flex items-center justify-center transition-all duration-200 ${getWorkTypeStyle(item.type, item.isToday || false)}`}
+                  className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg border flex items-center justify-center transition-all duration-200 ${getWorkTypeStyle(item.type, item.isToday || false)}`}
                 >
                   {getWorkTypeIcon(item.type)}
                 </div>
-
-                {/* Today indicator dot */}
-                {item.isToday && (
-                  <motion.div
-                    className="absolute bottom-1 right-1 sm:bottom-2 sm:right-2 w-1.5 h-1.5 rounded-full bg-cyan-400"
-                    animate={{ scale: [1, 1.2, 1], opacity: [1, 0.7, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  />
-                )}
               </>
             )}
           </motion.div>
@@ -519,24 +508,24 @@ function LiveCalendar() {
       </div>
 
       {/* Legend */}
-      <div className="flex items-center justify-center gap-4 sm:gap-8 py-4 border-t border-white/5 bg-white/[0.02]">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
-            <Sun className="w-3 h-3 text-amber-400" />
+      <div className="flex items-center justify-center gap-3 sm:gap-6 py-2.5 border-t border-white/5 bg-white/[0.02]">
+        <div className="flex items-center gap-1.5">
+          <div className="w-5 h-5 rounded-md bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
+            <Sun className="w-2.5 h-2.5 text-amber-400" />
           </div>
-          <span className="text-xs text-white/50">Day</span>
+          <span className="text-[10px] text-white/50">Day</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
-            <Moon className="w-3 h-3 text-indigo-400" />
+        <div className="flex items-center gap-1.5">
+          <div className="w-5 h-5 rounded-md bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
+            <Moon className="w-2.5 h-2.5 text-indigo-400" />
           </div>
-          <span className="text-xs text-white/50">Night</span>
+          <span className="text-[10px] text-white/50">Night</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
-            <Coffee className="w-3 h-3 text-emerald-400" />
+        <div className="flex items-center gap-1.5">
+          <div className="w-5 h-5 rounded-md bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
+            <Coffee className="w-2.5 h-2.5 text-emerald-400" />
           </div>
-          <span className="text-xs text-white/50">Off</span>
+          <span className="text-[10px] text-white/50">Off</span>
         </div>
       </div>
     </div>
@@ -551,9 +540,6 @@ export default function LandingPage() {
 
   const heroY = useTransform(scrollYProgress, [0, 0.3], [0, -100]);
   const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
-  // Calendar starts faint and becomes fully visible as user scrolls
-  const calendarOpacity = useTransform(scrollYProgress, [0, 0.15], [0.4, 1]);
-  const calendarScale = useTransform(scrollYProgress, [0, 0.15], [0.95, 1]);
 
   const isLoggedIn = !!user && !loading;
 
@@ -761,16 +747,14 @@ export default function LandingPage() {
         </motion.div>
       </motion.section>
 
-      {/* Hero Product Preview - LIVE Calendar (Independent of hero opacity) */}
-      <motion.section
-        className="relative -mt-[420px] sm:-mt-[400px] md:-mt-[380px] pb-20 px-6 z-20 pointer-events-none"
-        style={{ opacity: calendarOpacity, scale: calendarScale }}
-      >
+      {/* Hero Product Preview - LIVE Calendar (Own section below hero) */}
+      <section className="relative py-16 sm:py-20 px-6">
         <motion.div
-          className="relative max-w-4xl mx-auto pointer-events-auto"
-          initial={{ opacity: 0, y: 40, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 1, delay: 0.4 }}
+          className="relative max-w-2xl mx-auto"
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8 }}
         >
           {/* Glow effect behind */}
           <div className="absolute -inset-4 bg-gradient-to-r from-cyan-500/20 via-emerald-500/20 to-green-500/20 rounded-3xl blur-2xl" />
@@ -792,7 +776,7 @@ export default function LandingPage() {
             </div>
           </motion.div>
         </motion.div>
-      </motion.section>
+      </section>
 
       {/* Stats Bar */}
       <section className="relative py-12 border-y border-white/5">
