@@ -824,7 +824,7 @@ function LiveCalendar({ selectedDate, onDayClick }: LiveCalendarProps) {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: i * 0.005, duration: 0.2 }}
               onClick={() => {
-                if (item.day && item.type !== 'empty') {
+                if (item.day) {
                   const clickedDate = new Date(viewYear, viewMonth, item.day);
                   onDayClick(clickedDate, item.type as 'day_shift' | 'night_shift' | 'off');
                 }
