@@ -942,9 +942,21 @@ export default function LandingPage() {
                 key={`${industry.name}-${i}`}
                 className="flex-shrink-0 mx-3"
               >
-                <div className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all duration-300 cursor-default group">
-                  <span className="text-2xl group-hover:scale-110 transition-transform">{industry.icon}</span>
-                  <span className="text-sm font-medium text-white/70 group-hover:text-white/90 transition-colors whitespace-nowrap">{industry.name}</span>
+                <div className="relative flex items-center gap-3 px-6 py-4 rounded-2xl overflow-hidden cursor-default group
+                  bg-gradient-to-br from-emerald-500/10 via-cyan-500/5 to-transparent
+                  border border-emerald-500/20
+                  shadow-[0_8px_32px_rgba(16,185,129,0.15),inset_0_1px_0_rgba(255,255,255,0.1)]
+                  hover:shadow-[0_8px_40px_rgba(16,185,129,0.25),inset_0_1px_0_rgba(255,255,255,0.15)]
+                  hover:border-emerald-400/40
+                  hover:from-emerald-500/15 hover:via-cyan-500/10 hover:to-transparent
+                  backdrop-blur-xl transition-all duration-300"
+                >
+                  {/* Glossy shine overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
+                  {/* Inner glow */}
+                  <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/5 via-transparent to-cyan-500/5" />
+                  <span className="relative text-2xl group-hover:scale-110 transition-transform drop-shadow-lg">{industry.icon}</span>
+                  <span className="relative text-sm font-medium text-white/80 group-hover:text-white transition-colors whitespace-nowrap">{industry.name}</span>
                 </div>
               </div>
             ))}
@@ -954,9 +966,21 @@ export default function LandingPage() {
                 key={`${industry.name}-dup-${i}`}
                 className="flex-shrink-0 mx-3"
               >
-                <div className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all duration-300 cursor-default group">
-                  <span className="text-2xl group-hover:scale-110 transition-transform">{industry.icon}</span>
-                  <span className="text-sm font-medium text-white/70 group-hover:text-white/90 transition-colors whitespace-nowrap">{industry.name}</span>
+                <div className="relative flex items-center gap-3 px-6 py-4 rounded-2xl overflow-hidden cursor-default group
+                  bg-gradient-to-br from-emerald-500/10 via-cyan-500/5 to-transparent
+                  border border-emerald-500/20
+                  shadow-[0_8px_32px_rgba(16,185,129,0.15),inset_0_1px_0_rgba(255,255,255,0.1)]
+                  hover:shadow-[0_8px_40px_rgba(16,185,129,0.25),inset_0_1px_0_rgba(255,255,255,0.15)]
+                  hover:border-emerald-400/40
+                  hover:from-emerald-500/15 hover:via-cyan-500/10 hover:to-transparent
+                  backdrop-blur-xl transition-all duration-300"
+                >
+                  {/* Glossy shine overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
+                  {/* Inner glow */}
+                  <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/5 via-transparent to-cyan-500/5" />
+                  <span className="relative text-2xl group-hover:scale-110 transition-transform drop-shadow-lg">{industry.icon}</span>
+                  <span className="relative text-sm font-medium text-white/80 group-hover:text-white transition-colors whitespace-nowrap">{industry.name}</span>
                 </div>
               </div>
             ))}
