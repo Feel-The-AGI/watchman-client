@@ -475,73 +475,99 @@ export default function MasterSettingsPage() {
           <div className="p-6">
             <div className="grid sm:grid-cols-2 gap-6">
               {/* Day Shift Hours */}
-              <motion.div
+              <motion.button
+                onClick={openWorkHoursEditor}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 whileHover={{ scale: 1.02, y: -2 }}
-                className="p-5 glass rounded-2xl border border-white/5 cursor-default group"
+                whileTap={{ scale: 0.98 }}
+                className="p-5 glass rounded-2xl border border-white/5 cursor-pointer group hover:border-amber-500/30 transition-colors text-left"
               >
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30 transition-transform group-hover:scale-110">
-                    <Sun className="w-6 h-6 text-white" />
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30 transition-transform group-hover:scale-110">
+                      <Sun className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">Day Shift</p>
+                      <p className="text-xs text-watchman-muted">
+                        {calculateShiftDuration(settings.work?.day_hours?.start, settings.work?.day_hours?.end)} hours
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-semibold">Day Shift</p>
-                    <p className="text-xs text-watchman-muted">
-                      {calculateShiftDuration(settings.work?.day_hours?.start, settings.work?.day_hours?.end)} hours
-                    </p>
-                  </div>
+                  <Edit2 className="w-4 h-4 text-watchman-muted opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 <div className="flex items-center justify-between text-lg">
                   <span className="font-bold text-amber-400">{settings.work?.day_hours?.start || '06:00'}</span>
                   <span className="text-watchman-muted">→</span>
                   <span className="font-bold text-amber-400">{settings.work?.day_hours?.end || '18:00'}</span>
                 </div>
-              </motion.div>
+              </motion.button>
 
               {/* Night Shift Hours */}
-              <motion.div
+              <motion.button
+                onClick={openWorkHoursEditor}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.05 }}
                 whileHover={{ scale: 1.02, y: -2 }}
-                className="p-5 glass rounded-2xl border border-white/5 cursor-default group"
+                whileTap={{ scale: 0.98 }}
+                className="p-5 glass rounded-2xl border border-white/5 cursor-pointer group hover:border-indigo-500/30 transition-colors text-left"
               >
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 transition-transform group-hover:scale-110">
-                    <Moon className="w-6 h-6 text-white" />
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 transition-transform group-hover:scale-110">
+                      <Moon className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">Night Shift</p>
+                      <p className="text-xs text-watchman-muted">
+                        {calculateShiftDuration(settings.work?.night_hours?.start, settings.work?.night_hours?.end)} hours
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-semibold">Night Shift</p>
-                    <p className="text-xs text-watchman-muted">
-                      {calculateShiftDuration(settings.work?.night_hours?.start, settings.work?.night_hours?.end)} hours
-                    </p>
-                  </div>
+                  <Edit2 className="w-4 h-4 text-watchman-muted opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 <div className="flex items-center justify-between text-lg">
                   <span className="font-bold text-indigo-400">{settings.work?.night_hours?.start || '18:00'}</span>
                   <span className="text-watchman-muted">→</span>
                   <span className="font-bold text-indigo-400">{settings.work?.night_hours?.end || '06:00'}</span>
                 </div>
-              </motion.div>
+              </motion.button>
             </div>
 
             {/* Available Study Hours */}
             <div className="mt-6 grid sm:grid-cols-2 gap-4">
-              <div className="p-4 glass rounded-xl border border-white/5 flex items-center justify-between">
+              <motion.button
+                onClick={openWorkHoursEditor}
+                whileHover={{ scale: 1.02, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                className="p-4 glass rounded-xl border border-white/5 flex items-center justify-between cursor-pointer hover:border-emerald-500/30 transition-colors group text-left"
+              >
                 <div className="flex items-center gap-3">
-                  <Coffee className="w-5 h-5 text-emerald-400" />
+                  <Coffee className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
                   <span className="text-sm text-watchman-muted">Available hours on off days</span>
                 </div>
-                <span className="font-bold text-emerald-400">{settings.work?.available_hours_on_off ?? 12}h</span>
-              </div>
-              <div className="p-4 glass rounded-xl border border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-emerald-400">{settings.work?.available_hours_on_off ?? 12}h</span>
+                  <Edit2 className="w-4 h-4 text-watchman-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </motion.button>
+              <motion.button
+                onClick={openWorkHoursEditor}
+                whileHover={{ scale: 1.02, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                className="p-4 glass rounded-xl border border-white/5 flex items-center justify-between cursor-pointer hover:border-blue-500/30 transition-colors group text-left"
+              >
                 <div className="flex items-center gap-3">
-                  <BookOpen className="w-5 h-5 text-blue-400" />
+                  <BookOpen className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
                   <span className="text-sm text-watchman-muted">Available hours on work days</span>
                 </div>
-                <span className="font-bold text-blue-400">{settings.work?.available_hours_on_work ?? 2}h</span>
-              </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-blue-400">{settings.work?.available_hours_on_work ?? 2}h</span>
+                  <Edit2 className="w-4 h-4 text-watchman-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </motion.button>
             </div>
           </div>
         </motion.div>

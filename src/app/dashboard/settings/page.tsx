@@ -475,7 +475,19 @@ export default function SettingsPage() {
                         )}
                       </div>
 
-                      {subscription?.tier === 'pro' && (
+                      {subscription?.tier === 'admin' && (
+                        <div className="mt-4 p-4 bg-watchman-mint/10 rounded-xl border border-watchman-mint/20">
+                          <div className="flex items-center gap-2">
+                            <Star className="w-5 h-5 text-watchman-mint" />
+                            <p className="font-medium text-watchman-mint">Lifetime Admin Access</p>
+                          </div>
+                          <p className="text-sm text-watchman-muted mt-1">
+                            You have permanent access to all features.
+                          </p>
+                        </div>
+                      )}
+
+                      {subscription?.tier === 'pro' && subscription.current_period_end && (
                         <div className="mt-4 p-4 bg-watchman-bg rounded-xl">
                           <div className="flex items-center justify-between">
                             <div>
@@ -485,9 +497,7 @@ export default function SettingsPage() {
                                   : 'Next billing date'}
                               </p>
                               <p className="font-medium">
-                                {subscription.current_period_end
-                                  ? new Date(subscription.current_period_end).toLocaleDateString()
-                                  : 'N/A'}
+                                {new Date(subscription.current_period_end).toLocaleDateString()}
                               </p>
                             </div>
                             <Button
@@ -499,6 +509,18 @@ export default function SettingsPage() {
                               <ExternalLink className="w-4 h-4" />
                             </Button>
                           </div>
+                        </div>
+                      )}
+
+                      {subscription?.tier === 'pro' && !subscription.current_period_end && (
+                        <div className="mt-4 p-4 bg-watchman-accent/10 rounded-xl border border-watchman-accent/20">
+                          <div className="flex items-center gap-2">
+                            <Crown className="w-5 h-5 text-watchman-accent" />
+                            <p className="font-medium text-watchman-accent">Pro Access Granted</p>
+                          </div>
+                          <p className="text-sm text-watchman-muted mt-1">
+                            Your Pro access was granted manually. Enjoy all features!
+                          </p>
                         </div>
                       )}
                     </CardContent>
