@@ -179,6 +179,14 @@ class APIService {
     }),
   }
 
+  payments = {
+    createCheckout: () => this.request<{ checkout_url: string; session_id: string }>('/api/payments/create-checkout-session', {
+      method: 'POST',
+    }),
+    getHistory: () => this.request<{ payments: any[] }>('/api/payments/payment-history'),
+    getBillingPortal: () => this.request<{ url: string }>('/api/payments/billing-portal'),
+  }
+
   auth = {
     getProfile: () => this.request<any>('/api/auth/me'),
     completeOnboarding: () => this.request<any>('/api/auth/complete-onboarding', {
