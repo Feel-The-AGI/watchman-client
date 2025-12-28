@@ -31,6 +31,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Celebration } from '@/components/ui/Celebration';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -94,6 +95,14 @@ export default function SettingsPage() {
 
   // Celebration state
   const [showCelebration, setShowCelebration] = useState(false);
+
+  // Confirmation modal states
+  const [deleteAccountModal, setDeleteAccountModal] = useState(false);
+  const [revokeShareModal, setRevokeShareModal] = useState<string | null>(null);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  // Test email state
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -213,21 +222,19 @@ export default function SettingsPage() {
   };
 
   const handleDeleteAccount = async () => {
-    const confirmed = confirm(
-      'Are you sure you want to delete your account? This action cannot be undone.'
-    );
-    if (!confirmed) return;
+    setDeleteAccountModal(true);
+  };
 
-    const doubleConfirmed = confirm(
-      'This will permanently delete all your data including calendar, commitments, and settings. Type DELETE to confirm.'
-    );
-    if (!doubleConfirmed) return;
-
+  const confirmDeleteAccount = async () => {
     try {
+      setDeletingAccount(true);
       await api.settings.deleteAccount();
       await signOut();
     } catch (err: any) {
       setError(err.message || 'Failed to delete account');
+      setDeleteAccountModal(false);
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -273,15 +280,21 @@ export default function SettingsPage() {
     }
   };
 
-  const handleRevokeShare = async (shareId: string) => {
-    if (!confirm('Are you sure you want to revoke this share link?')) return;
+  const handleRevokeShare = (shareId: string) => {
+    setRevokeShareModal(shareId);
+  };
+
+  const confirmRevokeShare = async () => {
+    if (!revokeShareModal) return;
     try {
-      await api.sharing.revoke(shareId);
-      setShares(shares.filter(s => s.id !== shareId));
+      await api.sharing.revoke(revokeShareModal);
+      setShares(shares.filter(s => s.id !== revokeShareModal));
       setSuccess('Share link revoked');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
       setError(err.message || 'Failed to revoke share');
+    } finally {
+      setRevokeShareModal(null);
     }
   };
 
@@ -290,6 +303,20 @@ export default function SettingsPage() {
     navigator.clipboard.writeText(fullUrl);
     setCopiedShareId(share.id);
     setTimeout(() => setCopiedShareId(null), 2000);
+  };
+
+  const handleTestEmail = async () => {
+    try {
+      setSendingTestEmail(true);
+      setError(null);
+      const result = await api.settings.testEmail();
+      setSuccess(result.message || 'Test email sent successfully!');
+      setTimeout(() => setSuccess(null), 5000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to send test email');
+    } finally {
+      setSendingTestEmail(false);
+    }
   };
 
   // Fetch shares when switching to sharing tab
@@ -590,7 +617,35 @@ export default function SettingsPage() {
                       checked={settings.notifications_push}
                       onChange={(checked) => setSettings({ ...settings, notifications_push: checked })}
                     />
-                    
+
+                    {/* Test Email Section */}
+                    {settings.notifications_email && (
+                      <div className="mt-4 p-4 bg-watchman-bg rounded-xl border border-white/5">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-sm">Test Email Notifications</p>
+                            <p className="text-xs text-watchman-muted mt-1">
+                              Send a test email to verify notifications work
+                            </p>
+                          </div>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleTestEmail}
+                            disabled={sendingTestEmail}
+                            className="gap-2"
+                          >
+                            {sendingTestEmail ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Mail className="w-4 h-4" />
+                            )}
+                            Send Test
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="pt-4">
                       <Button
                         variant="primary"
@@ -925,6 +980,36 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
+
+      {/* Delete Account Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteAccountModal}
+        onClose={() => setDeleteAccountModal(false)}
+        onConfirm={confirmDeleteAccount}
+        title="Delete Account?"
+        message={
+          <div className="space-y-2">
+            <p>This action <strong>cannot be undone</strong>.</p>
+            <p className="text-xs text-watchman-muted">
+              All your data including calendar, commitments, incidents, and settings will be permanently deleted.
+            </p>
+          </div>
+        }
+        confirmText="Delete My Account"
+        variant="danger"
+        loading={deletingAccount}
+      />
+
+      {/* Revoke Share Link Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!revokeShareModal}
+        onClose={() => setRevokeShareModal(null)}
+        onConfirm={confirmRevokeShare}
+        title="Revoke Share Link?"
+        message="Anyone with this link will no longer be able to view your calendar."
+        confirmText="Revoke Link"
+        variant="warning"
+      />
     </div>
   );
 }

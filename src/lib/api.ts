@@ -174,6 +174,9 @@ class APIService {
     deleteAccount: () => this.request<void>('/api/settings/delete-account', {
       method: 'DELETE',
     }),
+    testEmail: () => this.request<{ success: boolean; message: string }>('/api/settings/test-email', {
+      method: 'POST',
+    }),
   }
 
   auth = {

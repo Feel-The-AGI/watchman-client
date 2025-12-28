@@ -28,6 +28,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -106,6 +107,9 @@ export default function MasterSettingsPage() {
   const [editNightEnd, setEditNightEnd] = useState(settings.work.night_hours.end);
   const [editOffHours, setEditOffHours] = useState(settings.work.available_hours_on_off);
   const [editWorkHours, setEditWorkHours] = useState(settings.work.available_hours_on_work);
+
+  // Confirmation modal state
+  const [regenerateModal, setRegenerateModal] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -224,10 +228,14 @@ export default function MasterSettingsPage() {
     }
   };
 
-  const handleRegenerateCalendar = async () => {
-    if (!confirm('This will regenerate your entire calendar. Continue?')) return;
+  const handleRegenerateCalendar = () => {
+    setRegenerateModal(true);
+  };
+
+  const confirmRegenerateCalendar = async () => {
     try {
       setSaving(true);
+      setRegenerateModal(false);
       await api.calendar.regenerate(new Date().getFullYear());
       setSuccess('Calendar regenerated successfully');
       setTimeout(() => setSuccess(null), 3000);
@@ -942,6 +950,17 @@ export default function MasterSettingsPage() {
           </Modal>
         )}
       </AnimatePresence>
+
+      {/* Regenerate Calendar Confirmation Modal */}
+      <ConfirmModal
+        isOpen={regenerateModal}
+        onClose={() => setRegenerateModal(false)}
+        onConfirm={confirmRegenerateCalendar}
+        title="Regenerate Calendar?"
+        message="This will regenerate your entire calendar based on your current settings. Any manual adjustments will be recalculated."
+        confirmText="Regenerate"
+        variant="info"
+      />
     </div>
   );
 }
