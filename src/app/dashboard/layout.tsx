@@ -129,7 +129,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               alt="Watchman"
               width={36}
               height={36}
-              className="object-contain flex-shrink-0"
+              className="object-contain rounded-full flex-shrink-0"
             />
             <span className={cn(
               'text-lg font-bold tracking-tight transition-all duration-300',

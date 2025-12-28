@@ -10,10 +10,16 @@ export const metadata: Metadata = {
   description: 'A deterministic life-state simulator with approval-gated change control. Guard your hours. Live by rule, not noise.',
   keywords: ['calendar', 'schedule', 'rotation', 'shift work', 'planning', 'life management'],
   authors: [{ name: 'Watchman' }],
+  icons: {
+    icon: '/watchman-logo.png',
+    shortcut: '/watchman-logo.png',
+    apple: '/watchman-logo.png',
+  },
   openGraph: {
     title: 'Watchman - Time Under Control',
     description: 'See your year clearly. Change it deliberately.',
     type: 'website',
+    images: ['/watchman-logo.png'],
   },
 }
 

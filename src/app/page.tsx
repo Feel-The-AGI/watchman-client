@@ -126,12 +126,12 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 group">
             <div className="relative w-10 h-10">
-              <Image 
-                src="/watchman-logo.png" 
-                alt="Watchman" 
+              <Image
+                src="/watchman-logo.png"
+                alt="Watchman"
                 width={40}
                 height={40}
-                className="object-contain"
+                className="object-contain rounded-full"
               />
             </div>
             <span className="text-xl font-bold tracking-tight">Watchman</span>
@@ -485,12 +485,12 @@ export default function LandingPage() {
       <footer className="py-12 px-6 border-t border-white/5">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
-            <Image 
-              src="/watchman-logo.png" 
-              alt="Watchman" 
+            <Image
+              src="/watchman-logo.png"
+              alt="Watchman"
               width={32}
               height={32}
-              className="object-contain"
+              className="object-contain rounded-full"
             />
             <span className="font-semibold">Watchman</span>
           </div>

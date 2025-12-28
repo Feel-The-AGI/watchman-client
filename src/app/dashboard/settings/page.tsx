@@ -26,6 +26,7 @@ import {
   Eye,
   EyeOff,
   Plus,
+  Receipt,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -63,6 +64,15 @@ interface CalendarShare {
   show_work_types: boolean;
   created_at: string;
   view_count: number;
+}
+
+interface Payment {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  description: string | null;
+  created_at: string;
 }
 
 export default function SettingsPage() {
@@ -103,6 +113,10 @@ export default function SettingsPage() {
 
   // Test email state
   const [sendingTestEmail, setSendingTestEmail] = useState(false);
+
+  // Payment history state
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -325,6 +339,25 @@ export default function SettingsPage() {
       fetchShares();
     }
   }, [activeTab]);
+
+  // Fetch payment history when switching to subscription tab
+  const fetchPayments = async () => {
+    try {
+      setLoadingPayments(true);
+      const result = await api.payments.getHistory();
+      setPayments(result.payments || []);
+    } catch (err) {
+      console.error('Failed to fetch payment history:', err);
+    } finally {
+      setLoadingPayments(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'subscription' && (subscription?.tier === 'pro' || subscription?.tier === 'admin')) {
+      fetchPayments();
+    }
+  }, [activeTab, subscription?.tier]);
 
   const tabs = [
     { id: 'profile' as const, label: 'Profile', icon: User },
@@ -590,6 +623,69 @@ export default function SettingsPage() {
                       </div>
                     </CardContent>
                   </Card>
+
+                  {/* Payment History - Only show for Pro/Admin users */}
+                  {(subscription?.tier === 'pro' || subscription?.tier === 'admin') && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Receipt className="w-5 h-5 text-watchman-accent" />
+                          Payment History
+                        </CardTitle>
+                        <CardDescription>Your subscription payment records</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {loadingPayments ? (
+                          <div className="flex items-center justify-center py-8">
+                            <Loader2 className="w-6 h-6 animate-spin text-watchman-accent" />
+                          </div>
+                        ) : payments.length > 0 ? (
+                          <div className="space-y-3">
+                            {payments.map((payment) => (
+                              <div
+                                key={payment.id}
+                                className="flex items-center justify-between p-4 bg-watchman-bg rounded-xl"
+                              >
+                                <div className="flex items-center gap-4">
+                                  <div className="w-10 h-10 rounded-lg bg-watchman-accent/10 flex items-center justify-center">
+                                    <Receipt className="w-5 h-5 text-watchman-accent" />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium">
+                                      {payment.description || 'Pro Subscription'}
+                                    </p>
+                                    <p className="text-sm text-watchman-muted">
+                                      {new Date(payment.created_at).toLocaleDateString('en-US', {
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric',
+                                      })}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-semibold text-watchman-mint">
+                                    ${(payment.amount).toFixed(2)} {payment.currency.toUpperCase()}
+                                  </p>
+                                  <p className="text-xs text-watchman-muted capitalize">
+                                    {payment.status}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8">
+                            <Receipt className="w-12 h-12 mx-auto text-watchman-muted/30 mb-3" />
+                            <p className="text-watchman-muted">No payment records yet</p>
+                            <p className="text-sm text-watchman-muted/70 mt-1">
+                              Your payment history will appear here after your first billing cycle
+                            </p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               )}
 
@@ -618,7 +714,10 @@ export default function SettingsPage() {
                       onChange={(checked) => setSettings({ ...settings, notifications_push: checked })}
                     />
 
-                    {/* Test Email Section */}
+                    {/*
+                      TEST EMAIL SECTION - Commented out for production
+                      Uncomment this section when you need to test email notifications
+
                     {settings.notifications_email && (
                       <div className="mt-4 p-4 bg-watchman-bg rounded-xl border border-white/5">
                         <div className="flex items-center justify-between">
@@ -645,6 +744,7 @@ export default function SettingsPage() {
                         </div>
                       </div>
                     )}
+                    */}
 
                     <div className="pt-4">
                       <Button

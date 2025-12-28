@@ -25,7 +25,7 @@ export function Logo({ size = 'md', className = '', showText = false }: LogoProp
         alt="Watchman"
         width={dimension}
         height={dimension}
-        className="object-contain"
+        className="object-contain rounded-full"
         priority
       />
       {showText && (
