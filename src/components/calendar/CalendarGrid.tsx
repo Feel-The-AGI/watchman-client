@@ -15,7 +15,7 @@ import {
   addMonths,
   subMonths,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Sun, Moon, Coffee, Plane, Sparkles, Lock, Crown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Sun, Moon, Coffee, Plane, Sparkles, Lock, Crown, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface DailyLog {
@@ -43,7 +43,7 @@ export interface Incident {
 export interface CalendarDay {
   date: string;
   cycle_day: number;
-  work_type: 'work_day' | 'work_night' | 'off' | null;
+  work_type: 'work_day' | 'work_night' | 'off' | 'blank' | null;
   is_leave: boolean;
   commitments: {
     id: string;
@@ -96,14 +96,23 @@ const workTypeConfig: Record<string, {
     label: 'Night Shift',
     textColor: 'text-indigo-400'
   },
-  off: { 
-    bg: 'bg-emerald-500', 
+  off: {
+    bg: 'bg-emerald-500',
     gradient: 'from-emerald-500/20 via-emerald-500/10 to-transparent',
     glow: 'shadow-emerald-500/30',
     border: 'border-emerald-500/30',
     icon: Coffee,
     label: 'Off Day',
     textColor: 'text-emerald-400'
+  },
+  blank: {
+    bg: 'bg-zinc-600',
+    gradient: 'from-zinc-600/20 via-zinc-600/10 to-transparent',
+    glow: 'shadow-zinc-500/20',
+    border: 'border-zinc-500/30',
+    icon: HelpCircle,
+    label: 'Untracked',
+    textColor: 'text-zinc-400'
   },
 };
 

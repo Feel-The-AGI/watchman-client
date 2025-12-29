@@ -39,6 +39,7 @@ import {
   ShieldAlert,
   Building2,
   Eye,
+  HelpCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from '@/components/ui/Toast';
@@ -90,6 +91,16 @@ const workTypeInfo = {
     bg: 'bg-gradient-to-br from-emerald-500 to-teal-600',
     glow: 'shadow-emerald-500/30',
     gradient: 'from-emerald-500/20 to-transparent',
+    defaultHours: 0,
+  },
+  blank: {
+    icon: HelpCircle,
+    label: 'Untracked',
+    description: 'Schedule not yet defined for this day',
+    color: 'text-zinc-400',
+    bg: 'bg-gradient-to-br from-zinc-600 to-zinc-700',
+    glow: 'shadow-zinc-500/20',
+    gradient: 'from-zinc-600/20 to-transparent',
     defaultHours: 0,
   },
 };

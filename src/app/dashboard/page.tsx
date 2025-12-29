@@ -58,14 +58,48 @@ export default function DashboardPage() {
   const currentYearRef = useRef(currentYear);
   currentYearRef.current = currentYear;
 
-  const fetchCalendarData = useCallback(async (yearOverride?: number) => {
+  // Track if we're doing a background refresh (no loading spinner)
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Silent refresh - updates data in background without loading state or clearing existing data
+  const refreshCalendarSilently = useCallback(async () => {
+    const yearToFetch = currentYearRef.current;
+    setIsRefreshing(true);
+
+    try {
+      // Fetch new data without clearing existing
+      const calendarResponse = await api.calendar.getYear(yearToFetch);
+      if (calendarResponse) {
+        setCalendarDays(calendarResponse);
+      }
+
+      const statsResponse = await api.stats.getSummary(yearToFetch);
+      if (statsResponse) {
+        setStats(statsResponse);
+      }
+    } catch (err: any) {
+      console.error('Background refresh failed:', err);
+      // Don't show error for background refreshes
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  const fetchCalendarData = useCallback(async (yearOverride?: number, silent: boolean = false) => {
     const yearToFetch = yearOverride ?? currentYearRef.current;
+
+    // If silent mode and we have existing data, just refresh in background
+    if (silent && calendarDays.length > 0) {
+      return refreshCalendarSilently();
+    }
 
     try {
       setLoading(true);
       setError(null);
-      // Clear old data immediately to prevent stale data showing
-      setCalendarDays([]);
+      // Only clear data if not a silent refresh
+      if (!silent) {
+        setCalendarDays([]);
+      }
 
       const cyclesResponse = await api.cycles.list();
       if (!cyclesResponse || cyclesResponse.length === 0) {
@@ -102,7 +136,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [initialYearSet]);
+  }, [initialYearSet, calendarDays.length, refreshCalendarSilently]);
 
   // Initial fetch only
   useEffect(() => {
@@ -203,16 +237,28 @@ export default function DashboardPage() {
           </div>
 
           {/* Refresh Button - always visible on the right */}
-          <Button
-            variant="glass"
-            size="sm"
-            onClick={() => fetchCalendarData()}
-            disabled={loading}
-            className="gap-2"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            {isRefreshing && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="text-xs text-watchman-accent"
+              >
+                Syncing...
+              </motion.div>
+            )}
+            <Button
+              variant="glass"
+              size="sm"
+              onClick={() => fetchCalendarData()}
+              disabled={loading}
+              className="gap-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading || isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
+          </div>
         </div>
 
         {/* Bottom row: View Mode Toggle - full width on mobile */}
@@ -318,7 +364,7 @@ export default function DashboardPage() {
               transition={{ duration: 0.5, delay: 0.1 }}
             >
               <ChatPanel
-                onCalendarUpdate={fetchCalendarData}
+                onCalendarUpdate={refreshCalendarSilently}
                 className="h-[420px]"
                 autoExecute={false}
                 userTier={profile?.tier as 'free' | 'pro' || 'free'}
