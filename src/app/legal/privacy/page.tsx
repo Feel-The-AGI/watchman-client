@@ -33,7 +33,7 @@ export default function PrivacyPolicyPage() {
             </div>
             <div>
               <h1 className="text-3xl font-bold">Privacy Policy</h1>
-              <p className="text-watchman-muted">Last updated: December 2024</p>
+              <p className="text-watchman-muted">Last updated: December 2025</p>
             </div>
           </div>
 

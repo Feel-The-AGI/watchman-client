@@ -33,7 +33,7 @@ export default function TermsOfServicePage() {
             </div>
             <div>
               <h1 className="text-3xl font-bold">Terms of Service</h1>
-              <p className="text-watchman-muted">Last updated: December 2024</p>
+              <p className="text-watchman-muted">Last updated: December 2025</p>
             </div>
           </div>
 
