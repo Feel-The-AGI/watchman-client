@@ -37,7 +37,7 @@ const tiers = [
   },
   {
     name: 'Pro',
-    price: '$10',
+    price: '$12',
     period: '/month',
     description: 'For professionals who need intelligent parsing and full control.',
     icon: Crown,

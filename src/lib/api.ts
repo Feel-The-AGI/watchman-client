@@ -170,7 +170,6 @@ class APIService {
         method: 'DELETE',
       }),
     getSubscription: () => this.request<any>('/api/settings/subscription'),
-    getPortalUrl: () => this.request<{ url: string }>('/api/settings/billing-portal'),
     deleteAccount: () => this.request<void>('/api/settings/delete-account', {
       method: 'DELETE',
     }),
@@ -180,11 +179,16 @@ class APIService {
   }
 
   payments = {
-    createCheckout: () => this.request<{ checkout_url: string; session_id: string }>('/api/payments/create-checkout-session', {
+    createCheckout: () => this.request<{ checkout_url: string; access_code: string; reference: string }>('/api/payments/create-checkout-session', {
       method: 'POST',
     }),
     getHistory: () => this.request<{ payments: any[] }>('/api/payments/payment-history'),
-    getBillingPortal: () => this.request<{ url: string }>('/api/payments/billing-portal'),
+    getSubscriptionStatus: () => this.request<any>('/api/payments/subscription-status'),
+    cancelSubscription: () => this.request<any>('/api/payments/cancel-subscription', {
+      method: 'POST',
+    }),
+    verifyTransaction: (reference: string) => this.request<any>(`/api/payments/verify/${reference}`),
+    getManageSubscription: () => this.request<any>('/api/payments/manage-subscription'),
   }
 
   auth = {
