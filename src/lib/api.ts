@@ -396,6 +396,7 @@ class APIService {
         free: number;
         pro: number;
         admin: number;
+        paying: number;
         onboarded: number;
         not_onboarded: number;
         onboarding_rate: number;

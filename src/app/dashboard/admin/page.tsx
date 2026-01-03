@@ -38,6 +38,7 @@ interface AdminStats {
     free: number;
     pro: number;
     admin: number;
+    paying: number;
     onboarded: number;
     not_onboarded: number;
     onboarding_rate: number;
@@ -240,9 +241,9 @@ export default function AdminDashboardPage() {
           trendValue={`${stats.growth.wow_percent > 0 ? '+' : ''}${stats.growth.wow_percent}% WoW`}
         />
         <StatCard
-          title="Pro Users"
-          value={stats.users.pro}
-          subtitle={`${stats.conversion.overall_rate}% conversion`}
+          title="Paying Users"
+          value={stats.users.paying}
+          subtitle={`${stats.users.pro} Pro + ${stats.users.admin} Admin`}
           icon={Crown}
           color="purple"
         />
