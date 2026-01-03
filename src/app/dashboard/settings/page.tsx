@@ -1230,16 +1230,10 @@ export default function SettingsPage() {
             ) : (
               <>
                 <div className="bg-watchman-bg rounded-xl p-4 mb-6">
-                  <div className="flex items-baseline justify-center gap-2 mb-2">
+                  <div className="flex items-baseline justify-center gap-2">
                     <span className="text-4xl font-bold">${pricingInfo?.usd_price || 12}</span>
                     <span className="text-watchman-muted">/month</span>
                   </div>
-                  <p className="text-center text-sm text-watchman-muted">
-                    Charged as <span className="text-white font-medium">{pricingInfo?.display_ghs || 'GHS 174.00'}</span>
-                  </p>
-                  <p className="text-center text-xs text-watchman-muted mt-1">
-                    Exchange rate: 1 USD = {pricingInfo?.exchange_rate?.toFixed(2) || '14.50'} GHS
-                  </p>
                 </div>
 
                 <div className="space-y-2 mb-6">
