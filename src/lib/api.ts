@@ -179,7 +179,14 @@ class APIService {
   }
 
   payments = {
-    createCheckout: () => this.request<{ checkout_url: string; access_code: string; reference: string }>('/api/payments/create-checkout-session', {
+    createCheckout: () => this.request<{ 
+      checkout_url: string; 
+      access_code: string; 
+      reference: string;
+      amount_ghs: number;
+      amount_usd: number;
+      exchange_rate: number;
+    }>('/api/payments/create-checkout-session', {
       method: 'POST',
     }),
     getHistory: () => this.request<{ payments: any[] }>('/api/payments/payment-history'),
@@ -189,6 +196,15 @@ class APIService {
     }),
     verifyTransaction: (reference: string) => this.request<any>(`/api/payments/verify/${reference}`),
     getManageSubscription: () => this.request<any>('/api/payments/manage-subscription'),
+    getPricing: () => this.request<{
+      usd_price: number;
+      ghs_amount: number;
+      exchange_rate: number;
+      currency: string;
+      display_price: string;
+      display_ghs: string;
+      note: string;
+    }>('/api/payments/pricing'),
   }
 
   auth = {
