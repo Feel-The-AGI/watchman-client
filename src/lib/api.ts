@@ -385,6 +385,94 @@ class APIService {
     getPublic: (shareCode: string) =>
       this.request<any>(`/api/sharing/public/${shareCode}`),
   }
+
+  // ==================== ADMIN ====================
+  admin = {
+    // Get comprehensive stats overview
+    getStats: () => this.request<{
+      generated_at: string;
+      users: {
+        total: number;
+        free: number;
+        pro: number;
+        admin: number;
+        onboarded: number;
+        not_onboarded: number;
+        onboarding_rate: number;
+        dormant: number;
+      };
+      signups: {
+        today: number;
+        yesterday: number;
+        this_week: number;
+        this_month: number;
+        this_quarter: number;
+      };
+      activity: {
+        active_today: number;
+        active_this_week: number;
+        active_this_month: number;
+        dau: number;
+        wau: number;
+        mau: number;
+      };
+      revenue: {
+        total_usd: number;
+        this_month_usd: number;
+        this_quarter_usd: number;
+        mrr: number;
+        arr: number;
+        arppu: number;
+      };
+      conversion: {
+        overall_rate: number;
+        onboarded_rate: number;
+        total_payments: number;
+      };
+      growth: {
+        wow_percent: number;
+        mom_percent: number;
+      };
+      engagement: {
+        total_chat_messages: number;
+        total_commitments: number;
+        total_incidents: number;
+        avg_messages_per_user: number;
+      };
+      geography: {
+        top_countries: { country: string; count: number }[];
+        unique_countries: number;
+      };
+      recent_users: any[];
+    }>('/api/admin/stats/overview'),
+
+    // Get all users with pagination
+    getUsers: (params?: { limit?: number; offset?: number; tier?: string; country?: string }) => {
+      const query = new URLSearchParams();
+      if (params?.limit) query.set('limit', params.limit.toString());
+      if (params?.offset) query.set('offset', params.offset.toString());
+      if (params?.tier) query.set('tier', params.tier);
+      if (params?.country) query.set('country', params.country);
+      return this.request<{ users: any[]; total: number }>(`/api/admin/users?${query.toString()}`);
+    },
+
+    // Get user details
+    getUserDetails: (userId: string) => this.request<any>(`/api/admin/users/${userId}`),
+
+    // Update user tier
+    updateUserTier: (userId: string, tier: string) => 
+      this.request<any>(`/api/admin/users/${userId}/update-tier?tier=${tier}`, {
+        method: 'POST',
+      }),
+
+    // Get all payments
+    getPayments: (params?: { limit?: number; offset?: number }) => {
+      const query = new URLSearchParams();
+      if (params?.limit) query.set('limit', params.limit.toString());
+      if (params?.offset) query.set('offset', params.offset.toString());
+      return this.request<{ payments: any[]; total: number }>(`/api/admin/payments?${query.toString()}`);
+    },
+  }
 }
 
 export const api = new APIService()
