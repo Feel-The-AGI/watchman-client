@@ -1,11 +1,15 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Check, ArrowRight, Zap, Crown, X, Sparkles, Shield, Clock } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Check, ArrowRight, Zap, Crown, X, Sparkles, Shield, Clock, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Logo } from '@/components/ui/Logo';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
+import { api } from '@/lib/api';
 
 const tiers = [
   {
@@ -85,6 +89,41 @@ const faqs = [
 ];
 
 export default function PricingPage() {
+  const { user, profile, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const [upgrading, setUpgrading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const isLoggedIn = !!user;
+  const isPro = profile?.tier === 'pro' || profile?.tier === 'admin';
+
+  const handleUpgrade = async () => {
+    if (!isLoggedIn) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      setUpgrading(true);
+      setError(null);
+      const result = await api.payments.createCheckout();
+      if (result.checkout_url) {
+        window.location.href = result.checkout_url;
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to start checkout');
+      setUpgrading(false);
+    }
+  };
+
+  const handleGetStarted = () => {
+    if (isLoggedIn) {
+      router.push('/dashboard');
+    } else {
+      router.push('/login');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-watchman-bg text-white relative overflow-hidden">
       {/* Background Effects */}
@@ -104,14 +143,29 @@ export default function PricingPage() {
             <Link href="/" className="text-watchman-muted hover:text-white transition-colors text-sm">
               Home
             </Link>
-            <Link href="/login">
-              <Button variant="gradient" size="sm">
-                Sign In
-              </Button>
-            </Link>
+            {isLoggedIn ? (
+              <Link href="/dashboard">
+                <Button variant="gradient" size="sm">
+                  Dashboard
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/login">
+                <Button variant="gradient" size="sm">
+                  Sign In
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </nav>
+
+      {/* Error Message */}
+      {error && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-sm">
+          {error}
+        </div>
+      )}
 
       {/* Header */}
       <section className="relative pt-32 pb-16 px-6">
@@ -188,16 +242,48 @@ export default function PricingPage() {
                   <p className="mt-4 text-sm text-watchman-muted leading-relaxed">{tier.description}</p>
                 </div>
 
-                <Link href="/login">
+                {/* Dynamic CTA based on tier and auth state */}
+                {tier.name === 'Free' ? (
                   <Button
                     variant={tier.variant}
                     size="lg"
                     className="w-full gap-2 mb-8"
+                    onClick={handleGetStarted}
                   >
-                    {tier.cta}
+                    {isLoggedIn ? 'Go to Dashboard' : tier.cta}
                     <ArrowRight className="w-4 h-4" />
                   </Button>
-                </Link>
+                ) : isPro ? (
+                  <Button
+                    variant="glass"
+                    size="lg"
+                    className="w-full gap-2 mb-8"
+                    onClick={() => router.push('/dashboard')}
+                  >
+                    You're on Pro
+                    <Check className="w-4 h-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    variant={tier.variant}
+                    size="lg"
+                    className="w-full gap-2 mb-8"
+                    onClick={handleUpgrade}
+                    disabled={upgrading}
+                  >
+                    {upgrading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      <>
+                        {isLoggedIn ? 'Upgrade Now' : tier.cta}
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </Button>
+                )}
 
                 <div className="space-y-3">
                   {tier.features.map((feature, i) => (
@@ -344,16 +430,19 @@ export default function PricingPage() {
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-watchman-accent/20 to-watchman-purple/20 flex items-center justify-center mx-auto mb-8">
               <Clock className="w-8 h-8 text-watchman-accent" />
             </div>
-            <h2 className="text-3xl font-bold mb-4">Ready to take control?</h2>
+                        <h2 className="text-3xl font-bold mb-4">Ready to take control?</h2>
             <p className="text-watchman-muted mb-8 text-lg">
               Start with Free. Upgrade when you&apos;re ready. No pressure.
             </p>
-            <Link href="/login">
-              <Button variant="gradient" size="lg" className="gap-2 shadow-lg shadow-watchman-accent/30">
-                Get Started
-                <ArrowRight className="w-5 h-5" />
-              </Button>
-            </Link>
+            <Button 
+              variant="gradient" 
+              size="lg" 
+              className="gap-2 shadow-lg shadow-watchman-accent/30"
+              onClick={handleGetStarted}
+            >
+              {isLoggedIn ? 'Go to Dashboard' : 'Get Started'}
+              <ArrowRight className="w-5 h-5" />
+            </Button>
           </motion.div>
         </div>
       </section>

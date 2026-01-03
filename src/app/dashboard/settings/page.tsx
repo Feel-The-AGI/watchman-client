@@ -122,6 +122,17 @@ export default function SettingsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
 
+  // Upgrade modal state
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+  const [pricingInfo, setPricingInfo] = useState<{
+    usd_price: number;
+    ghs_amount: number;
+    exchange_rate: number;
+    display_ghs: string;
+  } | null>(null);
+  const [loadingPricing, setLoadingPricing] = useState(false);
+
   useEffect(() => {
     fetchSettings();
   }, []);
@@ -226,8 +237,40 @@ export default function SettingsPage() {
     }
   };
 
-  const handleUpgrade = () => {
-    window.open('/pricing', '_blank');
+  const handleUpgrade = async () => {
+    // Show upgrade modal and fetch pricing
+    setShowUpgradeModal(true);
+    setLoadingPricing(true);
+    try {
+      const pricing = await api.payments.getPricing();
+      setPricingInfo(pricing);
+    } catch (err) {
+      console.error('Failed to fetch pricing:', err);
+      // Use fallback pricing
+      setPricingInfo({
+        usd_price: 12,
+        ghs_amount: 174,
+        exchange_rate: 14.5,
+        display_ghs: 'GHS 174.00',
+      });
+    } finally {
+      setLoadingPricing(false);
+    }
+  };
+
+  const handleProceedToCheckout = async () => {
+    try {
+      setUpgrading(true);
+      setError(null);
+      const result = await api.payments.createCheckout();
+      if (result.checkout_url) {
+        // Redirect to Paystack checkout
+        window.location.href = result.checkout_url;
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to start checkout');
+      setUpgrading(false);
+    }
   };
 
   const handleManageSubscription = async () => {
@@ -1159,6 +1202,99 @@ export default function SettingsPage() {
         variant="warning"
         loading={cancellingSubscription}
       />
+
+      {/* Upgrade to Pro Modal */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => !upgrading && setShowUpgradeModal(false)}
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative z-10 w-full max-w-md mx-4 p-6 rounded-2xl bg-watchman-surface border border-white/10 shadow-2xl"
+          >
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-watchman-accent to-watchman-purple flex items-center justify-center mx-auto mb-4 shadow-lg shadow-watchman-accent/30">
+                <Crown className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold">Upgrade to Pro</h2>
+              <p className="text-watchman-muted mt-2">Unlock all features and unlimited access</p>
+            </div>
+
+            {loadingPricing ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-watchman-accent" />
+              </div>
+            ) : (
+              <>
+                <div className="bg-watchman-bg rounded-xl p-4 mb-6">
+                  <div className="flex items-baseline justify-center gap-2 mb-2">
+                    <span className="text-4xl font-bold">${pricingInfo?.usd_price || 12}</span>
+                    <span className="text-watchman-muted">/month</span>
+                  </div>
+                  <p className="text-center text-sm text-watchman-muted">
+                    Charged as <span className="text-white font-medium">{pricingInfo?.display_ghs || 'GHS 174.00'}</span>
+                  </p>
+                  <p className="text-center text-xs text-watchman-muted mt-1">
+                    Exchange rate: 1 USD = {pricingInfo?.exchange_rate?.toFixed(2) || '14.50'} GHS
+                  </p>
+                </div>
+
+                <div className="space-y-2 mb-6">
+                  {[
+                    'Unlimited calendar years',
+                    'Unlimited rotations & commitments',
+                    'Unlimited Watchman AI agent',
+                    'Weighted constraints',
+                    'CSV & PDF exports',
+                    'Calendar sharing',
+                  ].map((feature) => (
+                    <div key={feature} className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="w-4 h-4 text-watchman-mint" />
+                      <span>{feature}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="glass"
+                    className="flex-1"
+                    onClick={() => setShowUpgradeModal(false)}
+                    disabled={upgrading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="gradient"
+                    className="flex-1 gap-2"
+                    onClick={handleProceedToCheckout}
+                    disabled={upgrading}
+                  >
+                    {upgrading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="w-4 h-4" />
+                        Subscribe Now
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                <p className="text-center text-xs text-watchman-muted mt-4">
+                  Secure payment via Paystack. Cancel anytime.
+                </p>
+              </>
+            )}
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
