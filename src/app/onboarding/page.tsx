@@ -78,52 +78,8 @@ const PRESET_CYCLES = [
   },
 ];
 
-// Parse natural language shift descriptions into pattern
-function parseShiftDescription(text: string): CycleBlock[] | null {
-  const lowered = text.toLowerCase();
-
-  // Common patterns to detect
-  // "5 days, 5 nights, 5 off" or "5 day 5 night 5 off"
-  const dayNightOffMatch = lowered.match(/(\d+)\s*(?:days?|day\s*shifts?)\s*[,\s]+(\d+)\s*(?:nights?|night\s*shifts?)\s*[,\s]+(\d+)\s*(?:off|rest|days?\s*off)/i);
-  if (dayNightOffMatch) {
-    return [
-      { label: 'work_day', duration: parseInt(dayNightOffMatch[1]) },
-      { label: 'work_night', duration: parseInt(dayNightOffMatch[2]) },
-      { label: 'off', duration: parseInt(dayNightOffMatch[3]) },
-    ];
-  }
-
-  // "5/5/5" pattern (days/nights/off)
-  const slashPattern = lowered.match(/(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)/);
-  if (slashPattern) {
-    return [
-      { label: 'work_day', duration: parseInt(slashPattern[1]) },
-      { label: 'work_night', duration: parseInt(slashPattern[2]) },
-      { label: 'off', duration: parseInt(slashPattern[3]) },
-    ];
-  }
-
-  // "X on Y off" pattern
-  const onOffMatch = lowered.match(/(\d+)\s*(?:on|days?)\s*[,\s]+(\d+)\s*(?:off|rest)/i);
-  if (onOffMatch) {
-    return [
-      { label: 'work_day', duration: parseInt(onOffMatch[1]) },
-      { label: 'off', duration: parseInt(onOffMatch[2]) },
-    ];
-  }
-
-  // "X days then Y nights then Z off"
-  const thenPattern = lowered.match(/(\d+)\s*(?:days?|day\s*shifts?)\s*then\s*(\d+)\s*(?:nights?|night\s*shifts?)\s*then\s*(\d+)\s*(?:off|rest)/i);
-  if (thenPattern) {
-    return [
-      { label: 'work_day', duration: parseInt(thenPattern[1]) },
-      { label: 'work_night', duration: parseInt(thenPattern[2]) },
-      { label: 'off', duration: parseInt(thenPattern[3]) },
-    ];
-  }
-
-  return null;
-}
+// No local parsing - let the LLM understand natural language directly
+// The backend Gemini integration handles all natural language understanding
 
 const PRESET_CONSTRAINTS = [
   { name: 'No study on night shifts', rule: 'no_study_on:work_night', icon: Moon },
@@ -270,42 +226,66 @@ export default function OnboardingPage() {
     setInputValue('');
     setShowQuickActions(false);
 
-    // If we're in step 1 (rotation selection), try to parse the shift description
+    // If we're in step 1 (rotation selection), send to LLM to understand
     if (step === 1) {
-      const parsedPattern = parseShiftDescription(userMessage);
-
-      if (parsedPattern) {
-        setPattern(parsedPattern);
-        const totalDays = parsedPattern.reduce((s, b) => s + b.duration, 0);
-        const patternDescription = parsedPattern.map(p => {
-          if (p.label === 'work_day') return `${p.duration} day shift${p.duration > 1 ? 's' : ''}`;
-          if (p.label === 'work_night') return `${p.duration} night shift${p.duration > 1 ? 's' : ''}`;
-          return `${p.duration} day${p.duration > 1 ? 's' : ''} off`;
-        }).join(', ');
-
-        setTimeout(() => {
-          addMessage('assistant', `Got it! I understood your rotation as: ${patternDescription} (${totalDays}-day cycle). Now I need to anchor your calendar. Pick a date you know for sure, and tell me which day of the ${totalDays}-day cycle it is.`);
-          setStep(2);
-          setTimeout(() => setShowQuickActions(true), 500);
-        }, 600);
-        return;
-      } else {
-        // Couldn't parse, send to AI for help
+      try {
+        setLoading(true);
+        // Ask the LLM to understand the shift pattern and return structured data
+        const response = await api.chat.sendMessage(
+          `The user is describing their work shift rotation pattern: "${userMessage}"
+          
+          Please understand this and respond in this EXACT JSON format:
+          {"understood": true/false, "pattern": [{"label": "work_day"/"work_night"/"off", "duration": number}], "description": "human readable summary", "message": "your response to user"}
+          
+          Common patterns:
+          - "5 days, 5 nights, 5 off" = 5 day shifts, 5 night shifts, 5 days off
+          - "10 on 5 off" = 10 working days, 5 days off
+          - "5/5/5" = 5 days, 5 nights, 5 off
+          - "4 on 4 off" = 4 day shifts, 4 days off
+          
+          If unclear, set understood=false and ask clarifying questions in the message field.
+          ONLY respond with the JSON object, nothing else.`
+        );
+        
+        const responseText = response?.response || response?.message || '';
+        
+        // Try to extract JSON from the LLM response
         try {
-          setLoading(true);
-          const response = await api.chat.sendMessage(`Help me understand this shift pattern: "${userMessage}". Respond with a simple explanation of what pattern you understood, or ask clarifying questions if unclear. Keep response brief.`);
-          if (response?.response || response?.message) {
-            addMessage('assistant', (response.response || response.message) + "\n\nTry describing your schedule like: \"5 days, 5 nights, 5 off\" or \"10 on, 5 off\" - or select from the options above.");
+          // Handle if response is wrapped in markdown code block
+          const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            
+            if (parsed.understood && parsed.pattern && parsed.pattern.length > 0) {
+              // LLM understood the pattern
+              setPattern(parsed.pattern);
+              const totalDays = parsed.pattern.reduce((s: number, b: CycleBlock) => s + b.duration, 0);
+              
+              addMessage('assistant', `Got it! I understood your rotation as: ${parsed.description} (${totalDays}-day cycle). Now I need to anchor your calendar. Pick a date you know for sure, and tell me which day of the ${totalDays}-day cycle it is.`);
+              setStep(2);
+              setTimeout(() => setShowQuickActions(true), 500);
+            } else {
+              // LLM couldn't understand - show its clarifying question
+              addMessage('assistant', parsed.message || "I couldn't quite understand that pattern. Could you describe it differently? For example: '5 days, 5 nights, 5 off' or '10 on, 5 off'");
+              setTimeout(() => setShowQuickActions(true), 500);
+            }
+          } else {
+            // No JSON found, show raw response
+            addMessage('assistant', responseText || "Could you describe your shift pattern? For example: '5 days, 5 nights, 5 off' or '10 on, 5 off'");
+            setTimeout(() => setShowQuickActions(true), 500);
           }
+        } catch {
+          // JSON parse failed, show raw response
+          addMessage('assistant', responseText || "Could you describe your shift pattern? For example: '5 days, 5 nights, 5 off' or '10 on, 5 off'");
           setTimeout(() => setShowQuickActions(true), 500);
-        } catch (err: any) {
-          addMessage('assistant', "I couldn't understand that pattern. Try describing it like: \"5 days, 5 nights, 5 off\" or \"10 on, 5 off\" - or select from the options above.");
-          setTimeout(() => setShowQuickActions(true), 500);
-        } finally {
-          setLoading(false);
         }
-        return;
+      } catch (err: any) {
+        addMessage('assistant', "I couldn't process that right now. Try selecting from the presets above or describe your pattern like: '5 days, 5 nights, 5 off'");
+        setTimeout(() => setShowQuickActions(true), 500);
+      } finally {
+        setLoading(false);
       }
+      return;
     }
 
     // For other steps, send to Gemini via backend
