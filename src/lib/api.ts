@@ -236,10 +236,17 @@ class APIService {
       return this.request<any>(`/api/commands${query}`)
     },
     get: (id: string) => this.request<any>(`/api/commands/${id}`),
-    execute: (command: { action: string; payload: any; explanation?: string }) =>
+    execute: (proposalId: string) =>
       this.request<any>('/api/commands/execute', {
         method: 'POST',
-        body: JSON.stringify(command),
+        body: JSON.stringify({ proposal_id: proposalId }),
+      }),
+    pendingProposals: () =>
+      this.request<any>('/api/commands/proposals/pending'),
+    reviewProposal: (proposalId: string, decision: 'approve' | 'reject') =>
+      this.request<any>(`/api/commands/proposals/${proposalId}/review`, {
+        method: 'POST',
+        body: JSON.stringify({ decision }),
       }),
     undo: (commandId?: string) =>
       this.request<any>('/api/commands/undo', {
