@@ -6,8 +6,9 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://www.trywatchman.app'),
   title: 'Watchman - Time Under Control',
-  description: 'A deterministic life-state simulator with approval-gated change control. Guard your hours. Live by rule, not noise.',
+  description: 'Plan rotating shifts, leave and personal commitments in one calendar. Built for people whose working week changes.',
   keywords: ['calendar', 'schedule', 'rotation', 'shift work', 'planning', 'life management'],
   authors: [{ name: 'Watchman' }],
   icons: {
