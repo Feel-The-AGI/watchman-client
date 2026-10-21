@@ -81,19 +81,19 @@ export default function TermsOfServicePage() {
                   <div>
                     <h3 className="font-medium text-white">Pro Plan</h3>
                     <p>
-                      Pro is a one-time payment of $12, processed by Paystack and charged in Ghanaian cedis at the exchange rate shown at checkout. It unlocks calendar sharing, CSV and PDF exports, weighted constraints, leave planning, and unlimited Watchman messages. Checkout does not start an automatic renewal.
+                      Pro is $12 for 30 days, processed by Paystack and charged in Ghanaian cedis at the exchange rate shown at checkout. It unlocks calendar sharing, CSV and PDF exports, weighted constraints, leave planning, and unlimited Watchman messages. Checkout does not start an automatic card subscription. Another checkout adds another 30 days.
                     </p>
                   </div>
                   <div>
                     <h3 className="font-medium text-white">Payment</h3>
                     <p>
-                      Payments are processed by Paystack. We do not store your full card number. A successful payment turns on Pro for that account. We do not charge the same payment method again unless you start another checkout.
+                      Payments are processed by Paystack. We do not store your full card number. A verified payment turns on Pro until the end of that 30-day period. We do not charge the same payment method again unless you start another checkout.
                     </p>
                   </div>
                   <div>
                     <h3 className="font-medium text-white">Cancellation</h3>
                     <p>
-                      There is no renewing subscription to cancel in account settings. Pro access from a completed checkout stays on the account, and no further charge is scheduled.
+                      You can cancel from account settings. Cancellation does not end Pro early. Access lasts until the end of the period you already paid for, and the settings page shows that date.
                     </p>
                   </div>
                 </div>

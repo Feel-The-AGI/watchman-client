@@ -10,6 +10,7 @@ import { Logo } from '@/components/ui/Logo';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
+import { rememberCheckoutReference } from '@/lib/checkout';
 
 const tiers = [
   {
@@ -42,8 +43,8 @@ const tiers = [
   {
     name: 'Pro',
     price: '$12',
-    period: 'one time',
-    description: 'Paid once through Paystack. This checkout does not renew automatically.',
+    period: 'for 30 days',
+    description: 'Paid through Paystack for 30 days. Another checkout extends it. This one does not bill you again on its own.',
     icon: Crown,
     gradient: 'from-watchman-accent to-watchman-purple',
     glow: 'shadow-watchman-accent/30',
@@ -76,7 +77,7 @@ const faqs = [
   },
   {
     question: 'Does Pro renew automatically?',
-    answer: 'No. Pro is a one-time $12 payment processed by Paystack and charged in Ghanaian cedis at checkout. Watchman does not bill you again unless you start another checkout.',
+    answer: 'Checkout does not start an automatic card subscription. $12 through Paystack covers 30 days. Another checkout adds 30 more days. If you cancel, Pro stays until the end of the days you already paid for.',
   },
   {
     question: 'What does "binary constraints" mean?',
@@ -107,6 +108,7 @@ export default function PricingPage() {
       setUpgrading(true);
       setError(null);
       const result = await api.payments.createCheckout();
+      if (result.reference) rememberCheckoutReference(result.reference);
       if (result.checkout_url) {
         window.location.href = result.checkout_url;
       }
@@ -187,8 +189,8 @@ export default function PricingPage() {
               Simple, <span className="text-gradient">Honest</span> Pricing
             </h1>
             <p className="text-xl text-watchman-muted max-w-2xl mx-auto">
-              Start free with a 3-day Pro trial. Upgrade when you need unlimited access.
-              No hidden fees. Pro does not renew automatically.
+              Start free with a 3-day Pro trial. Pro is $12 for 30 days through Paystack.
+              It does not bill you again on its own.
             </p>
           </motion.div>
         </div>
