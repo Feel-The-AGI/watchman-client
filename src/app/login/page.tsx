@@ -1,9 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Mail, ArrowRight, Loader2, Sparkles, Shield, Clock, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -13,7 +12,6 @@ import { useAuth } from '@/hooks/useAuth';
 type AuthMode = 'signin' | 'signup' | 'magic';
 
 export default function LoginPage() {
-  const router = useRouter();
   const { signIn, signUp, signInWithGoogle, signInWithMagicLink, loading } = useAuth();
   
   const [mode, setMode] = useState<AuthMode>('signin');
@@ -22,42 +20,78 @@ export default function LoginPage() {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const message = params.get('message');
+    const authError = params.get('error');
+    if (message) {
+      setError(message);
+    } else if (authError) {
+      setError('Sign-in could not be completed. Request a new link and try again.');
+    }
+  }, []);
+
+  const beginSubmit = () => {
+    if (submittingRef.current) return false;
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    setError('');
+    return true;
+  };
+
+  const endSubmit = () => {
+    submittingRef.current = false;
+    setIsSubmitting(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    if (!beginSubmit()) return;
 
     try {
       if (mode === 'magic') {
-        await signInWithMagicLink(email);
+        const { error } = await signInWithMagicLink(email);
+        if (error) throw error;
         setMagicLinkSent(true);
+        endSubmit();
         return;
       }
 
       if (mode === 'signin') {
         const { error } = await signIn(email, password);
         if (error) throw error;
-      } else {
-        const { error } = await signUp(email, password, name);
-        if (error) throw error;
+        return;
       }
-      
-      // Small delay to let session establish, then redirect
-      setTimeout(() => router.push('/dashboard'), 100);
+
+      const { error, needsEmailConfirmation } = await signUp(email, password, name);
+      if (error) throw error;
+      if (needsEmailConfirmation) {
+        setEmailConfirmationSent(true);
+        endSubmit();
+      }
+      // A real session is redirected by AuthProvider. Keep the form locked until then.
     } catch (err: any) {
       setError(err.message || 'Authentication failed');
+      endSubmit();
     }
   };
 
   const handleGoogleSignIn = async () => {
+    if (!beginSubmit()) return;
     try {
-      await signInWithGoogle();
+      const { error } = await signInWithGoogle();
+      if (error) throw error;
     } catch (err: any) {
       setError(err.message || 'Google sign in failed');
+      endSubmit();
     }
   };
 
-  if (magicLinkSent) {
+  if (magicLinkSent || emailConfirmationSent) {
     return (
       <div className="min-h-screen bg-watchman-bg text-white flex items-center justify-center px-6 relative overflow-hidden">
         {/* Background Effects */}
@@ -81,16 +115,17 @@ export default function LoginPage() {
           </motion.div>
           <h1 className="text-3xl font-bold mb-4">Check Your Email</h1>
           <p className="text-watchman-muted mb-8 leading-relaxed">
-            We sent a magic link to <span className="text-white font-medium">{email}</span>. 
-            Click the link in your email to sign in securely.
+            {emailConfirmationSent ? 'Check for a confirmation link at ' : 'We sent a sign-in link to '}
+            <span className="text-white font-medium">{email}</span>.
+            {' '}{emailConfirmationSent ? 'Confirm your email to finish creating your account.' : 'Open the link to sign in.'}
           </p>
           <Button 
             variant="glass" 
-            onClick={() => setMagicLinkSent(false)}
+            onClick={() => { setMagicLinkSent(false); setEmailConfirmationSent(false); }}
             className="gap-2"
           >
             <ArrowRight className="w-4 h-4 rotate-180" />
-            Try a different email
+            {emailConfirmationSent ? 'Back' : 'Try a different email'}
           </Button>
         </motion.div>
       </div>
@@ -271,9 +306,9 @@ export default function LoginPage() {
                 variant="gradient"
                 size="lg"
                 className="w-full gap-2 mt-6"
-                disabled={loading}
+                disabled={loading || isSubmitting}
               >
-                {loading ? (
+                {loading || isSubmitting ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
                   <>
@@ -301,7 +336,7 @@ export default function LoginPage() {
                 size="lg"
                 className="w-full gap-3"
                 onClick={handleGoogleSignIn}
-                disabled={loading}
+                disabled={loading || isSubmitting}
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>

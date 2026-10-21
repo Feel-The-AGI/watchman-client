@@ -33,14 +33,6 @@ import { Button } from '@/components/ui/Button';
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 
-// Stats for social proof
-const stats = [
-  { value: '365', label: 'Days Generated', suffix: '+' },
-  { value: '15', label: 'Cycle Patterns', suffix: '+' },
-  { value: '100', label: 'Uptime', suffix: '%' },
-  { value: '0', label: 'Silent Changes', suffix: '' },
-];
-
 // Features with emotional copy
 const features = [
   {
@@ -123,33 +115,6 @@ function FloatingDays() {
       ))}
     </div>
   );
-}
-
-// Animated counter for stats
-function AnimatedCounter({ value, suffix }: { value: string; suffix: string }) {
-  const [count, setCount] = useState(0);
-  const numValue = parseInt(value);
-
-  useEffect(() => {
-    const duration = 2000;
-    const steps = 60;
-    const increment = numValue / steps;
-    let current = 0;
-
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= numValue) {
-        setCount(numValue);
-        clearInterval(timer);
-      } else {
-        setCount(Math.floor(current));
-      }
-    }, duration / steps);
-
-    return () => clearInterval(timer);
-  }, [numValue]);
-
-  return <span>{count}{suffix}</span>;
 }
 
 // Particle type for New Year celebration
@@ -1078,7 +1043,7 @@ export default function LandingPage() {
             <Link href="#how-it-works">
               <Button variant="ghost" size="xl" className="text-white/60 hover:text-white hover:bg-white/5 border border-white/10">
                 <Play className="w-5 h-5 mr-2" />
-                Watch Demo
+                How it works
               </Button>
             </Link>
           </motion.div>
@@ -1172,30 +1137,6 @@ export default function LandingPage() {
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats Bar */}
-      <section className="relative py-12 border-y border-white/5">
-        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 via-emerald-500/5 to-green-500/5" />
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {stats.map((stat, i) => (
-              <motion.div
-                key={stat.label}
-                className="text-center"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-              >
-                <div className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent mb-2">
-                  <AnimatedCounter value={stat.value} suffix={stat.suffix} />
-                </div>
-                <div className="text-sm text-white/40 uppercase tracking-wider">{stat.label}</div>
-              </motion.div>
-            ))}
           </div>
         </div>
       </section>
