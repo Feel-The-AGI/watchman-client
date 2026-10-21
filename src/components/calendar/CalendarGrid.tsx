@@ -18,6 +18,7 @@ import {
 import { ChevronLeft, ChevronRight, Sun, Moon, Coffee, Plane, Sparkles, Lock, Crown, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { cycleDayBadge } from '@/lib/cycle-day-badge';
+import { calendarCellKind } from '@/lib/calendar-day';
 
 export interface DailyLog {
   id: string;
@@ -300,11 +301,13 @@ export function CalendarGrid({
               : null;
 
             const hasCommitments = calendarDay?.commitments && calendarDay.commitments.length > 0;
-            const isLeave = calendarDay?.is_leave;
+            const isLeave = calendarCellKind(calendarDay) === 'leave';
             const isPreview = calendarDay?.is_preview;
-            const dayBadge = inCurrentMonth
-              ? cycleDayBadge(calendarDay?.work_type, calendarDay?.cycle_day)
-              : null;
+            const dayBadge = !inCurrentMonth
+              ? null
+              : isLeave
+                ? 'Leave'
+                : cycleDayBadge(calendarDay?.work_type, calendarDay?.cycle_day);
 
             return (
               <motion.button
@@ -324,7 +327,8 @@ export function CalendarGrid({
                   isSelected && 'ring-2 ring-watchman-accent ring-inset bg-watchman-accent/10',
                   isPreview && 'bg-watchman-accent/5 border-dashed border-watchman-accent/30',
                   isHovered && inCurrentMonth && !isSelected && 'bg-white/5',
-                  workConfig && inCurrentMonth && `bg-gradient-to-br ${workConfig.gradient}`
+                  isLeave && inCurrentMonth && 'bg-gradient-to-br from-teal-500/25 via-teal-500/10 to-transparent',
+                  workConfig && inCurrentMonth && !isLeave && `bg-gradient-to-br ${workConfig.gradient}`
                 )}
               >
                 <div className="h-full flex flex-col relative">
@@ -349,7 +353,17 @@ export function CalendarGrid({
 
                   {/* Work Type Indicator */}
                   <div className="flex-1 flex flex-col justify-center items-center gap-0.5 sm:gap-1.5 py-0.5 sm:py-1">
-                    {workConfig && inCurrentMonth && (
+                    {isLeave && inCurrentMonth && (
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="w-5 h-5 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-lg shadow-teal-500/30"
+                      >
+                        <Plane className="w-2.5 h-2.5 sm:w-4 sm:h-4 text-white" />
+                      </motion.div>
+                    )}
+
+                    {workConfig && inCurrentMonth && !isLeave && (
                       <motion.div
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
@@ -362,16 +376,6 @@ export function CalendarGrid({
                         )}
                       >
                         <workConfig.icon className="w-2.5 h-2.5 sm:w-4 sm:h-4 text-white" />
-                      </motion.div>
-                    )}
-
-                    {isLeave && inCurrentMonth && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="w-5 h-5 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shadow-lg shadow-teal-500/30"
-                      >
-                        <Plane className="w-2.5 h-2.5 sm:w-4 sm:h-4 text-white" />
                       </motion.div>
                     )}
 
@@ -586,17 +590,17 @@ export function YearOverview({ days, year, onSelectMonth, userTier = 'free' }: Y
             </h3>
             <div className="grid grid-cols-7 gap-0.5">
               {days.map(({ date, day }) => {
-                const workType = day?.work_type;
+                const kind = calendarCellKind(day);
                 return (
                   <div
                     key={format(date, 'yyyy-MM-dd')}
                     className={cn(
                       'w-2.5 h-2.5 rounded-sm transition-transform group-hover:scale-110',
-                      workType === 'work_day' && 'bg-amber-500 shadow-sm shadow-amber-500/30',
-                      workType === 'work_night' && 'bg-indigo-500 shadow-sm shadow-indigo-500/30',
-                      workType === 'off' && 'bg-emerald-500 shadow-sm shadow-emerald-500/30',
-                      day?.is_leave && 'bg-teal-500 shadow-sm shadow-teal-500/30',
-                      !workType && !day?.is_leave && 'bg-white/10'
+                      kind === 'work_day' && 'bg-amber-500 shadow-sm shadow-amber-500/30',
+                      kind === 'work_night' && 'bg-indigo-500 shadow-sm shadow-indigo-500/30',
+                      kind === 'off' && 'bg-emerald-500 shadow-sm shadow-emerald-500/30',
+                      kind === 'leave' && 'bg-teal-500 shadow-sm shadow-teal-500/30',
+                      kind === 'empty' && 'bg-white/10'
                     )}
                   />
                 );
