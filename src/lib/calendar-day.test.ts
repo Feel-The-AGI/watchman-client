@@ -69,17 +69,11 @@ describe('commitments on the calendar', () => {
 })
 
 describe('leave day panel', () => {
-  it('shows only the leave card and zero expected hours', () => {
-    const panel = dayPanelSummary({ work_type: 'work_day', cycle_day: 10, is_leave: true })
-    assert.equal(panel.showShiftCard, false)
-    assert.equal(panel.showLeaveCard, true)
-    assert.equal(panel.expectedHours, 0)
+  it('hides the shift card on a leave day', () => {
+    assert.equal(dayPanelSummary({ work_type: 'work_day', is_leave: true }).showShiftCard, false)
   })
 
   it('keeps the shift card on a working day', () => {
-    const panel = dayPanelSummary({ work_type: 'work_day', cycle_day: 10, is_leave: false })
-    assert.equal(panel.showShiftCard, true)
-    assert.equal(panel.showLeaveCard, false)
-    assert.equal(panel.expectedHours, 12)
+    assert.equal(dayPanelSummary({ work_type: 'work_day', is_leave: false }).showShiftCard, true)
   })
 })

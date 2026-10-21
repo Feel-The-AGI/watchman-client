@@ -82,18 +82,12 @@ export function commitmentCellCount(day: { commitments?: unknown; state_json?: u
   return dayCommitments(day).length
 }
 
-export function dayPanelSummary(day: { work_type?: string | null; is_leave?: boolean; cycle_day?: number } | null | undefined): {
+export function dayPanelSummary(day: { work_type?: string | null; is_leave?: boolean } | null | undefined): {
   showShiftCard: boolean
-  showLeaveCard: boolean
-  expectedHours: number
 } {
-  const leave = Boolean(day?.is_leave)
   const workType = day?.work_type
-  const workingShift = workType === 'work_day' || workType === 'work_night'
   return {
-    showShiftCard: !leave && Boolean(workType && workType !== 'blank'),
-    showLeaveCard: leave,
-    expectedHours: leave || !workingShift ? 0 : 12,
+    showShiftCard: !day?.is_leave && Boolean(workType && workType !== 'blank'),
   }
 }
 

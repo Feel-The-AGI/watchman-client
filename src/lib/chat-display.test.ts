@@ -86,4 +86,35 @@ describe('chat display', () => {
     assert.equal(merged.filter((message) => message.role === 'user').length, 1)
     assert.equal(merged.filter((message) => message.role === 'user')[0].id, 'srv-1')
   })
+
+  it('keeps a new yes when an older saved yes has no echo in the reply', () => {
+    const earlier = { id: 'srv-old', role: 'user', content: 'yes', created_at: '' }
+    const optimistic = { id: 'temp-2', role: 'user', content: 'yes', created_at: '' }
+    const reply = { id: 'asst-2', role: 'assistant', content: 'Noted.', created_at: '' }
+    const shown = messagesAfterSend([earlier, optimistic], 'temp-2', null, reply)
+    const yeses = shown.filter((message) => message.role === 'user' && message.content === 'yes')
+    assert.equal(yeses.length, 2)
+    assert.equal(yeses[1].id, 'temp-2')
+
+    const merged = mergeChatHistory(
+      [earlier, optimistic],
+      [earlier, { id: 'srv-other', role: 'user', content: 'book a dentist', created_at: '' }],
+    )
+    assert.equal(merged.filter((message) => message.id === 'temp-2').length, 1)
+  })
+
+  it('does not repeat a user message already stored when the proposal reply echoes it', () => {
+    const saved = { id: 'srv-1', role: 'user', content: 'Book a dentist appointment', created_at: '' }
+    const optimistic = { id: 'temp-1', role: 'user', content: 'Book a dentist appointment', created_at: '' }
+    const card = {
+      id: 'asst-1',
+      role: 'assistant',
+      content: 'Add Dentist appointment on Tue 27 Oct, 10–11am',
+      created_at: '',
+      proposal: { id: 'p1' },
+    }
+    const shown = messagesAfterSend([saved, optimistic], 'temp-1', saved, card)
+    assert.equal(shown.filter((message) => message.role === 'user').length, 1)
+    assert.equal(shown.filter((message) => message.role === 'user')[0].id, 'srv-1')
+  })
 })

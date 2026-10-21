@@ -177,7 +177,7 @@ export function DayInspector({
 
   // Calculate expected hours from work type and settings
   const calculateExpectedHours = () => {
-    if (panel.expectedHours === 0) return 0;
+    if (dayData?.is_leave) return 0;
     if (!workInfo || dayData?.work_type === 'off') return 0;
 
     if (workSettings) {

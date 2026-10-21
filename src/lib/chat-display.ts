@@ -125,24 +125,19 @@ export interface ChatListMessage {
   content: string
 }
 
-function sameUserText(left: ChatListMessage, right: ChatListMessage): boolean {
-  return left.role === 'user' && right.role === 'user' && left.content.trim() === right.content.trim()
-}
-
-/** One saved user row wins over the optimistic copy with the same text. */
+/** A saved user row replaces only a temporary row that appears before it. */
 export function collapseUserEchoes<T extends ChatListMessage>(messages: T[]): T[] {
   const next: T[] = []
   for (const message of messages) {
     if (!message.id || next.some((existing) => existing.id === message.id)) continue
-    if (message.role === 'user') {
+    if (message.role === 'user' && !message.id.startsWith('temp-')) {
       const echoIndex = next.findIndex((existing) =>
-        sameUserText(existing, message)
-        && (existing.id.startsWith('temp-') || message.id.startsWith('temp-'))
+        existing.role === 'user'
+        && existing.id.startsWith('temp-')
+        && existing.content.trim() === message.content.trim()
       )
       if (echoIndex >= 0) {
-        if (next[echoIndex].id.startsWith('temp-') && !message.id.startsWith('temp-')) {
-          next[echoIndex] = message
-        }
+        next[echoIndex] = message
         continue
       }
     }
@@ -170,12 +165,15 @@ export function messagesAfterSend<T extends ChatListMessage>(
 /** A late history payload must not sit beside the optimistic copy of a message it already stored. */
 export function mergeChatHistory<T extends ChatListMessage>(local: T[], history: T[]): T[] {
   const savedIds = new Set(history.map((message) => message.id))
-  const savedUserText = new Set(
-    history.filter((message) => message.role === 'user').map((message) => message.content.trim()),
-  )
+  const newestSavedUser = [...history].reverse().find((message) => message.role === 'user')
   const pending = local.filter((message) => {
     if (savedIds.has(message.id)) return false
-    if (message.role === 'user' && message.id.startsWith('temp-') && savedUserText.has(message.content.trim())) {
+    if (
+      message.role === 'user'
+      && message.id.startsWith('temp-')
+      && newestSavedUser
+      && message.content.trim() === newestSavedUser.content.trim()
+    ) {
       return false
     }
     return true
