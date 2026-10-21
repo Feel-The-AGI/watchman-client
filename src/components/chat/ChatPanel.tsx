@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, Loader2, Bot, User, Undo2, Redo2, CheckCircle, XCircle, AlertTriangle, Sparkles, Command } from 'lucide-react'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
 
@@ -519,10 +520,10 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
           <div className="flex items-start gap-2 text-amber-400 text-xs">
             <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <div>
-              <span className="font-medium">Context limit reached.</span>
-              <span className="text-amber-400/80"> You can keep chatting, but the agent may lose older context. </span>
-              <span className="text-watchman-accent hover:underline cursor-pointer">Upgrade to Pro</span>
-              <span className="text-amber-400/80"> for unlimited history.</span>
+              <span className="font-medium">Showing the latest 50 messages.</span>
+              <span className="text-amber-400/80"> That is the free history window. Free accounts can still send 100 messages each month. </span>
+              <Link href="/pricing" className="text-watchman-accent hover:underline">Upgrade to Pro</Link>
+              <span className="text-amber-400/80"> for a longer history.</span>
             </div>
           </div>
         </motion.div>
