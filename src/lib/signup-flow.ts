@@ -25,6 +25,27 @@ export function resendCooldownRemaining(startedAt: number | null, now: number): 
   return Math.max(0, RESEND_COOLDOWN_SECONDS - elapsed)
 }
 
+export const RESEND_SENT_MESSAGE = 'Confirmation email sent again.'
+
+export const RESEND_RATE_LIMIT_MESSAGE = 'Too many emails sent. Try again in a few minutes.'
+
+const RESEND_FAILED_MESSAGE = 'The confirmation email could not be sent. Try again in a moment.'
+
+/** What the check-email screen says after Resend. A rate limit gets its own sentence. */
+export function resendConfirmationFeedback(error: { message?: string; status?: number; code?: string } | null | undefined): {
+  tone: 'success' | 'error'
+  text: string
+} {
+  if (!error) return { tone: 'success', text: RESEND_SENT_MESSAGE }
+  const code = (error.code || '').toLowerCase()
+  const message = (error.message || '').toLowerCase()
+  const rateLimited = error.status === 429
+    || code.includes('rate_limit')
+    || message.includes('rate limit')
+  if (rateLimited) return { tone: 'error', text: RESEND_RATE_LIMIT_MESSAGE }
+  return { tone: 'error', text: error.message?.trim() || RESEND_FAILED_MESSAGE }
+}
+
 export type AuthNavChoice = 'pending' | 'in' | 'out'
 
 /** Sign In stays hidden only until a user is known. A slow profile fetch must not blank a signed-in nav. */
