@@ -1,11 +1,10 @@
 /**
- * Free accounts see every month of the current year.
- * Months further than six months beyond today, in another year, stay limited.
+ * Free accounts can open a month when it starts inside the next six months.
+ * Pro and admin are never locked. Year view and month view both use this.
  */
 export function isFreeMonthLocked(month: Date, today: Date, tier: 'free' | 'pro' | 'admin' = 'free'): boolean {
   if (tier !== 'free') return false
   const monthStart = new Date(month.getFullYear(), month.getMonth(), 1)
-  if (monthStart.getFullYear() === today.getFullYear()) return false
   const horizon = new Date(today.getFullYear(), today.getMonth() + 6, 1)
   return monthStart >= horizon
 }
