@@ -4,6 +4,8 @@ import {
   chatInputLocked,
   chatMessageText,
   isInternalChatMessage,
+  mergeChatHistory,
+  messagesAfterSend,
   proposalAppliedText,
   proposalCardText,
   REVIEW_FAILURE_MESSAGE,
@@ -57,5 +59,31 @@ describe('chat display', () => {
       REVIEW_FAILURE_MESSAGE,
       "That didn't go through. You can try again or send another message.",
     )
+  })
+
+  it('shows the user message once when a proposal card arrives', () => {
+    const older = { id: 'older', role: 'assistant', content: 'Hello', created_at: '' }
+    const optimistic = { id: 'temp-1', role: 'user', content: 'Book a dentist appointment', created_at: '' }
+    const saved = { id: 'srv-1', role: 'user', content: 'Book a dentist appointment', created_at: '' }
+    const card = {
+      id: 'asst-1',
+      role: 'assistant',
+      content: 'Add Dentist appointment on Tue 27 Oct, 10–11am',
+      created_at: '',
+      isProposal: true,
+      proposal: { id: 'p1' },
+    }
+    const shown = messagesAfterSend([older, optimistic], 'temp-1', saved, card)
+    const userMessages = shown.filter((message) => message.role === 'user')
+    assert.equal(userMessages.length, 1)
+    assert.equal(userMessages[0].id, 'srv-1')
+    assert.equal(userMessages[0].content, 'Book a dentist appointment')
+    assert.equal(shown.filter((message) => message.proposal).length, 1)
+    assert.equal(proposalAppliedText(card.proposal), 'Done! Changes applied successfully.')
+
+    const echoed = [older, optimistic, saved, card]
+    const merged = mergeChatHistory(echoed, [older, saved, card])
+    assert.equal(merged.filter((message) => message.role === 'user').length, 1)
+    assert.equal(merged.filter((message) => message.role === 'user')[0].id, 'srv-1')
   })
 })

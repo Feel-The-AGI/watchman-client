@@ -46,6 +46,7 @@ import { toast } from '@/components/ui/Toast';
 import { IncidentModal, LogModal } from '@/components/ui/IncidentModal';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { dayCommitments, dayPanelSummary } from '@/lib/calendar-day';
 import type { CalendarDay, DailyLog, Incident } from './CalendarGrid';
 
 interface DayInspectorProps {
@@ -141,6 +142,8 @@ export function DayInspector({
   workSettings
 }: DayInspectorProps) {
   const workInfo = dayData?.work_type ? workTypeInfo[dayData.work_type] : null;
+  const panel = dayPanelSummary(dayData);
+  const commitments = dayCommitments(dayData);
   const hasData = dayData !== null;
   const dateStr = format(date, 'yyyy-MM-dd');
 
@@ -174,6 +177,7 @@ export function DayInspector({
 
   // Calculate expected hours from work type and settings
   const calculateExpectedHours = () => {
+    if (panel.expectedHours === 0) return 0;
     if (!workInfo || dayData?.work_type === 'off') return 0;
 
     if (workSettings) {
@@ -511,8 +515,8 @@ export function DayInspector({
           </motion.div>
         )}
 
-        {/* Work Type & Cycle */}
-        {workInfo && (
+        {/* Work Type & Cycle. Leave replaces the shift card. */}
+        {panel.showShiftCard && workInfo && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -870,9 +874,9 @@ export function DayInspector({
               )}
             </div>
 
-            {dayData?.commitments && dayData.commitments.length > 0 ? (
+            {commitments.length > 0 ? (
               <div className="space-y-2">
-                {dayData.commitments.map((commitment, i) => (
+                {commitments.map((commitment, i) => (
                   <motion.div
                     key={commitment.id}
                     initial={{ opacity: 0, x: -10 }}

@@ -11,6 +11,8 @@ import {
   chatMessageText,
   friendlyChatError,
   isInternalChatMessage,
+  mergeChatHistory,
+  messagesAfterSend,
   proposalAppliedText,
   proposalCardText,
   REVIEW_FAILURE_MESSAGE,
@@ -184,7 +186,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       }
     }
 
-    setMessages(history)
+    setMessages((current) => mergeChatHistory(current, history))
     setTimeout(() => setInitialLoadComplete(true), 100)
   }
 
@@ -208,24 +210,27 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
     try {
       const response = await api.chat.sendMessage(userMessage, autoExecute)
       
-      if (response.user_message) {
-        setMessages(prev => prev.map(m => 
-          m.id === tempUserMessage.id ? response.user_message : m
-        ))
-      }
-      
-      if (response.assistant_message) {
-        const assistantText = chatMessageText(response.assistant_message.content)
-        if (assistantText && !isInternalChatMessage(response.assistant_message)) {
-          const assistantMessage: Message = {
-            ...response.assistant_message,
-            content: response.proposal ? proposalCardText(response.proposal, assistantText) : assistantText,
-            isProposal: response.is_command,
-            proposal: response.proposal
-          }
-          setMessages(prev => [...prev, assistantMessage])
+      const assistantText = response.assistant_message
+        ? chatMessageText(response.assistant_message.content)
+        : null
+      const assistantMessage: Message | null = response.assistant_message
+        && assistantText
+        && !isInternalChatMessage(response.assistant_message)
+        ? {
+          ...response.assistant_message,
+          content: response.proposal ? proposalCardText(response.proposal, assistantText) : assistantText,
+          isProposal: response.is_command,
+          proposal: response.proposal,
         }
-      }
+        : null
+      const savedUser = response.user_message
+        ? {
+          ...response.user_message,
+          role: 'user' as const,
+          content: chatMessageText(response.user_message.content) || userMessage,
+        }
+        : null
+      setMessages(prev => messagesAfterSend(prev, tempUserMessage.id, savedUser, assistantMessage))
       setHistoryError(null)
       
       // Refresh calendar if a command was actually executed (not just proposed)

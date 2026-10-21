@@ -31,19 +31,79 @@ export function calendarCellKind(day: { work_type?: string | null; is_leave?: bo
   return 'empty'
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+function parseState(value: unknown): Record<string, unknown> {
+  if (typeof value === 'string') {
+    try {
+      return parseState(JSON.parse(value))
+    } catch {
+      return {}
+    }
+  }
+  return asRecord(value) ?? {}
+}
+
+function commitmentRecords(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) return []
+  return value.map(asRecord).filter((item): item is Record<string, unknown> => item !== null)
+}
+
+function commitmentChip(raw: Record<string, unknown>): NormalizedCalendarDay['commitments'][number] | null {
+  const name = typeof raw.name === 'string' ? raw.name.trim() : ''
+  if (!name) return null
+  const id = typeof raw.id === 'string'
+    ? raw.id
+    : typeof raw.commitment_id === 'string'
+      ? raw.commitment_id
+      : name
+  const type = typeof raw.type === 'string' ? raw.type : ''
+  const hours = typeof raw.hours === 'number' ? raw.hours : undefined
+  return { id, type, name, hours }
+}
+
+/**
+ * Commitments for a calendar cell and the day panel.
+ * Approved rows keep the list on state_json.commitments. An empty top-level
+ * array must not hide that list.
+ */
+export function dayCommitments(day: { commitments?: unknown; state_json?: unknown } | null | undefined): NormalizedCalendarDay['commitments'] {
+  if (!day) return []
+  const state = parseState(day.state_json)
+  const top = commitmentRecords(day.commitments).map(commitmentChip).filter((item): item is NormalizedCalendarDay['commitments'][number] => item !== null)
+  if (top.length > 0) return top
+  return commitmentRecords(state.commitments).map(commitmentChip).filter((item): item is NormalizedCalendarDay['commitments'][number] => item !== null)
+}
+
+export function commitmentCellCount(day: { commitments?: unknown; state_json?: unknown } | null | undefined): number {
+  return dayCommitments(day).length
+}
+
+export function dayPanelSummary(day: { work_type?: string | null; is_leave?: boolean; cycle_day?: number } | null | undefined): {
+  showShiftCard: boolean
+  showLeaveCard: boolean
+  expectedHours: number
+} {
+  const leave = Boolean(day?.is_leave)
+  const workType = day?.work_type
+  const workingShift = workType === 'work_day' || workType === 'work_night'
+  return {
+    showShiftCard: !leave && Boolean(workType && workType !== 'blank'),
+    showLeaveCard: leave,
+    expectedHours: leave || !workingShift ? 0 : 12,
+  }
+}
+
 export function normalizeCalendarDay(raw: unknown): NormalizedCalendarDay | null {
   if (!raw || typeof raw !== 'object') return null
   const record = raw as Record<string, unknown>
   const date = typeof record.date === 'string' ? record.date.slice(0, 10) : ''
   if (!date) return null
-  const state = record.state_json && typeof record.state_json === 'object'
-    ? record.state_json as Record<string, unknown>
-    : {}
-  const commitments = Array.isArray(record.commitments)
-    ? record.commitments
-    : Array.isArray(state.commitments)
-      ? state.commitments
-      : []
+  const state = parseState(record.state_json)
+  const commitments = dayCommitments(record)
   const workType = record.work_type
   return {
     date,
@@ -52,7 +112,7 @@ export function normalizeCalendarDay(raw: unknown): NormalizedCalendarDay | null
       ? workType
       : null,
     is_leave: Boolean(record.is_leave ?? state.is_leave),
-    commitments: commitments as NormalizedCalendarDay['commitments'],
+    commitments,
     is_preview: Boolean(record.is_preview ?? state.is_preview),
     logs: Array.isArray(record.logs) ? record.logs : Array.isArray(state.logs) ? state.logs : undefined,
     incidents: Array.isArray(record.incidents) ? record.incidents : Array.isArray(state.incidents) ? state.incidents : undefined,
