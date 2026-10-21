@@ -5,8 +5,22 @@ import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
 
+function publicSiteUrl() {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL
+  if (configured) {
+    try {
+      return new URL(configured).origin
+    } catch {
+      // Ignore a malformed site URL and use the public production origin.
+    }
+  }
+  return 'https://trywatchman.app'
+}
+
+const siteUrl = publicSiteUrl()
+
 export const metadata: Metadata = {
-  metadataBase: new URL('https://www.trywatchman.app'),
+  metadataBase: new URL(siteUrl),
   title: 'Watchman - Time Under Control',
   description: 'Plan rotating shifts, leave and personal commitments in one calendar. Built for people whose working week changes.',
   keywords: ['calendar', 'schedule', 'rotation', 'shift work', 'planning', 'life management'],
@@ -19,6 +33,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Watchman - Time Under Control',
     description: 'See your year clearly. Change it deliberately.',
+    url: siteUrl,
     type: 'website',
     images: ['/watchman-logo.png'],
   },

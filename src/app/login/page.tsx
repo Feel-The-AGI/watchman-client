@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { Mail, ArrowRight, Loader2, Sparkles, Shield, Clock, Zap } from 'lucide-react';
@@ -22,48 +22,72 @@ export default function LoginPage() {
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const message = params.get('message');
+    const authError = params.get('error');
+    if (message) {
+      setError(message);
+    } else if (authError) {
+      setError('Sign-in could not be completed. Request a new link and try again.');
+    }
+  }, []);
+
+  const beginSubmit = () => {
+    if (submittingRef.current) return false;
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    setError('');
+    return true;
+  };
+
+  const endSubmit = () => {
+    submittingRef.current = false;
+    setIsSubmitting(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
-    setError('');
-    setIsSubmitting(true);
+    if (!beginSubmit()) return;
 
     try {
       if (mode === 'magic') {
         const { error } = await signInWithMagicLink(email);
         if (error) throw error;
         setMagicLinkSent(true);
+        endSubmit();
         return;
       }
 
       if (mode === 'signin') {
         const { error } = await signIn(email, password);
         if (error) throw error;
-      } else {
-        const { error, needsEmailConfirmation } = await signUp(email, password, name);
-        if (error) throw error;
-        if (needsEmailConfirmation) setEmailConfirmationSent(true);
+        return;
       }
-      // AuthProvider redirects after the session and profile are available.
+
+      const { error, needsEmailConfirmation } = await signUp(email, password, name);
+      if (error) throw error;
+      if (needsEmailConfirmation) {
+        setEmailConfirmationSent(true);
+        endSubmit();
+      }
+      // A real session is redirected by AuthProvider. Keep the form locked until then.
     } catch (err: any) {
       setError(err.message || 'Authentication failed');
-    } finally {
-      setIsSubmitting(false);
+      endSubmit();
     }
   };
 
   const handleGoogleSignIn = async () => {
-    if (isSubmitting) return;
-    setError('');
-    setIsSubmitting(true);
+    if (!beginSubmit()) return;
     try {
       const { error } = await signInWithGoogle();
       if (error) throw error;
     } catch (err: any) {
       setError(err.message || 'Google sign in failed');
-    } finally {
-      setIsSubmitting(false);
+      endSubmit();
     }
   };
 
@@ -101,7 +125,7 @@ export default function LoginPage() {
             className="gap-2"
           >
             <ArrowRight className="w-4 h-4 rotate-180" />
-            Try a different email
+            {emailConfirmationSent ? 'Back' : 'Try a different email'}
           </Button>
         </motion.div>
       </div>
