@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Logo } from '@/components/ui/Logo';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { authNavChoice } from '@/lib/signup-flow';
 import { api } from '@/lib/api';
 import { cedisChargeLine, OPENING_CHECKOUT_LABEL, plainCheckoutError, type PricingAmounts } from '@/lib/billing';
 import { rememberCheckoutReference } from '@/lib/checkout';
@@ -164,7 +165,9 @@ export default function PricingPage() {
             <Link href="/" className="text-watchman-muted hover:text-white transition-colors text-sm">
               Home
             </Link>
-            {isLoggedIn ? (
+            {authNavChoice(authLoading, user) === 'pending' ? (
+              <span className="inline-block h-9 w-24 rounded-xl bg-white/5" aria-hidden="true" />
+            ) : authNavChoice(authLoading, user) === 'in' ? (
               <Link href="/dashboard">
                 <Button variant="gradient" size="sm">
                   Dashboard
