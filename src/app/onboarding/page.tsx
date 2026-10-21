@@ -34,8 +34,11 @@ import {
   parseLocalDate,
   parseRotation,
   ROTATION_PRESETS,
+  rotationFromChatResponse,
+  rotationParsePrompt,
   workTypeForCycleDay,
   type CycleBlock,
+  type ParsedRotation,
 } from '@/lib/rotation';
 
 interface Message {
@@ -214,15 +217,43 @@ export default function OnboardingPage() {
     setShowQuickActions(false);
 
     if (step === 1) {
-      const parsed = parseRotation(userMessage);
-      if (parsed) {
+      const acceptRotation = (parsed: ParsedRotation) => {
         setPattern(parsed.pattern);
         addMessage('assistant', `Got it! ${parsed.description} (${parsed.totalDays}-day cycle). Pick a date you know, and which day of that cycle it is. The preview updates as you change the anchor.`);
         setStep(2);
         setShowQuickActions(true);
-      } else {
-        addMessage('assistant', "I couldn't match that to a rotation. Pick one of the presets below, or try \"14 on, 14 off\", \"2-2-3\", or \"5 days, 5 nights, 5 off\".");
+      };
+
+      const parsed = parseRotation(userMessage);
+      if (parsed) {
+        acceptRotation(parsed);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await api.chat.sendMessage(rotationParsePrompt(userMessage));
+        const fromChat = rotationFromChatResponse(response);
+        if (fromChat?.understood) {
+          acceptRotation(fromChat);
+        } else if (fromChat) {
+          addMessage('assistant', fromChat.message);
+          setShowQuickActions(true);
+        } else {
+          const reply = chatMessageText(
+            response && typeof response === 'object'
+              ? (response as { response?: unknown; message?: unknown }).response
+                ?? (response as { message?: unknown }).message
+              : response,
+          );
+          addMessage('assistant', reply || "Could you describe your shift pattern? For example: '5 days, 5 nights, 5 off' or '14 on, 14 off'");
+          setShowQuickActions(true);
+        }
+      } catch {
+        addMessage('assistant', "I couldn't process that right now. Try selecting from the presets below or describe your pattern like: '14 on, 14 off'.");
         setShowQuickActions(true);
+      } finally {
+        setLoading(false);
       }
       return;
     }

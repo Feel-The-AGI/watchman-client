@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { buildMonthPreview, parseRotation, ROTATION_PRESETS } from './rotation.ts'
+import {
+  buildMonthPreview,
+  DUPONT_PATTERN,
+  PANAMA_PATTERN,
+  parseRotation,
+  ROTATION_PARSE_MARKER,
+  ROTATION_PRESETS,
+  rotationFromAssistantText,
+  rotationParsePrompt,
+} from './rotation.ts'
 
 describe('parseRotation', () => {
   it('reads FIFO presets and typed phrases', () => {
@@ -18,6 +27,58 @@ describe('parseRotation', () => {
     assert.equal(parseRotation('4 on/4 off')?.totalDays, 8)
     assert.equal(parseRotation('5 days, 5 nights, 5 off')?.totalDays, 15)
     assert.equal(parseRotation('not a rotation'), null)
+  })
+
+  it('reads number words, weeks, fortnights, and then/followed-by sequences', () => {
+    assert.deepEqual(parseRotation('two weeks on two weeks off')?.pattern, [
+      { label: 'work_day', duration: 14 },
+      { label: 'off', duration: 14 },
+    ])
+    assert.deepEqual(parseRotation('four on four off')?.pattern, [
+      { label: 'work_day', duration: 4 },
+      { label: 'off', duration: 4 },
+    ])
+    assert.deepEqual(parseRotation('3 weeks on 1 week off')?.pattern, [
+      { label: 'work_day', duration: 21 },
+      { label: 'off', duration: 7 },
+    ])
+    assert.deepEqual(parseRotation('fortnight on, fortnight off')?.pattern, [
+      { label: 'work_day', duration: 14 },
+      { label: 'off', duration: 14 },
+    ])
+    assert.deepEqual(parseRotation('I do 3 days then 3 nights then 6 off')?.pattern, [
+      { label: 'work_day', duration: 3 },
+      { label: 'work_night', duration: 3 },
+      { label: 'off', duration: 6 },
+    ])
+    assert.deepEqual(parseRotation('I work 7 day shifts followed by 7 nights and then 14 days off')?.pattern, [
+      { label: 'work_day', duration: 7 },
+      { label: 'work_night', duration: 7 },
+      { label: 'off', duration: 14 },
+    ])
+    assert.deepEqual(parseRotation('DuPont')?.pattern, DUPONT_PATTERN)
+    assert.deepEqual(parseRotation('Panama schedule')?.pattern, PANAMA_PATTERN)
+  })
+
+  it('builds the server parse prompt and reads its JSON reply', () => {
+    const prompt = rotationParsePrompt('two weeks on two weeks off')
+    assert.match(prompt, new RegExp(ROTATION_PARSE_MARKER))
+    const parsed = rotationFromAssistantText(`Sure.\n${JSON.stringify({
+      understood: true,
+      pattern: [
+        { label: 'work_day', duration: 14 },
+        { label: 'off', duration: 14 },
+      ],
+      description: '14 days on, 14 days off',
+      message: 'Got it',
+    })}`)
+    assert.equal(parsed?.understood, true)
+    if (parsed?.understood) {
+      assert.equal(parsed.totalDays, 28)
+      assert.equal(parsed.description, '14 days on, 14 days off')
+    }
+    const unclear = rotationFromAssistantText('{"understood": false, "message": "Which days are nights?"}')
+    assert.deepEqual(unclear, { understood: false, message: 'Which days are nights?' })
   })
 
   it('offers the launch presets', () => {

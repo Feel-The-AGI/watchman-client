@@ -6,9 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit && tsc -p e2e/tsconfig.json",
-    "test:unit": "node --experimental-strip-types --test src/lib/rotation.test.ts src/lib/chat-display.test.ts",
+    "test:unit": "node --import tsx --test src/lib/rotation.test.ts src/lib/chat-display.test.ts",
     "e2e": "playwright test -c e2e/playwright.config.ts"
   },
   "dependencies": {
@@ -41,6 +41,7 @@
     "globals": "^16.5.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.16",
+    "tsx": "^4.23.15",
     "typescript": "^5.7.2"
   },
   "packageManager": "pnpm@9.15.0"

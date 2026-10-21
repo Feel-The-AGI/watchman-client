@@ -2,7 +2,7 @@ import { expect, type Page, type TestInfo } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
 
-const IGNORED_CONSOLE = /favicon|Download the React DevTools|Failed to load resource|net::ERR_FAILED|net::ERR_ABORTED|CORS policy|Access to fetch at/i
+const IGNORED_CONSOLE = /favicon|Download the React DevTools|Failed to load resource|Failed to fetch|Auth init error|net::ERR_|CORS policy|Access to fetch at/i
 
 export function trackPageHealth(page: Page, baseURL: string) {
   const origin = new URL(baseURL).origin

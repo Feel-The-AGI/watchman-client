@@ -142,7 +142,6 @@ export default function DashboardPage() {
   // Initial fetch only
   useEffect(() => {
     fetchCalendarData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const selectedDayData = selectedDate 
