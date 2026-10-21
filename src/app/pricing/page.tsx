@@ -10,6 +10,7 @@ import { Logo } from '@/components/ui/Logo';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
+import { cedisChargeLine, OPENING_CHECKOUT_LABEL, plainCheckoutError, type PricingAmounts } from '@/lib/billing';
 import { rememberCheckoutReference } from '@/lib/checkout';
 
 const tiers = [
@@ -94,6 +95,21 @@ export default function PricingPage() {
   const router = useRouter();
   const [upgrading, setUpgrading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pricingAmounts, setPricingAmounts] = useState<PricingAmounts | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.payments.getPricing()
+      .then((pricing) => {
+        if (!cancelled) setPricingAmounts(pricing);
+      })
+      .catch(() => {
+        if (!cancelled) setPricingAmounts(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const isLoggedIn = !!user;
   const isPro = profile?.tier === 'pro' || profile?.tier === 'admin';
@@ -111,9 +127,12 @@ export default function PricingPage() {
       if (result.reference) rememberCheckoutReference(result.reference);
       if (result.checkout_url) {
         window.location.href = result.checkout_url;
+        return;
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to start checkout');
+      setError("Paystack didn't open. Nothing was charged. Try again in a moment.");
+      setUpgrading(false);
+    } catch (err: unknown) {
+      setError(plainCheckoutError(err));
       setUpgrading(false);
     }
   };
@@ -122,7 +141,7 @@ export default function PricingPage() {
     if (isLoggedIn) {
       router.push('/dashboard');
     } else {
-      router.push('/login');
+      router.push('/login?mode=signup');
     }
   };
 
@@ -241,6 +260,11 @@ export default function PricingPage() {
                     <span className="text-5xl font-bold">{tier.price}</span>
                     <span className="text-watchman-muted text-lg">{tier.period}</span>
                   </div>
+                  {tier.name === 'Pro' && (
+                    <p className="mt-3 text-sm text-watchman-muted leading-relaxed" data-testid="ghs-charge-note">
+                      {cedisChargeLine(pricingAmounts)}
+                    </p>
+                  )}
                   <p className="mt-4 text-sm text-watchman-muted leading-relaxed">{tier.description}</p>
                 </div>
 
@@ -276,7 +300,7 @@ export default function PricingPage() {
                     {upgrading ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Loading...
+                        {OPENING_CHECKOUT_LABEL}
                       </>
                     ) : (
                       <>

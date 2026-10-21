@@ -30,7 +30,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           ref={ref}
           id={inputId}
           className={cn(
-            'w-full px-3 py-2 bg-watchman-bg border border-watchman-border rounded-lg text-watchman-text placeholder:text-watchman-muted focus:outline-none focus:ring-2 focus:ring-watchman-accent focus:border-transparent transition-all',
+            'w-full px-3 py-2 bg-watchman-bg border border-watchman-border rounded-lg text-watchman-text placeholder:text-watchman-muted focus:outline-none focus:ring-2 focus:ring-watchman-accent focus:border-transparent transition-all disabled:opacity-60 disabled:cursor-not-allowed',
             error && 'border-watchman-error focus:ring-watchman-error',
             className
           )}

@@ -17,11 +17,11 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Sparkles,
   Crown,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { cn } from '@/lib/utils';
 
 const navigation = [
@@ -64,13 +64,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-watchman-bg flex items-center justify-center">
-        <div className="relative">
-          <div className="w-16 h-16 rounded-full border-2 border-watchman-accent/20 border-t-watchman-accent animate-spin" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Sparkles className="w-6 h-6 text-watchman-accent" />
-          </div>
-        </div>
+      <div className="min-h-screen bg-watchman-bg flex items-center justify-center px-6">
+        <LoadingState title="Loading Watchman…" detail="Checking your account before opening the calendar." />
       </div>
     );
   }

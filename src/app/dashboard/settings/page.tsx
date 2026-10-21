@@ -36,6 +36,8 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import { checkoutReferenceFromReturn, clearCheckoutReference, rememberCheckoutReference } from '@/lib/checkout';
+import { cedisChargeLine, OPENING_CHECKOUT_LABEL, plainCheckoutError } from '@/lib/billing';
+import { BlockSkeleton, LoadingState } from '@/components/ui/LoadingState';
 import { cn } from '@/lib/utils';
 
 function formatAccessDate(value: string) {
@@ -341,9 +343,12 @@ export default function SettingsPage() {
       if (result.reference) rememberCheckoutReference(result.reference);
       if (result.checkout_url) {
         window.location.href = result.checkout_url;
+        return;
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to start checkout');
+      setError("Paystack didn't open. Nothing was charged. Try again in a moment.");
+      setUpgrading(false);
+    } catch (err: unknown) {
+      setError(plainCheckoutError(err));
       setUpgrading(false);
     }
   };
@@ -586,9 +591,12 @@ export default function SettingsPage() {
         {/* Content */}
         <div className="flex-1">
           {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="w-8 h-8 border-2 border-watchman-accent border-t-transparent rounded-full animate-spin" />
-            </div>
+            <LoadingState title="Loading your settings…" detail="Fetching your account. This can take a few seconds.">
+              <div className="space-y-3">
+                <BlockSkeleton className="h-28" />
+                <BlockSkeleton className="h-40" />
+              </div>
+            </LoadingState>
           ) : (
             <>
               {/* Profile Tab */}
@@ -1310,13 +1318,17 @@ export default function SettingsPage() {
               <>
                 <div className="bg-watchman-bg rounded-xl p-4 mb-6">
                   <div className="flex items-baseline justify-center gap-2">
-                    <span className="text-4xl font-bold">${pricingInfo.usd_price}</span>
+                    <span className="text-4xl font-bold">${pricingInfo.usd_price || 12}</span>
                     <span className="text-watchman-muted">for {pricingInfo.period_days || 30} days</span>
                   </div>
-                  <p className="text-center text-xs text-watchman-muted mt-2">
-                    Charged in cedis, about {pricingInfo.display_ghs}.
+                  <p className="text-center text-sm text-watchman-muted mt-2" data-testid="upgrade-ghs-note">
+                    {cedisChargeLine(pricingInfo)}
                   </p>
                 </div>
+
+                {error && (
+                  <p className="mb-4 text-sm text-center text-red-300">{error}</p>
+                )}
 
                 <div className="space-y-2 mb-6">
                   {[
@@ -1352,7 +1364,7 @@ export default function SettingsPage() {
                     {upgrading ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Processing...
+                        {OPENING_CHECKOUT_LABEL}
                       </>
                     ) : (
                       <>

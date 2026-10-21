@@ -89,7 +89,7 @@ function FloatingDays() {
   };
 
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div className="absolute inset-0 overflow-hidden pointer-events-none hidden sm:block">
       {days.map((day, i) => (
         <motion.div
           key={i}
@@ -461,7 +461,9 @@ function LandingDayInspector({ date, workType, onClose }: LandingDayInspectorPro
             </p>
           </div>
           <motion.button
+            type="button"
             onClick={onClose}
+            aria-label="Close day details"
             whileHover={{ scale: 1.1, rotate: 90 }}
             whileTap={{ scale: 0.9 }}
             className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
@@ -526,7 +528,9 @@ function LandingDayInspector({ date, workType, onClose }: LandingDayInspectorPro
                         <div className="flex justify-between items-start gap-2">
                           <p className="text-sm text-white/80 flex-1">{note.note}</p>
                           <button
+                            type="button"
                             onClick={() => handleDeleteNote(note.id)}
+                            aria-label="Delete note"
                             className="p-1 rounded hover:bg-red-500/20 text-white/30 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -633,7 +637,7 @@ function LandingDayInspector({ date, workType, onClose }: LandingDayInspectorPro
 
       {/* CTA Footer */}
       <div className="px-4 py-3 border-t border-white/5 bg-white/[0.02]">
-        <Link href="/login">
+        <Link href="/signup">
           <button className="w-full px-4 py-2.5 text-sm font-medium rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-white hover:from-cyan-400 hover:to-emerald-400 transition-all shadow-lg shadow-cyan-500/20">
             Sign Up to Track Everything
           </button>
@@ -733,7 +737,9 @@ function LiveCalendar({ selectedDate, onDayClick }: LiveCalendarProps) {
       {/* Calendar Header - Like the app */}
       <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-b border-white/5">
         <button
+          type="button"
           onClick={goToPreviousMonth}
+          aria-label="Previous month"
           className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white/60 hover:text-white"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -753,7 +759,9 @@ function LiveCalendar({ selectedDate, onDayClick }: LiveCalendarProps) {
           )}
         </div>
         <button
+          type="button"
           onClick={goToNextMonth}
+          aria-label="Next month"
           className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white/60 hover:text-white"
         >
           <ChevronRight className="w-4 h-4" />
@@ -1019,7 +1027,7 @@ export default function LandingPage() {
           >
             Rotating shifts. Night work. Cycles that repeat.
             <br className="hidden sm:block" />
-            <span className="text-white/70">Most calendars don't understand. This one does.</span>
+            <span className="text-white/70"> Most calendars don't understand. This one does.</span>
           </motion.p>
 
           {/* CTA Buttons */}
@@ -1029,7 +1037,7 @@ export default function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.3 }}
           >
-            <Link href="/login">
+            <Link href="/signup">
               <Button
                 variant="primary"
                 size="xl"
@@ -1370,7 +1378,7 @@ export default function LandingPage() {
               <span className="text-white/70">No credit card required.</span>
             </p>
 
-            <Link href="/login">
+            <Link href="/signup">
               <Button
                 variant="primary"
                 size="xl"

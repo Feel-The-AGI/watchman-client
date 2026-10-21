@@ -6,12 +6,10 @@ import { Send, Loader2, Bot, User, Undo2, Redo2, CheckCircle, XCircle, AlertTria
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
+import { chatMessageText, friendlyChatError, isInternalChatMessage } from '@/lib/chat-display'
 
 function errorText(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message && !error.message.includes('[object Object]')) {
-    return error.message
-  }
-  return fallback
+  return friendlyChatError(error, fallback)
 }
 
 function apiStatus(error: unknown): number | null {
@@ -51,7 +49,7 @@ function withProposalCard(messages: Message[], proposal: any | null): Message[] 
   return [...messages, {
     id: `proposal-${proposal.id}`,
     role: 'assistant',
-    content: proposal.command?.explanation || 'Review this proposed change.',
+    content: chatMessageText(proposal.command?.explanation) || 'Review this proposed change.',
     created_at: proposal.created_at || new Date().toISOString(),
     isProposal: true,
     proposal,
@@ -111,16 +109,42 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
 
   const loadHistory = async () => {
     let history: Message[] = []
-    try {
-      // The server caps free history at history_limit (50) and allows up to 500 otherwise.
-      const response = await api.chat.getHistory(500)
-      history = Array.isArray(response?.messages) ? [...response.messages].reverse() : []
-      setHistoryError(null)
+    let historyLoaded = false
+    const limit = userTier === 'pro' ? 100 : 50
+
+    const pullHistory = async () => {
+      const response = await api.chat.getHistory(limit)
+      const raw = Array.isArray(response?.messages) ? response.messages as Message[] : []
+      history = raw
+        .filter((message) => !isInternalChatMessage(message))
+        .map((message) => ({
+          ...message,
+          content: chatMessageText(message.content) || '',
+        }))
+        .filter((message) => message.content.length > 0)
+        .reverse()
       const historyLimit = typeof response?.history_limit === 'number' ? response.history_limit : null
       setHistoryLimitReached(historyLimit !== null && history.length >= historyLimit)
+      historyLoaded = true
+      setHistoryError(null)
+    }
+
+    try {
+      await pullHistory()
     } catch (error) {
-      console.error('Failed to load chat history:', error)
-      setHistoryError(errorText(error, 'Chat history is unavailable right now. You can try again in a moment.'))
+      // A cold start can fail the first request even though the server is up. Retry once before showing the banner.
+      if (apiStatus(error) === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 1200))
+        try {
+          await pullHistory()
+        } catch (retryError) {
+          console.error('Failed to load chat history:', retryError)
+          setHistoryError(errorText(retryError, 'Chat history is unavailable right now. You can try again in a moment.'))
+        }
+      } else {
+        console.error('Failed to load chat history:', error)
+        setHistoryError(errorText(error, 'Chat history is unavailable right now. You can try again in a moment.'))
+      }
     }
 
     try {
@@ -128,12 +152,16 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       const proposal = pending?.proposals?.[0] || null
       setPendingProposal(proposal)
       history = withProposalCard(history, proposal)
+      if (historyLoaded) setHistoryError(null)
     } catch (error) {
       console.error('Failed to load pending proposals:', error)
-      setHistoryError(previous => previous || errorText(
-        error,
-        'Could not check for calendar changes waiting on your review. Refresh before sending a new message.'
-      ))
+      // History already proved the server is reachable. Don't raise the red banner for this secondary call.
+      if (!historyLoaded) {
+        setHistoryError(previous => previous || errorText(
+          error,
+          'Could not check for calendar changes waiting on your review. Refresh before sending a new message.'
+        ))
+      }
     }
 
     setMessages(history)
@@ -167,13 +195,18 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       }
       
       if (response.assistant_message) {
-        const assistantMessage: Message = {
-          ...response.assistant_message,
-          isProposal: response.is_command,
-          proposal: response.proposal
+        const assistantText = chatMessageText(response.assistant_message.content)
+        if (assistantText && !isInternalChatMessage(response.assistant_message)) {
+          const assistantMessage: Message = {
+            ...response.assistant_message,
+            content: assistantText,
+            isProposal: response.is_command,
+            proposal: response.proposal
+          }
+          setMessages(prev => [...prev, assistantMessage])
         }
-        setMessages(prev => [...prev, assistantMessage])
       }
+      setHistoryError(null)
       
       // Refresh calendar if a command was actually executed (not just proposed)
       if (response.execution?.success) {
@@ -221,7 +254,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
         setMessages(prev => [...prev, {
           id: `success-${Date.now()}`,
           role: 'assistant',
-          content: `Done! ${proposal?.command?.explanation || 'Changes applied successfully.'}`,
+          content: `Done! ${chatMessageText(proposal?.command?.explanation) || 'Changes applied successfully.'}`,
           created_at: new Date().toISOString()
         }])
         await new Promise(resolve => setTimeout(resolve, 500))
@@ -230,7 +263,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
         setMessages(prev => [...prev, {
           id: `error-${Date.now()}`,
           role: 'assistant',
-          content: `That change was not applied: ${result?.error || 'Unknown error'}`,
+          content: `That change was not applied: ${chatMessageText(result?.error) || 'Unknown error'}`,
           created_at: new Date().toISOString()
         }])
       }
@@ -418,14 +451,14 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
                   ? 'bg-watchman-accent text-white rounded-br-lg shadow-lg shadow-watchman-accent/20' 
                   : 'glass border border-white/5 text-watchman-text rounded-bl-lg'
               )}>
-                <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">{chatMessageText(message.content)}</p>
                 
                 {/* Proposal approval buttons */}
                 {message.isProposal && message.proposal && pendingProposal?.id === message.proposal.id && (
                   <div className="mt-4 pt-3 border-t border-white/10">
                     {message.proposal.validation?.valid === false && message.proposal.validation?.violations?.[0]?.message && (
                       <div className="mb-3 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs">
-                        {message.proposal.validation.violations[0].message} Decline this change, or edit the request.
+                        {chatMessageText(message.proposal.validation.violations[0].message) || 'That change is not allowed.'} Decline this change, or edit the request.
                       </div>
                     )}
                     {message.proposal.validation?.warnings?.length > 0 && (
@@ -436,7 +469,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
                       >
                         <div className="flex items-start gap-2 text-amber-400 text-xs">
                           <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                          <span>{message.proposal.validation.warnings[0].message}</span>
+                          <span>{chatMessageText(message.proposal.validation.warnings[0].message) || 'Review this warning before applying the change.'}</span>
                         </div>
                       </motion.div>
                     )}

@@ -38,6 +38,6 @@ export default [
     },
   },
   {
-    ignores: ["node_modules/**", ".next/**", "out/**"],
+    ignores: ["node_modules/**", ".next/**", "out/**", "e2e/artifacts/**", "test-results/**", "playwright-report/**"],
   },
 ];

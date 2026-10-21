@@ -25,6 +25,7 @@ import {
 import { CalendarGrid, YearOverview, DayInspector, type CalendarDay } from '@/components/calendar';
 import { ChatPanel } from '@/components/chat';
 import { Button } from '@/components/ui/Button';
+import { BlockSkeleton, LoadingState } from '@/components/ui/LoadingState';
 import { Card, CardContent, CardHeader, CardTitle, BentoCard } from '@/components/ui/Card';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
@@ -141,7 +142,6 @@ export default function DashboardPage() {
   // Initial fetch only
   useEffect(() => {
     fetchCalendarData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const selectedDayData = selectedDate 
@@ -325,14 +325,12 @@ export default function DashboardPage() {
 
       {/* Loading State */}
       {loading && (
-        <div className="flex items-center justify-center py-20">
-          <div className="relative">
-            <div className="w-16 h-16 rounded-full border-2 border-watchman-accent/20 border-t-watchman-accent animate-spin" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-watchman-accent" />
-            </div>
+        <LoadingState title="Loading your calendar…" detail="Fetching this year's rotation. This can take a few seconds.">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <BlockSkeleton className="lg:col-span-8 h-80" />
+            <BlockSkeleton className="lg:col-span-4 h-80" />
           </div>
-        </div>
+        </LoadingState>
       )}
 
       {/* Main Bento Layout */}
