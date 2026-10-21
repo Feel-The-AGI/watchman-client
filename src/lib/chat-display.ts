@@ -162,7 +162,7 @@ export function appliedConfirmation(proposal: unknown): string | null {
   const when = `${WEEKDAY_LABELS[local.getDay()]} ${day} ${MONTH_LABELS[month - 1]}`
   const start = clockLabel(payload.time_start)
   const end = clockLabel(payload.time_end)
-  const clock = start && end ? `${start}–${end}` : start
+  const clock = start && end ? `${start}-${end}` : start
   const name = typeof payload.name === 'string' ? payload.name.trim() : ''
   const actionValue = commandRecord(proposal)?.action
   const action = typeof actionValue === 'string' ? actionValue : ''

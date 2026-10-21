@@ -127,10 +127,18 @@ describe('chat display', () => {
       command: {
         action: 'add_commitment',
         explanation: "I'll add the haircut on Thursday.",
-        payload: { name: 'Haircut', type: 'personal', start_date: '2026-11-05', time_start: '16:00' },
+        payload: {
+          name: 'Haircut',
+          type: 'personal',
+          start_date: '2026-11-05',
+          time_start: '16:00',
+          time_end: '17:00',
+        },
       },
     }
-    assert.equal(appliedConfirmation(proposal), 'Added: Haircut on Thu 5 Nov, 16:00.')
+    const line = appliedConfirmation(proposal)
+    assert.equal(line, 'Added: Haircut on Thu 5 Nov, 16:00-17:00.')
+    assert.equal(line?.includes("I'll"), false)
     assert.equal(appliedConfirmation({ command: { explanation: "I'll add the haircut next week." } }), null)
   })
 
