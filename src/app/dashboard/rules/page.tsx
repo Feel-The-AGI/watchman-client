@@ -179,16 +179,42 @@ export default function MasterSettingsPage() {
     }
   };
 
+  const saveRotation = async (cycle: MasterSettings['cycle']) => {
+    if (!cycle.anchor_date) {
+      setError('Set an anchor date before updating the rotation.');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const active = await api.cycles.getActive();
+      const body = {
+        pattern: cycle.pattern,
+        anchor_date: cycle.anchor_date,
+        anchor_cycle_day: cycle.anchor_cycle_day,
+      };
+      if (active?.id) {
+        await api.cycles.update(active.id, body);
+      } else {
+        await api.cycles.create({ name: 'My Rotation', ...body });
+      }
+      await fetchSettings();
+      setSuccess('Rotation saved');
+      setTimeout(() => setSuccess(null), 3000);
+      setEditingSection(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to save rotation');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSaveCycle = () => {
-    const newSettings = {
-      ...settings,
-      cycle: {
-        pattern: editPattern,
-        anchor_date: editAnchorDate || null,
-        anchor_cycle_day: editAnchorDay,
-      },
-    };
-    saveSettings(newSettings);
+    saveRotation({
+      pattern: editPattern,
+      anchor_date: editAnchorDate || null,
+      anchor_cycle_day: editAnchorDay,
+    });
   };
 
   const handleSaveWorkHours = () => {
@@ -233,17 +259,8 @@ export default function MasterSettingsPage() {
   };
 
   const confirmRegenerateCalendar = async () => {
-    try {
-      setSaving(true);
-      setRegenerateModal(false);
-      await api.calendar.regenerate(new Date().getFullYear());
-      setSuccess('Calendar regenerated successfully');
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to regenerate calendar');
-    } finally {
-      setSaving(false);
-    }
+    setRegenerateModal(false);
+    await saveRotation(settings.cycle);
   };
 
   const totalCycleDays = settings.cycle.pattern.reduce((sum, b) => sum + b.duration, 0);

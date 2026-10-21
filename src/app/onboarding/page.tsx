@@ -88,6 +88,14 @@ const PRESET_CONSTRAINTS = [
   { name: 'No study on work days', rule: 'no_study_on:work_day', icon: Sun },
 ];
 
+// POST /api/settings/constraints requires rule to be an object, matching ConstraintRequest.
+function constraintRule(encoded: string): { type: string; value: string | number } {
+  const splitAt = encoded.indexOf(':');
+  const type = splitAt === -1 ? encoded : encoded.slice(0, splitAt);
+  const raw = splitAt === -1 ? '' : encoded.slice(splitAt + 1);
+  return { type, value: /^-?\d+$/.test(raw) ? Number(raw) : raw };
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -181,31 +189,24 @@ export default function OnboardingPage() {
       setError(null);
 
       // Create cycle
+      // Creating the cycle syncs Master Settings and writes the calendar once.
       await api.cycles.create({
         name: cycleName,
         pattern,
         anchor_date: anchorDate,
         anchor_cycle_day: anchorCycleDay,
-        total_days: totalDays,
-        is_active: true,
       });
 
-      // Create constraints
       for (const rule of selectedConstraints) {
         const preset = PRESET_CONSTRAINTS.find(p => p.rule === rule);
         if (preset) {
           await api.settings.createConstraint({
             name: preset.name,
-            rule: preset.rule,
-            type: 'binary',
+            rule: constraintRule(preset.rule),
             is_active: true,
           });
         }
       }
-
-      // Generate calendar
-      const currentYear = new Date().getFullYear();
-      await api.calendar.regenerate(currentYear);
 
       setTimeout(() => {
         addMessage('assistant', "All done! Your calendar is ready. Welcome to Watchman! 🎉");
