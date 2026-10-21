@@ -3,17 +3,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import {
   ArrowRight,
-  ArrowLeft,
   Clock,
   Calendar,
   Sun,
   Moon,
   Coffee,
   CheckCircle,
-  Plus,
   X,
   Loader2,
   Sparkles,
@@ -26,14 +24,19 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Logo } from '@/components/ui/Logo';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { api } from '@/lib/api';
+import { chatMessageText } from '@/lib/chat-display';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
-
-interface CycleBlock {
-  label: 'work_day' | 'work_night' | 'off';
-  duration: number;
-}
+import {
+  buildMonthPreview,
+  parseLocalDate,
+  parseRotation,
+  ROTATION_PRESETS,
+  workTypeForCycleDay,
+  type CycleBlock,
+} from '@/lib/rotation';
 
 interface Message {
   id: string;
@@ -42,44 +45,6 @@ interface Message {
   timestamp: Date;
   typing?: boolean;
 }
-
-const PRESET_CYCLES = [
-  {
-    name: '10 On / 5 Off',
-    description: '10 straight days working, 5 days off',
-    pattern: [
-      { label: 'work_day' as const, duration: 10 },
-      { label: 'off' as const, duration: 5 },
-    ],
-  },
-  {
-    name: '5/5/5 Rotation',
-    description: '5 days, 5 nights, 5 off',
-    pattern: [
-      { label: 'work_day' as const, duration: 5 },
-      { label: 'work_night' as const, duration: 5 },
-      { label: 'off' as const, duration: 5 },
-    ],
-  },
-  {
-    name: 'Weekdays',
-    description: 'Monday to Friday (standard work week)',
-    pattern: [
-      { label: 'work_day' as const, duration: 5 },
-      { label: 'off' as const, duration: 2 },
-    ],
-  },
-  {
-    name: '5 On / 5 Off',
-    description: '5 days working, 5 days off',
-    pattern: [
-      { label: 'work_day' as const, duration: 5 },
-      { label: 'off' as const, duration: 5 },
-    ],
-  },
-];
-
-// Natural language is sent to the chat API. The server saves calendar changes as proposals.
 
 const PRESET_CONSTRAINTS = [
   { name: 'No study on night shifts', rule: 'no_study_on:work_night', icon: Moon },
@@ -98,8 +63,8 @@ function constraintRule(encoded: string): { type: string; value: string | number
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { refreshProfile } = useAuth();
-  const [step, setStep] = useState(0);
+  const { user, loading: authLoading, refreshProfile } = useAuth();
+  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -107,7 +72,7 @@ export default function OnboardingPage() {
   // Chat state
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
-  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(true);
 
   // Setup state
   const [cycleName] = useState('My Rotation');
@@ -125,11 +90,15 @@ export default function OnboardingPage() {
 
   // Initial greeting
   useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace('/login');
+    }
+  }, [authLoading, user, router]);
+
+  useEffect(() => {
     const timer = setTimeout(() => {
-      addMessage('assistant', "Hey! I'm your Watchman assistant. Let's set up your rotation schedule in under 2 minutes.\n\nYou can either select a preset below, or just type your schedule naturally - something like \"5 days, 5 nights, 5 off\" or \"10 on 5 off\".");
-      setStep(1);
-      setTimeout(() => setShowQuickActions(true), 500);
-    }, 800);
+      addMessage('assistant', "Hey! I'm your Watchman assistant. Let's set up your rotation in under 2 minutes.\n\nPick a rotation below, or type your own — for example, \"14 on, 14 off\" or \"5 days, 5 nights, 5 off\".");
+    }, 300);
     return () => clearTimeout(timer);
   }, []);
 
@@ -142,7 +111,7 @@ export default function OnboardingPage() {
     }]);
   };
 
-  const handleSelectCycle = (preset: typeof PRESET_CYCLES[0]) => {
+  const handleSelectCycle = (preset: typeof ROTATION_PRESETS[0]) => {
     addMessage('user', `I work ${preset.name}`);
     setPattern(preset.pattern);
     setShowQuickActions(false);
@@ -155,7 +124,8 @@ export default function OnboardingPage() {
   };
 
   const handleSetAnchor = () => {
-    addMessage('user', `${format(new Date(anchorDate), 'MMM d, yyyy')} is day ${anchorCycleDay} of my cycle`);
+    const anchor = parseLocalDate(anchorDate) || new Date();
+    addMessage('user', `${format(anchor, 'MMM d, yyyy')} is day ${anchorCycleDay} of my cycle`);
     setShowQuickActions(false);
     
     setTimeout(() => {
@@ -228,8 +198,9 @@ export default function OnboardingPage() {
         setStep(4);
       }, 1000);
     } catch (err: any) {
-      setError(err.message || 'Failed to complete setup');
-      addMessage('assistant', `Oops, something went wrong: ${err.message}. Let's try again.`);
+      const friendly = chatMessageText(err?.message) || 'Failed to complete setup';
+      setError(friendly);
+      addMessage('assistant', `Oops, something went wrong: ${friendly}. Let's try again.`);
     } finally {
       setLoading(false);
     }
@@ -242,64 +213,16 @@ export default function OnboardingPage() {
     setInputValue('');
     setShowQuickActions(false);
 
-    // If we're in step 1 (rotation selection), send to LLM to understand
     if (step === 1) {
-      try {
-        setLoading(true);
-        // Ask the LLM to understand the shift pattern and return structured data
-        const response = await api.chat.sendMessage(
-          `The user is describing their work shift rotation pattern: "${userMessage}"
-          
-          Please understand this and respond in this EXACT JSON format:
-          {"understood": true/false, "pattern": [{"label": "work_day"/"work_night"/"off", "duration": number}], "description": "human readable summary", "message": "your response to user"}
-          
-          Common patterns:
-          - "5 days, 5 nights, 5 off" = 5 day shifts, 5 night shifts, 5 days off
-          - "10 on 5 off" = 10 working days, 5 days off
-          - "5/5/5" = 5 days, 5 nights, 5 off
-          - "4 on 4 off" = 4 day shifts, 4 days off
-          
-          If unclear, set understood=false and ask clarifying questions in the message field.
-          ONLY respond with the JSON object, nothing else.`
-        );
-        
-        const responseText = response?.response || response?.message || '';
-        
-        // Try to extract JSON from the LLM response
-        try {
-          // Handle if response is wrapped in markdown code block
-          const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            
-            if (parsed.understood && parsed.pattern && parsed.pattern.length > 0) {
-              // LLM understood the pattern
-              setPattern(parsed.pattern);
-              const totalDays = parsed.pattern.reduce((s: number, b: CycleBlock) => s + b.duration, 0);
-              
-              addMessage('assistant', `Got it! I understood your rotation as: ${parsed.description} (${totalDays}-day cycle). Now I need to anchor your calendar. Pick a date you know for sure, and tell me which day of the ${totalDays}-day cycle it is.`);
-              setStep(2);
-              setTimeout(() => setShowQuickActions(true), 500);
-            } else {
-              // LLM couldn't understand - show its clarifying question
-              addMessage('assistant', parsed.message || "I couldn't quite understand that pattern. Could you describe it differently? For example: '5 days, 5 nights, 5 off' or '10 on, 5 off'");
-              setTimeout(() => setShowQuickActions(true), 500);
-            }
-          } else {
-            // No JSON found, show raw response
-            addMessage('assistant', responseText || "Could you describe your shift pattern? For example: '5 days, 5 nights, 5 off' or '10 on, 5 off'");
-            setTimeout(() => setShowQuickActions(true), 500);
-          }
-        } catch {
-          // JSON parse failed, show raw response
-          addMessage('assistant', responseText || "Could you describe your shift pattern? For example: '5 days, 5 nights, 5 off' or '10 on, 5 off'");
-          setTimeout(() => setShowQuickActions(true), 500);
-        }
-      } catch (err: any) {
-        addMessage('assistant', "I couldn't process that right now. Try selecting from the presets above or describe your pattern like: '5 days, 5 nights, 5 off'");
-        setTimeout(() => setShowQuickActions(true), 500);
-      } finally {
-        setLoading(false);
+      const parsed = parseRotation(userMessage);
+      if (parsed) {
+        setPattern(parsed.pattern);
+        addMessage('assistant', `Got it! ${parsed.description} (${parsed.totalDays}-day cycle). Pick a date you know, and which day of that cycle it is. The preview updates as you change the anchor.`);
+        setStep(2);
+        setShowQuickActions(true);
+      } else {
+        addMessage('assistant', "I couldn't match that to a rotation. Pick one of the presets below, or try \"14 on, 14 off\", \"2-2-3\", or \"5 days, 5 nights, 5 off\".");
+        setShowQuickActions(true);
       }
       return;
     }
@@ -308,11 +231,8 @@ export default function OnboardingPage() {
     try {
       setLoading(true);
       const response = await api.chat.sendMessage(userMessage);
-      if (response?.response) {
-        addMessage('assistant', response.response);
-      } else if (response?.message) {
-        addMessage('assistant', response.message);
-      }
+      const reply = chatMessageText(response?.response ?? response?.message);
+      addMessage('assistant', reply || "I couldn't use that reply. Try the options below.");
       setTimeout(() => setShowQuickActions(true), 500);
     } catch (err: any) {
       addMessage('assistant', "I couldn't process that right now. Try using the options above.");
@@ -322,11 +242,18 @@ export default function OnboardingPage() {
     }
   };
 
-  // Preview calendar generation
-  const previewDays = pattern.length > 0 ? generatePreviewDays(pattern, anchorDate, anchorCycleDay) : [];
+  const monthPreview = pattern.length > 0 ? buildMonthPreview(pattern, anchorDate, anchorCycleDay) : null;
+
+  if (authLoading || !user) {
+    return (
+      <div className="min-h-screen bg-watchman-bg flex items-center justify-center px-6">
+        <LoadingState title="Loading Watchman…" detail="Checking your account before setup." />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-watchman-bg text-white flex flex-col">
+    <div className="h-screen bg-watchman-bg text-white flex flex-col overflow-hidden">
       {/* Decorative Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-watchman-accent/10 rounded-full blur-[150px]" />
@@ -362,11 +289,11 @@ export default function OnboardingPage() {
       </header>
 
       {/* Main Content */}
-      <main className="relative z-10 flex-1 flex max-w-6xl mx-auto w-full">
+      <main className="relative z-10 flex-1 min-h-0 flex max-w-6xl mx-auto w-full">
         {/* Chat Panel */}
-        <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full p-6">
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto space-y-4 pb-4">
+        <div className="flex-1 flex flex-col min-h-0 max-w-2xl mx-auto w-full p-6">
+          {/* Messages and presets scroll together so the buttons sit under the intro. */}
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pb-4">
             <AnimatePresence mode="popLayout">
               {messages.map((message) => (
                 <motion.div
@@ -430,9 +357,8 @@ export default function OnboardingPage() {
             )}
 
             <div ref={messagesEndRef} />
-          </div>
 
-          {/* Quick Actions */}
+          {/* Quick Actions stay in the scroll area, directly under the intro. */}
           <AnimatePresence>
             {showQuickActions && step === 1 && (
               <motion.div
@@ -443,7 +369,7 @@ export default function OnboardingPage() {
               >
                 <p className="text-xs text-watchman-muted uppercase tracking-wider px-1">Select your rotation</p>
                 <div className="grid gap-2">
-                  {PRESET_CYCLES.map((preset, i) => (
+                  {ROTATION_PRESETS.map((preset, i) => (
                     <motion.button
                       key={preset.name}
                       initial={{ opacity: 0, x: -20 }}
@@ -513,6 +439,11 @@ export default function OnboardingPage() {
                     </div>
                   </div>
                   <CycleDayPreview cycleDay={anchorCycleDay} pattern={pattern} />
+                  {monthPreview && (
+                    <div className="lg:hidden pt-2">
+                      <MonthPreview preview={monthPreview} anchorDate={anchorDate} anchorCycleDay={anchorCycleDay} />
+                    </div>
+                  )}
                 </div>
                 <Button variant="gradient" className="w-full gap-2" onClick={handleSetAnchor}>
                   <Calendar className="w-4 h-4" />
@@ -611,6 +542,7 @@ export default function OnboardingPage() {
               </motion.div>
             )}
           </AnimatePresence>
+          </div>
 
           {/* Input */}
           <div className="glass rounded-2xl border border-white/10 p-2 flex gap-2">
@@ -629,11 +561,11 @@ export default function OnboardingPage() {
         </div>
 
         {/* Preview Panel - Desktop Only */}
-        {pattern.length > 0 && (
+        {monthPreview && (
           <motion.div
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
-            className="hidden lg:block w-80 p-6 border-l border-white/5"
+            className="hidden lg:block w-80 p-6 border-l border-white/5 overflow-y-auto"
           >
             <div className="sticky top-6 space-y-4">
               <div className="flex items-center gap-2 text-sm text-watchman-muted">
@@ -642,28 +574,7 @@ export default function OnboardingPage() {
               </div>
               
               <div className="glass rounded-2xl p-4 border border-white/10">
-                <p className="text-xs text-watchman-muted mb-3">{format(new Date(), 'MMMM yyyy')}</p>
-                <div className="grid grid-cols-7 gap-1">
-                  {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-                    <div key={i} className="text-[10px] text-center text-watchman-muted/50">{d}</div>
-                  ))}
-                  {previewDays.slice(0, 35).map((day, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: i * 0.02 }}
-                      className={cn(
-                        'aspect-square rounded-md flex items-center justify-center',
-                        day.workType === 'work_day' && 'bg-amber-500/30',
-                        day.workType === 'work_night' && 'bg-indigo-500/30',
-                        day.workType === 'off' && 'bg-emerald-500/30',
-                      )}
-                    >
-                      <span className="text-[10px]">{day.date}</span>
-                    </motion.div>
-                  ))}
-                </div>
+                <MonthPreview preview={monthPreview} anchorDate={anchorDate} anchorCycleDay={anchorCycleDay} />
               </div>
 
               <div className="space-y-2">
@@ -708,18 +619,8 @@ export default function OnboardingPage() {
   );
 }
 
-// Cycle Day Preview Component
 function CycleDayPreview({ cycleDay, pattern }: { cycleDay: number; pattern: CycleBlock[] }) {
-  let currentDay = 0;
-  let blockType: 'work_day' | 'work_night' | 'off' = 'off';
-
-  for (const block of pattern) {
-    if (cycleDay <= currentDay + block.duration) {
-      blockType = block.label;
-      break;
-    }
-    currentDay += block.duration;
-  }
+  const blockType = workTypeForCycleDay(pattern, cycleDay);
 
   const config = {
     work_day: { icon: Sun, label: 'Day Shift', color: 'text-amber-400', bg: 'bg-gradient-to-br from-amber-500 to-orange-600' },
@@ -742,36 +643,47 @@ function CycleDayPreview({ cycleDay, pattern }: { cycleDay: number; pattern: Cyc
   );
 }
 
-// Generate preview days
-function generatePreviewDays(pattern: CycleBlock[], anchorDate: string, anchorCycleDay: number) {
-  const days: { date: number; workType: 'work_day' | 'work_night' | 'off' }[] = [];
-  const startDate = new Date();
-  startDate.setDate(1); // Start of month
-  
-  const totalCycleDays = pattern.reduce((s, b) => s + b.duration, 0);
-  
-  for (let i = 0; i < 35; i++) {
-    const date = addDays(startDate, i);
-    const dayOfMonth = date.getDate();
-    
-    // Calculate cycle day for this date
-    const anchor = new Date(anchorDate);
-    const diff = Math.floor((date.getTime() - anchor.getTime()) / (1000 * 60 * 60 * 24));
-    let cycleDay = ((anchorCycleDay - 1 + diff) % totalCycleDays + totalCycleDays) % totalCycleDays + 1;
-    
-    // Find work type for this cycle day
-    let currentDay = 0;
-    let workType: 'work_day' | 'work_night' | 'off' = 'off';
-    for (const block of pattern) {
-      if (cycleDay <= currentDay + block.duration) {
-        workType = block.label;
-        break;
-      }
-      currentDay += block.duration;
-    }
-    
-    days.push({ date: dayOfMonth, workType });
-  }
-  
-  return days;
+function MonthPreview({
+  preview,
+  anchorDate,
+  anchorCycleDay,
+}: {
+  preview: NonNullable<ReturnType<typeof buildMonthPreview>>
+  anchorDate: string
+  anchorCycleDay: number
+}) {
+  const anchor = parseLocalDate(anchorDate);
+  const anchorIso = anchor
+    ? `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, '0')}-${String(anchor.getDate()).padStart(2, '0')}`
+    : null;
+
+  return (
+    <div data-testid="calendar-preview">
+      <p className="text-xs text-watchman-muted mb-1">{preview.label}</p>
+      <p className="text-[11px] text-watchman-muted mb-3">
+        {anchor ? format(anchor, 'MMM d, yyyy') : anchorDate} is cycle day {anchorCycleDay}
+      </p>
+      <div className="grid grid-cols-7 gap-1">
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((label, index) => (
+          <div key={`${label}-${index}`} className="text-[10px] text-center text-watchman-muted/50">{label}</div>
+        ))}
+        {preview.cells.map((cell) => (
+          <div
+            key={cell.key}
+            data-testid={cell.iso ? `preview-${cell.iso}` : undefined}
+            data-work-type={cell.workType ?? undefined}
+            className={cn(
+              'aspect-square rounded-md flex items-center justify-center',
+              cell.iso === anchorIso && 'ring-1 ring-cyan-300',
+              cell.workType === 'work_day' && 'bg-amber-500/40',
+              cell.workType === 'work_night' && 'bg-indigo-500/40',
+              cell.workType === 'off' && 'bg-emerald-500/40',
+            )}
+          >
+            <span className="text-[10px]">{cell.day ?? ''}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }

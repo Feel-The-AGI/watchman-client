@@ -26,6 +26,10 @@ export default function LoginPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const requested = params.get('mode');
+    if (requested === 'signup' || requested === 'magic' || requested === 'signin') {
+      setMode(requested);
+    }
     const message = params.get('message');
     const authError = params.get('error');
     if (message) {
@@ -131,6 +135,9 @@ export default function LoginPage() {
       </div>
     );
   }
+
+  const formLocked = loading || isSubmitting;
+  const creatingAccount = isSubmitting && mode === 'signup';
 
   const features = [
     { icon: Clock, text: 'Deterministic scheduling' },
@@ -265,8 +272,9 @@ export default function LoginPage() {
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="Jason Mensah"
+                      placeholder="Your name"
                       required
+                      disabled={formLocked}
                     />
                   </motion.div>
                 )}
@@ -279,6 +287,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 required
+                disabled={formLocked}
               />
 
               <AnimatePresence mode="wait">
@@ -296,6 +305,7 @@ export default function LoginPage() {
                       placeholder="••••••••"
                       required
                       minLength={8}
+                      disabled={formLocked}
                     />
                   </motion.div>
                 )}
@@ -306,10 +316,19 @@ export default function LoginPage() {
                 variant="gradient"
                 size="lg"
                 className="w-full gap-2 mt-6"
-                disabled={loading || isSubmitting}
+                disabled={formLocked}
+                aria-busy={isSubmitting}
               >
-                {loading || isSubmitting ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                {creatingAccount ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                    Creating your account…
+                  </>
+                ) : formLocked ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                    <span className="sr-only">Please wait</span>
+                  </>
                 ) : (
                   <>
                     {mode === 'signin' && 'Sign In'}
@@ -336,7 +355,7 @@ export default function LoginPage() {
                 size="lg"
                 className="w-full gap-3"
                 onClick={handleGoogleSignIn}
-                disabled={loading || isSubmitting}
+                disabled={formLocked}
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -349,10 +368,12 @@ export default function LoginPage() {
 
               {mode !== 'magic' && (
                 <Button
+                  type="button"
                   variant="ghost"
                   size="lg"
                   className="w-full gap-2"
                   onClick={() => setMode('magic')}
+                  disabled={formLocked}
                 >
                   <Mail className="w-5 h-5" />
                   Magic Link
@@ -365,8 +386,10 @@ export default function LoginPage() {
                 <p>
                   Don&apos;t have an account?{' '}
                   <button
+                    type="button"
                     onClick={() => setMode('signup')}
-                    className="text-watchman-accent hover:underline font-medium"
+                    disabled={formLocked}
+                    className="text-watchman-accent hover:underline font-medium disabled:opacity-50"
                   >
                     Sign up
                   </button>
@@ -376,8 +399,10 @@ export default function LoginPage() {
                 <p>
                   Already have an account?{' '}
                   <button
+                    type="button"
                     onClick={() => setMode('signin')}
-                    className="text-watchman-accent hover:underline font-medium"
+                    disabled={formLocked}
+                    className="text-watchman-accent hover:underline font-medium disabled:opacity-50"
                   >
                     Sign in
                   </button>
@@ -387,8 +412,10 @@ export default function LoginPage() {
                 <p>
                   Want to use password?{' '}
                   <button
+                    type="button"
                     onClick={() => setMode('signin')}
-                    className="text-watchman-accent hover:underline font-medium"
+                    disabled={formLocked}
+                    className="text-watchman-accent hover:underline font-medium disabled:opacity-50"
                   >
                     Sign in with password
                   </button>
