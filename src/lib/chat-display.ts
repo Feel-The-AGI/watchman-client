@@ -139,37 +139,50 @@ function clockLabel(value: unknown): string {
   return `${match[1].padStart(2, '0')}:${match[2]}`
 }
 
-/**
- * Past-tense Apply line from the stored payload.
- * The "I'll add…" sentence is the server explanation; this does not rewrite it.
- * Returns null when the payload has no calendar day, so the Done line can stay.
- */
-export function appliedConfirmation(proposal: unknown): string | null {
-  const payload = payloadRecord(proposal)
-  if (!payload) return null
-  const rawDate = typeof payload.start_date === 'string'
-    ? payload.start_date
-    : typeof payload.date === 'string'
-      ? payload.date
-      : ''
-  const match = rawDate.match(/^(\d{4})-(\d{2})-(\d{2})/)
+function localDay(value: unknown): Date | null {
+  if (typeof value !== 'string') return null
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/)
   if (!match) return null
   const year = Number(match[1])
   const month = Number(match[2])
   const day = Number(match[3])
   const local = new Date(year, month - 1, day)
   if (local.getFullYear() !== year || local.getMonth() !== month - 1 || local.getDate() !== day) return null
-  const when = `${WEEKDAY_LABELS[local.getDay()]} ${day} ${MONTH_LABELS[month - 1]}`
-  const start = clockLabel(payload.time_start)
-  const end = clockLabel(payload.time_end)
-  const clock = start && end ? `${start}-${end}` : start
-  const name = typeof payload.name === 'string' ? payload.name.trim() : ''
+  return local
+}
+
+/**
+ * Past-tense Apply line for add_commitment and add_leave.
+ * Other actions keep the older Done line. The future-tense explanation is not used.
+ */
+export function appliedConfirmation(proposal: unknown): string | null {
   const actionValue = commandRecord(proposal)?.action
   const action = typeof actionValue === 'string' ? actionValue : ''
+  if (action !== 'add_commitment' && action !== 'add_leave') return null
+  const payload = payloadRecord(proposal)
+  if (!payload) return null
+  const startDay = localDay(typeof payload.start_date === 'string' ? payload.start_date : payload.date)
+  if (!startDay) return null
+  const name = typeof payload.name === 'string' ? payload.name.trim() : ''
   const label = action === 'add_leave'
     ? (name && !['leave', 'other'].includes(name.toLowerCase()) ? name : 'Leave')
     : name
   if (!label) return null
+  if (action === 'add_leave') {
+    const endDay = localDay(payload.end_date)
+    if (endDay && endDay.getTime() !== startDay.getTime()) {
+      const sameMonth = endDay.getFullYear() === startDay.getFullYear() && endDay.getMonth() === startDay.getMonth()
+      const startText = sameMonth
+        ? `${WEEKDAY_LABELS[startDay.getDay()]} ${startDay.getDate()}`
+        : `${WEEKDAY_LABELS[startDay.getDay()]} ${startDay.getDate()} ${MONTH_LABELS[startDay.getMonth()]}`
+      const endText = `${WEEKDAY_LABELS[endDay.getDay()]} ${endDay.getDate()} ${MONTH_LABELS[endDay.getMonth()]}`
+      return `Added: ${label}, ${startText} – ${endText}`
+    }
+  }
+  const when = `${WEEKDAY_LABELS[startDay.getDay()]} ${startDay.getDate()} ${MONTH_LABELS[startDay.getMonth()]}`
+  const start = clockLabel(payload.time_start)
+  const end = clockLabel(payload.time_end)
+  const clock = start && end ? `${start}-${end}` : start
   return clock ? `Added: ${label} on ${when}, ${clock}.` : `Added: ${label} on ${when}.`
 }
 
@@ -179,22 +192,16 @@ function translateToolName(name: string): string {
   return 'Updating your calendar'
 }
 
-/** Display-only cleanup. Stored messages stay as they are. */
+/** Display-only cleanup for assistant text. Stored messages stay as they are. */
 export function sanitizeChatDisplay(content: unknown): string | null {
   const text = chatMessageText(content)
   if (!text) return null
-  const stripped = text
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<\/?[a-z][^>]*>/gi, '')
-    .trim()
-  if (!stripped) return null
-  if (isRawToolText(stripped)) {
-    const name = stripped.replace(/^(?:executing|running)\s+/i, '').replace(/[.!]$/, '')
+  if (isRawToolText(text)) {
+    const name = text.replace(/^(?:executing|running)\s+/i, '').replace(/[.!]$/, '')
     const sentence = translateToolName(name)
     return sentence.endsWith('.') ? sentence : `${sentence}.`
   }
-  return stripped.replace(
+  return text.replace(
     /\b(?:executing|running)\s+(add_commitment|add_leave)\b[.!?]?/gi,
     (_, name: string) => translateToolName(name),
   )
@@ -206,7 +213,7 @@ export type ChatTextPart =
   | { kind: 'em'; text: string }
   | { kind: 'code'; text: string }
 
-/** A small markdown subset as text parts. Tags are already stripped, so nothing becomes HTML. */
+/** Assistant markdown as text parts. Angle brackets stay in the text; React escapes them. */
 export function chatTextParts(content: unknown): ChatTextPart[] {
   const source = sanitizeChatDisplay(content)
   if (!source) return []
@@ -249,6 +256,14 @@ export function chatTextParts(content: unknown): ChatTextPart[] {
   }
   flush()
   return parts
+}
+
+/** User text is shown as typed. Markdown and tool-name cleanup apply to assistant text only. */
+export function displayedChatParts(role: string, content: unknown): ChatTextPart[] {
+  if (role === 'user') {
+    return typeof content === 'string' && content.length > 0 ? [{ kind: 'text', text: content }] : []
+  }
+  return chatTextParts(content)
 }
 
 /** Distance from the top of the chat scroller to the newest message. */

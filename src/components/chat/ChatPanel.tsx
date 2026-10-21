@@ -13,6 +13,7 @@ import {
   chatScrollBehavior,
   chatScrollTop,
   chatTextParts,
+  displayedChatParts,
   friendlyChatError,
   isInternalChatMessage,
   mergeChatHistory,
@@ -23,8 +24,8 @@ import {
   type ChatTextPart,
 } from '@/lib/chat-display'
 
-function ChatBubbleText({ content, fallback }: { content: unknown; fallback?: string }) {
-  const parts = chatTextParts(content)
+function ChatBubbleText({ role, content, fallback }: { role?: string; content: unknown; fallback?: string }) {
+  const parts = displayedChatParts(role || 'assistant', content)
   const shown = parts.length > 0 ? parts : chatTextParts(fallback)
   if (shown.length === 0) return null
   return (
@@ -517,9 +518,12 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
               )}>
                 <p className="text-sm whitespace-pre-wrap leading-relaxed">
                   <ChatBubbleText
-                    content={message.proposal
-                      ? proposalCardText(message.proposal, message.content)
-                      : message.content}
+                    role={message.role}
+                    content={message.role === 'user'
+                      ? message.content
+                      : message.proposal
+                        ? proposalCardText(message.proposal, message.content)
+                        : message.content}
                   />
                 </p>
                 

@@ -7,6 +7,7 @@ import {
   chatScrollBehavior,
   chatScrollTop,
   chatTextParts,
+  displayedChatParts,
   isInternalChatMessage,
   mergeChatHistory,
   messagesAfterSend,
@@ -112,8 +113,7 @@ describe('chat display', () => {
     assert.equal(sanitizeChatDisplay('Executing add_commitment'), 'Adding a commitment.')
     assert.equal(sanitizeChatDisplay('Executing add_leave'), 'Adding leave.')
     const parts = chatTextParts('See **this** <script>alert(1)</script> and `code`')
-    assert.equal(parts.some((part) => part.text.includes('<')), false)
-    assert.equal(parts.some((part) => part.text.toLowerCase().includes('script')), false)
+    assert.equal(parts.some((part) => part.kind === 'text' && part.text.includes('<script>alert(1)</script>')), true)
     assert.deepEqual(parts.filter((part) => part.kind === 'bold'), [{ kind: 'bold', text: 'this' }])
     assert.deepEqual(parts.filter((part) => part.kind === 'code'), [{ kind: 'code', text: 'code' }])
     const lines = chatTextParts('First line\n*second*')
@@ -140,6 +140,31 @@ describe('chat display', () => {
     assert.equal(line, 'Added: Haircut on Thu 5 Nov, 16:00-17:00.')
     assert.equal(line?.includes("I'll"), false)
     assert.equal(appliedConfirmation({ command: { explanation: "I'll add the haircut next week." } }), null)
+  })
+
+  it('names a multi-day leave by its start and end dates', () => {
+    assert.equal(appliedConfirmation({
+      command: {
+        action: 'add_leave',
+        payload: { name: 'Leave', start_date: '2026-12-20', end_date: '2026-12-27' },
+      },
+    }), 'Added: Leave, Sun 20 – Sun 27 Dec')
+  })
+
+  it('leaves a removed commitment on the older Done line', () => {
+    assert.equal(appliedConfirmation({
+      command: {
+        action: 'remove_commitment',
+        explanation: "I'll remove the dentist.",
+        payload: { name: 'Dentist', start_date: '2026-10-27' },
+      },
+    }), null)
+  })
+
+  it('renders a user message exactly as typed', () => {
+    const typed = 'Meeting with <John> at 2*3*4'
+    assert.deepEqual(displayedChatParts('user', typed), [{ kind: 'text', text: typed }])
+    assert.deepEqual(displayedChatParts('user', 'add_commitment'), [{ kind: 'text', text: 'add_commitment' }])
   })
 
   it('jumps to the newest message before later messages animate', () => {
