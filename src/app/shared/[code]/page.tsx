@@ -8,6 +8,7 @@ import { Sun, Moon, Coffee, Plane, ChevronLeft, ChevronRight, AlertCircle, Share
 import { Logo } from '@/components/ui/Logo';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { BACKEND_NOT_CONFIGURED_MESSAGE, BACKEND_UNAVAILABLE_MESSAGE, getApiBaseUrl } from '@/lib/api';
 
 interface SharedDay {
   date: string;
@@ -61,22 +62,41 @@ export default function SharedCalendarPage() {
   const [data, setData] = useState<SharedCalendarData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorTitle, setErrorTitle] = useState('Calendar unavailable');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [direction, setDirection] = useState(0);
 
   useEffect(() => {
     async function fetchSharedCalendar() {
+      const baseUrl = getApiBaseUrl();
+      if (!baseUrl) {
+        setErrorTitle('Calendar unavailable');
+        setError(BACKEND_NOT_CONFIGURED_MESSAGE);
+        setLoading(false);
+        return;
+      }
+
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/sharing/public/${shareCode}`);
-        const result = await response.json();
+        const response = await fetch(`${baseUrl}/api/sharing/public/${shareCode}`);
+        const result = await response.json().catch(() => ({}));
 
         if (!response.ok) {
-          throw new Error(result.detail || 'Failed to load shared calendar');
+          const detail = result?.detail;
+          const message = typeof detail === 'string'
+            ? detail
+            : detail?.message || 'This shared calendar could not be loaded.';
+          setErrorTitle(response.status === 404 ? 'Calendar not found' : 'Calendar unavailable');
+          throw new Error(message);
         }
 
         setData(result.data);
       } catch (err: any) {
-        setError(err.message || 'Failed to load shared calendar');
+        if (err instanceof TypeError) {
+          setErrorTitle('Calendar unavailable');
+          setError(BACKEND_UNAVAILABLE_MESSAGE);
+        } else {
+          setError(err.message || BACKEND_UNAVAILABLE_MESSAGE);
+        }
       } finally {
         setLoading(false);
       }
@@ -143,7 +163,7 @@ export default function SharedCalendarPage() {
           <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-6">
             <AlertCircle className="w-8 h-8 text-red-400" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-3">Calendar Not Found</h1>
+          <h1 className="text-2xl font-bold text-white mb-3">{errorTitle}</h1>
           <p className="text-watchman-muted mb-6">{error}</p>
           <Link href="/" className="text-watchman-accent hover:underline">
             Go to Watchman
