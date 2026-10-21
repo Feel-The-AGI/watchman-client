@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { format } from 'date-fns';
-import { gridMonthAfterViewToggle, headerYear, shiftViewedMonth, yearToLoad } from '@/lib/calendar-view';
+import { gridMonthAfterViewToggle, headerYear, monthToShow, shiftViewedMonth, yearToLoad } from '@/lib/calendar-view';
 import { 
   Calendar as CalendarIcon, 
   Grid3X3, 
@@ -51,7 +51,8 @@ export default function DashboardPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [viewedMonth, setViewedMonth] = useState(() => gridMonthAfterViewToggle(new Date(), null));
+  const [viewedMonth, setViewedMonth] = useState(() => gridMonthAfterViewToggle(new Date()));
+  const viewedYearRef = useRef(headerYear(viewedMonth));
   const [initialYearSet, setInitialYearSet] = useState(false);
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   const [stats, setStats] = useState<CalendarStats | null>(null);
@@ -73,6 +74,7 @@ export default function DashboardPage() {
 
     try {
       const snapshot = await loadDashboardSnapshot(api, yearToFetch);
+      if (yearToFetch !== viewedYearRef.current) return;
       if (Array.isArray(snapshot.cycles)) {
         setHasSetup(snapshot.cycles.length > 0);
       }
@@ -98,6 +100,8 @@ export default function DashboardPage() {
       return refreshCalendarSilently();
     }
 
+    let fetchYear = yearToFetch;
+
     try {
       setLoading(true);
       setError(null);
@@ -107,17 +111,14 @@ export default function DashboardPage() {
       }
 
       const cyclesResponse = await api.cycles.list();
+      if (yearToFetch !== viewedYearRef.current) return;
       if (!cyclesResponse || cyclesResponse.length === 0) {
         setHasSetup(false);
-        setLoading(false);
         return;
       }
       setHasSetup(true);
 
       const activeCycle = cyclesResponse.find((c: any) => c.is_active) || cyclesResponse[0];
-
-      // Determine which year to fetch - only adjust on FIRST load
-      let fetchYear = yearToFetch;
 
       // Only set anchor year on FIRST load, not every navigation
       if (!initialYearSet && activeCycle?.anchor_date) {
@@ -125,6 +126,7 @@ export default function DashboardPage() {
         if (anchorYear >= new Date().getFullYear() && anchorYear !== yearToFetch) {
           setCurrentYear(anchorYear);
           setViewedMonth((current) => new Date(anchorYear, current.getMonth(), 1));
+          viewedYearRef.current = anchorYear;
           fetchYear = anchorYear;
         }
         setInitialYearSet(true);
@@ -132,15 +134,20 @@ export default function DashboardPage() {
 
       // Fetch calendar data for the correct year
       const calendarResponse = await api.calendar.getYear(fetchYear);
+      if (fetchYear !== viewedYearRef.current) return;
       setCalendarDays(normalizeCalendarDays(calendarResponse) as CalendarDay[]);
 
       const statsResponse = await api.stats.getSummary(fetchYear);
+      if (fetchYear !== viewedYearRef.current) return;
       setStats(statsResponse || null);
     } catch (err: any) {
+      if (fetchYear !== viewedYearRef.current) return;
       console.error('Failed to fetch calendar:', err);
       setError(err.message || 'Failed to load calendar');
     } finally {
-      setLoading(false);
+      if (fetchYear === viewedYearRef.current) {
+        setLoading(false);
+      }
     }
   }, [initialYearSet, calendarDays.length, refreshCalendarSilently]);
 
@@ -150,7 +157,10 @@ export default function DashboardPage() {
   }, []);
 
   const showMonth = (month: Date) => {
-    const next = gridMonthAfterViewToggle(month, selectedDate);
+    const tier = profile?.tier === 'pro' || profile?.tier === 'admin' ? profile.tier : 'free';
+    const next = monthToShow(month, new Date(), tier);
+    if (!next) return;
+    viewedYearRef.current = headerYear(next);
     setViewedMonth(next);
     const year = yearToLoad(currentYearRef.current, next);
     if (year !== null) {
@@ -356,7 +366,7 @@ export default function DashboardPage() {
                   days={calendarDays}
                   selectedDate={selectedDate}
                   onSelectDate={setSelectedDate}
-                  initialMonth={gridMonthAfterViewToggle(viewedMonth, selectedDate)}
+                  initialMonth={gridMonthAfterViewToggle(viewedMonth)}
                   onMonthChange={showMonth}
                   userTier={profile?.tier as 'free' | 'pro' | 'admin' || 'free'}
                 />
