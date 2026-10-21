@@ -68,3 +68,53 @@ export function friendlyChatError(error: unknown, fallback: string): string {
   }
   return fallback
 }
+
+/** Whole string is a tool invocation such as "Executing add_commitment" or "add_commitment". */
+export function isRawToolText(value: string): boolean {
+  const text = value.trim()
+  if (/^(executing|running)\s+[a-z][a-z0-9_]*[.!]?$/i.test(text)) return true
+  if (/^[a-z]+(?:_[a-z0-9]+)+$/.test(text)) return true
+  return false
+}
+
+function explanationFromCommand(command: unknown): string | null {
+  if (!command || typeof command !== 'object') return null
+  const text = chatMessageText((command as { explanation?: unknown }).explanation)
+  if (!text || isRawToolText(text)) return null
+  return text
+}
+
+function commandOf(source: unknown): unknown {
+  if (!source || typeof source !== 'object') return source
+  if ('command' in source) return (source as { command?: unknown }).command
+  return source
+}
+
+export const PROPOSAL_CARD_FALLBACK = 'Review this proposed change.'
+
+export const REVIEW_FAILURE_MESSAGE = "That didn't go through. Nothing was changed. You can send another message."
+
+/** Card copy prefers the server's human explanation and never a raw tool name. */
+export function proposalCardText(
+  proposal: { command?: { explanation?: unknown } } | null | undefined,
+  messageContent?: unknown,
+): string {
+  const explanation = explanationFromCommand(proposal?.command)
+  if (explanation) return explanation
+  const content = chatMessageText(messageContent)
+  if (content && !isRawToolText(content)) return content
+  return PROPOSAL_CARD_FALLBACK
+}
+
+/** Post-apply line. Same explanation, never "Executing add_commitment". */
+export function proposalAppliedText(...sources: unknown[]): string {
+  for (const source of sources) {
+    const text = explanationFromCommand(commandOf(source))
+    if (text) return `Done! ${text}`
+  }
+  return 'Done! Changes applied successfully.'
+}
+
+export function chatInputLocked(pendingProposal: unknown, isReviewing: boolean): boolean {
+  return Boolean(pendingProposal) || isReviewing
+}

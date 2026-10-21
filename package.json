@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit && tsc -p e2e/tsconfig.json",
-    "test:unit": "node --import tsx --test src/lib/rotation.test.ts src/lib/chat-display.test.ts",
+    "test:unit": "node --import tsx --test src/lib/rotation.test.ts src/lib/chat-display.test.ts src/lib/dashboard-refresh.test.ts",
     "e2e": "playwright test -c e2e/playwright.config.ts"
   },
   "dependencies": {

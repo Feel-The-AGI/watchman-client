@@ -6,7 +6,15 @@ import { Send, Loader2, Bot, User, Undo2, Redo2, CheckCircle, XCircle, AlertTria
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
-import { chatMessageText, friendlyChatError, isInternalChatMessage } from '@/lib/chat-display'
+import {
+  chatInputLocked,
+  chatMessageText,
+  friendlyChatError,
+  isInternalChatMessage,
+  proposalAppliedText,
+  proposalCardText,
+  REVIEW_FAILURE_MESSAGE,
+} from '@/lib/chat-display'
 
 function errorText(error: unknown, fallback: string) {
   return friendlyChatError(error, fallback)
@@ -26,7 +34,13 @@ function withProposalCard(messages: Message[], proposal: any | null): Message[] 
   const existingIndex = messages.findIndex(message => message.proposal?.id === proposal.id)
   if (existingIndex >= 0) {
     const next = [...messages]
-    next[existingIndex] = { ...next[existingIndex], isProposal: true, proposal }
+    const current = next[existingIndex]
+    next[existingIndex] = {
+      ...current,
+      content: proposalCardText(proposal, current.content),
+      isProposal: true,
+      proposal,
+    }
     return next
   }
 
@@ -41,7 +55,13 @@ function withProposalCard(messages: Message[], proposal: any | null): Message[] 
     ))
     if (assistantIndex >= 0) {
       const next = [...messages]
-      next[assistantIndex] = { ...next[assistantIndex], isProposal: true, proposal }
+      const current = next[assistantIndex]
+      next[assistantIndex] = {
+        ...current,
+        content: proposalCardText(proposal, current.content),
+        isProposal: true,
+        proposal,
+      }
       return next
     }
   }
@@ -49,7 +69,7 @@ function withProposalCard(messages: Message[], proposal: any | null): Message[] 
   return [...messages, {
     id: `proposal-${proposal.id}`,
     role: 'assistant',
-    content: chatMessageText(proposal.command?.explanation) || 'Review this proposed change.',
+    content: proposalCardText(proposal),
     created_at: proposal.created_at || new Date().toISOString(),
     isProposal: true,
     proposal,
@@ -67,7 +87,7 @@ interface Message {
 }
 
 interface ChatPanelProps {
-  onCalendarUpdate?: () => void
+  onCalendarUpdate?: () => void | Promise<void>
   className?: string
   autoExecute?: boolean  // If false, shows approval popup for commands
   userTier?: 'free' | 'pro'
@@ -199,7 +219,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
         if (assistantText && !isInternalChatMessage(response.assistant_message)) {
           const assistantMessage: Message = {
             ...response.assistant_message,
-            content: assistantText,
+            content: response.proposal ? proposalCardText(response.proposal, assistantText) : assistantText,
             isProposal: response.is_command,
             proposal: response.proposal
           }
@@ -243,6 +263,16 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
     }
   }
 
+  const noteReviewFailure = () => {
+    setPendingProposal(null)
+    setMessages(prev => [...prev, {
+      id: `error-${Date.now()}`,
+      role: 'assistant',
+      content: REVIEW_FAILURE_MESSAGE,
+      created_at: new Date().toISOString(),
+    }])
+  }
+
   const approveProposal = async (proposalId: string) => {
     if (isReviewing || !proposalId) return
     setIsReviewing(true)
@@ -250,39 +280,34 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       const proposal = pendingProposal?.id === proposalId ? pendingProposal : null
       const result = await api.commands.reviewProposal(proposalId, 'approve')
 
-      if (result?.success) {
-        setMessages(prev => [...prev, {
-          id: `success-${Date.now()}`,
-          role: 'assistant',
-          content: `Done! ${chatMessageText(proposal?.command?.explanation) || 'Changes applied successfully.'}`,
-          created_at: new Date().toISOString()
-        }])
-        await new Promise(resolve => setTimeout(resolve, 500))
-        onCalendarUpdate?.()
-      } else {
-        setMessages(prev => [...prev, {
-          id: `error-${Date.now()}`,
-          role: 'assistant',
-          content: `That change was not applied: ${chatMessageText(result?.error) || 'Unknown error'}`,
-          created_at: new Date().toISOString()
-        }])
+      if (!result?.success) {
+        noteReviewFailure()
+        return
       }
+
+      setMessages(prev => [...prev, {
+        id: `success-${Date.now()}`,
+        role: 'assistant',
+        content: proposalAppliedText(proposal, result),
+        created_at: new Date().toISOString()
+      }])
       setPendingProposal(null)
+      await onCalendarUpdate?.()
       await loadNextProposal()
     } catch (error) {
       console.error('Failed to approve proposal:', error)
       if (apiStatus(error) === 409) {
         setPendingProposal(null)
+        setMessages(prev => [...prev, {
+          id: `error-${Date.now()}`,
+          role: 'assistant',
+          content: 'That proposal was already reviewed.',
+          created_at: new Date().toISOString(),
+        }])
         await loadNextProposal()
+        return
       }
-      setMessages(prev => [...prev, {
-        id: `error-${Date.now()}`,
-        role: 'assistant',
-        content: apiStatus(error) === 409
-          ? 'That proposal was already reviewed.'
-          : 'Sorry, I had trouble applying that change. It is still waiting for review.',
-        created_at: new Date().toISOString()
-      }])
+      noteReviewFailure()
     } finally {
       setIsReviewing(false)
     }
@@ -291,8 +316,13 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
   const rejectProposal = async () => {
     if (!pendingProposal || isReviewing) return
     setIsReviewing(true)
+    const proposalId = pendingProposal.id
     try {
-      await api.commands.reviewProposal(pendingProposal.id, 'reject')
+      const result = await api.commands.reviewProposal(proposalId, 'reject')
+      if (result && typeof result === 'object' && 'success' in result && result.success === false) {
+        noteReviewFailure()
+        return
+      }
       setMessages(prev => [...prev, {
         id: `rejected-${Date.now()}`,
         role: 'assistant',
@@ -305,16 +335,16 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       console.error('Failed to decline proposal:', error)
       if (apiStatus(error) === 409) {
         setPendingProposal(null)
+        setMessages(prev => [...prev, {
+          id: `error-${Date.now()}`,
+          role: 'assistant',
+          content: 'That proposal was already reviewed.',
+          created_at: new Date().toISOString(),
+        }])
         await loadNextProposal()
+        return
       }
-      setMessages(prev => [...prev, {
-        id: `error-${Date.now()}`,
-        role: 'assistant',
-        content: apiStatus(error) === 409
-          ? 'That proposal was already reviewed.'
-          : 'The change was not declined. It is still waiting for review.',
-        created_at: new Date().toISOString(),
-      }])
+      noteReviewFailure()
     } finally {
       setIsReviewing(false)
     }
@@ -451,7 +481,11 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
                   ? 'bg-watchman-accent text-white rounded-br-lg shadow-lg shadow-watchman-accent/20' 
                   : 'glass border border-white/5 text-watchman-text rounded-bl-lg'
               )}>
-                <p className="text-sm whitespace-pre-wrap leading-relaxed">{chatMessageText(message.content)}</p>
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                  {message.proposal
+                    ? proposalCardText(message.proposal, message.content)
+                    : chatMessageText(message.content)}
+                </p>
                 
                 {/* Proposal approval buttons */}
                 {message.isProposal && message.proposal && pendingProposal?.id === message.proposal.id && (
@@ -572,7 +606,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={pendingProposal ? 'Apply or decline the proposed change first' : 'Tell me about your schedule...'}
-              disabled={!!pendingProposal || isReviewing}
+              disabled={chatInputLocked(pendingProposal, isReviewing)}
               rows={1}
               className="w-full px-3 sm:px-4 py-2.5 sm:py-3 glass border border-white/10 rounded-xl text-xs sm:text-sm text-watchman-text placeholder-watchman-muted focus:outline-none focus:ring-2 focus:ring-watchman-accent focus:border-transparent resize-none transition-all disabled:cursor-not-allowed disabled:opacity-60"
               style={{ minHeight: '44px', maxHeight: '120px' }}
@@ -580,7 +614,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
           </div>
           <motion.button
             type="submit"
-            disabled={!input.trim() || isLoading || !!pendingProposal || isReviewing}
+            disabled={!input.trim() || isLoading || chatInputLocked(pendingProposal, isReviewing)}
             className={cn(
               'px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all flex items-center justify-center',
               input.trim() && !isLoading
