@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 import {
   gridMonthAfterViewToggle,
   headerYear,
+  monthArrowLabel,
   monthToShow,
   shiftViewedMonth,
   yearToLoad,
@@ -38,6 +39,11 @@ describe('calendar view across years', () => {
     assert.ok(opened)
     assert.equal(opened.getFullYear(), 2027)
     assert.equal(opened.getMonth(), 9)
+  })
+
+  it('names the month arrows for assistive tech', () => {
+    assert.equal(monthArrowLabel('previous'), 'Previous month')
+    assert.equal(monthArrowLabel('next'), 'Next month')
   })
 
   it('steps back across the year boundary', () => {

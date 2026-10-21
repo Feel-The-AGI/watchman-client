@@ -30,6 +30,10 @@ export function monthToShow(
   return next
 }
 
+export function monthArrowLabel(direction: 'previous' | 'next'): string {
+  return direction === 'previous' ? 'Previous month' : 'Next month'
+}
+
 export function yearToLoad(loadedYear: number, viewedMonth: Date): number | null {
   const year = headerYear(viewedMonth)
   return year === loadedYear ? null : year

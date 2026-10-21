@@ -118,3 +118,65 @@ export function proposalAppliedText(...sources: unknown[]): string {
 export function chatInputLocked(pendingProposal: unknown, isReviewing: boolean): boolean {
   return Boolean(pendingProposal) || isReviewing
 }
+
+export interface ChatListMessage {
+  id: string
+  role: string
+  content: string
+}
+
+/** A saved user row replaces only a temporary row that appears before it. */
+export function collapseUserEchoes<T extends ChatListMessage>(messages: T[]): T[] {
+  const next: T[] = []
+  for (const message of messages) {
+    if (!message.id || next.some((existing) => existing.id === message.id)) continue
+    if (message.role === 'user' && !message.id.startsWith('temp-')) {
+      const echoIndex = next.findIndex((existing) =>
+        existing.role === 'user'
+        && existing.id.startsWith('temp-')
+        && existing.content.trim() === message.content.trim()
+      )
+      if (echoIndex >= 0) {
+        next[echoIndex] = message
+        continue
+      }
+    }
+    next.push(message)
+  }
+  return next
+}
+
+/**
+ * Reply after Send. The optimistic row and the saved user row are the same message.
+ * The proposal card is the assistant turn, not a second copy of the user text.
+ */
+export function messagesAfterSend<T extends ChatListMessage>(
+  current: T[],
+  optimisticId: string,
+  user: T | null | undefined,
+  assistant: T | null | undefined,
+): T[] {
+  const base = user?.id ? current.filter((message) => message.id !== optimisticId) : current
+  const withUser = user?.id ? [...base, user] : base
+  const withAssistant = assistant?.id ? [...withUser, assistant] : withUser
+  return collapseUserEchoes(withAssistant)
+}
+
+/** A late history payload must not sit beside the optimistic copy of a message it already stored. */
+export function mergeChatHistory<T extends ChatListMessage>(local: T[], history: T[]): T[] {
+  const savedIds = new Set(history.map((message) => message.id))
+  const newestSavedUser = [...history].reverse().find((message) => message.role === 'user')
+  const pending = local.filter((message) => {
+    if (savedIds.has(message.id)) return false
+    if (
+      message.role === 'user'
+      && message.id.startsWith('temp-')
+      && newestSavedUser
+      && message.content.trim() === newestSavedUser.content.trim()
+    ) {
+      return false
+    }
+    return true
+  })
+  return collapseUserEchoes([...history, ...pending])
+}

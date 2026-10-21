@@ -18,8 +18,9 @@ import {
 import { ChevronLeft, ChevronRight, Sun, Moon, Coffee, Plane, Sparkles, Lock, Crown, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { cycleDayBadge } from '@/lib/cycle-day-badge';
-import { calendarCellKind } from '@/lib/calendar-day';
+import { calendarCellKind, dayCommitments } from '@/lib/calendar-day';
 import { isFreeMonthLocked, isYearMonthVisible } from '@/lib/free-calendar-access';
+import { monthArrowLabel } from '@/lib/calendar-view';
 
 export interface DailyLog {
   id: string;
@@ -213,6 +214,8 @@ export function CalendarGrid({
       {/* Header with Month Navigation */}
       <div className="flex items-center justify-between px-6 py-5 border-b border-white/5">
         <motion.button
+          type="button"
+          aria-label={monthArrowLabel('previous')}
           onClick={() => navigateMonth('prev')}
           whileHover={{ scale: 1.1, x: -2 }}
           whileTap={{ scale: 0.95 }}
@@ -237,6 +240,8 @@ export function CalendarGrid({
         </AnimatePresence>
         
         <motion.button
+          type="button"
+          aria-label={monthArrowLabel('next')}
           onClick={() => navigateMonth('next')}
           whileHover={!isNextMonthLocked ? { scale: 1.1, x: 2 } : {}}
           whileTap={!isNextMonthLocked ? { scale: 0.95 } : {}}
@@ -298,7 +303,8 @@ export function CalendarGrid({
               ? workTypeConfig[calendarDay.work_type] 
               : null;
 
-            const hasCommitments = calendarDay?.commitments && calendarDay.commitments.length > 0;
+            const commitments = dayCommitments(calendarDay);
+            const hasCommitments = commitments.length > 0;
             const isLeave = calendarCellKind(calendarDay) === 'leave';
             const isPreview = calendarDay?.is_preview;
             const dayBadge = !inCurrentMonth
@@ -379,7 +385,7 @@ export function CalendarGrid({
 
                     {hasCommitments && inCurrentMonth && (
                       <div className="flex gap-1">
-                        {calendarDay.commitments.slice(0, 3).map((_, i) => (
+                        {commitments.slice(0, 3).map((_, i) => (
                           <motion.div
                             key={i}
                             initial={{ scale: 0 }}
@@ -388,9 +394,9 @@ export function CalendarGrid({
                             className="w-1.5 h-1.5 rounded-full bg-watchman-accent shadow-sm shadow-watchman-accent/50"
                           />
                         ))}
-                        {calendarDay.commitments.length > 3 && (
+                        {commitments.length > 3 && (
                           <span className="text-[8px] text-watchman-accent ml-0.5">
-                            +{calendarDay.commitments.length - 3}
+                            +{commitments.length - 3}
                           </span>
                         )}
                       </div>
@@ -424,7 +430,7 @@ export function CalendarGrid({
                           </p>
                           {hasCommitments && (
                             <p className="text-[10px] text-watchman-muted">
-                              {calendarDay.commitments.length} commitment{calendarDay.commitments.length !== 1 ? 's' : ''}
+                              {commitments.length} commitment{commitments.length !== 1 ? 's' : ''}
                             </p>
                           )}
                         </div>
