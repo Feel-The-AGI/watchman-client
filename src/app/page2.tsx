@@ -47,8 +47,8 @@ const features = [
     gradient: 'from-rose-500 to-orange-500',
   },
   {
-    title: 'No Silent Changes',
-    description: 'Every update to your schedule is proposed, not imposed. You approve it — or it doesn\'t happen.',
+    title: 'Chat Changes Wait',
+    description: 'When chat wants to edit your calendar, it proposes the change. You apply it or decline it. Edits you make in settings apply directly.',
     icon: Eye,
     gradient: 'from-violet-500 to-purple-500',
   },
@@ -65,7 +65,7 @@ const steps = [
   { num: '01', title: 'Define Your Cycle', desc: 'Tell us your shift pattern in natural language.', icon: Clock },
   { num: '02', title: 'Set Your Rules', desc: 'Tell us what matters — sleep, study, max load.', icon: Shield },
   { num: '03', title: 'Propose Changes', desc: 'Need leave? A new commitment? Just ask.', icon: MessageSquare },
-  { num: '04', title: 'Approve or Decline', desc: "You're in control. Nothing changes without you.", icon: CheckCircle },
+  { num: '04', title: 'Review Chat Changes', desc: 'Apply or decline a proposal before it updates the calendar.', icon: CheckCircle },
 ];
 
 // Industries
@@ -308,7 +308,7 @@ export default function LandingPage() {
             transition={{ duration: 0.8, delay: 0.25 }}
           >
             Watchman is a rule-driven calendar built for rotating shifts, study schedules, and real constraints.
-            <span className="text-white/70"> It listens. It proposes. Nothing changes without your approval.</span>
+            <span className="text-white/70"> It proposes chat changes and waits for you to apply or decline them.</span>
           </motion.p>
 
           {/* CTA Buttons */}

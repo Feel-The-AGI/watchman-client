@@ -106,10 +106,6 @@ export default function SettingsPage() {
   // Celebration state
   const [showCelebration, setShowCelebration] = useState(false);
 
-  // Cancel subscription modal
-  const [cancelSubscriptionModal, setCancelSubscriptionModal] = useState(false);
-  const [cancellingSubscription, setCancellingSubscription] = useState(false);
-
   // Confirmation modal states
   const [deleteAccountModal, setDeleteAccountModal] = useState(false);
   const [revokeShareModal, setRevokeShareModal] = useState<string | null>(null);
@@ -270,33 +266,6 @@ export default function SettingsPage() {
     } catch (err: any) {
       setError(err.message || 'Failed to start checkout');
       setUpgrading(false);
-    }
-  };
-
-  const handleManageSubscription = async () => {
-    // Paystack doesn't have a billing portal like Stripe
-    // Users manage subscriptions via email or cancellation
-    setActiveTab('subscription');
-    setSuccess('Subscription management: You can cancel your subscription below, or check your email from Paystack for payment method updates.');
-    setTimeout(() => setSuccess(null), 5000);
-  };
-
-  const handleCancelSubscription = () => {
-    setCancelSubscriptionModal(true);
-  };
-
-  const confirmCancelSubscription = async () => {
-    try {
-      setCancellingSubscription(true);
-      await api.payments.cancelSubscription();
-      setSubscription({ ...subscription!, tier: 'free' });
-      setSuccess('Your subscription has been cancelled. You will retain Pro access until the end of your billing period.');
-      setCancelSubscriptionModal(false);
-      setTimeout(() => setSuccess(null), 5000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to cancel subscription');
-    } finally {
-      setCancellingSubscription(false);
     }
   };
 
@@ -612,48 +581,15 @@ export default function SettingsPage() {
                         </div>
                       )}
 
-                      {subscription?.tier === 'pro' && subscription.current_period_end && (
-                        <div className="mt-4 p-4 bg-watchman-bg rounded-xl">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm text-watchman-muted">
-                                {subscription.cancel_at_period_end
-                                  ? 'Your plan will end on'
-                                  : 'Next billing date'}
-                              </p>
-                              <p className="font-medium">
-                                {new Date(subscription.current_period_end).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <Button
-                              variant="secondary"
-                              onClick={handleCancelSubscription}
-                              className="gap-2 text-watchman-error hover:text-watchman-error hover:bg-watchman-error/10"
-                            >
-                              Cancel Subscription
-                            </Button>
+                      {subscription?.tier === 'pro' && (
+                        <div className="mt-4 p-4 bg-watchman-accent/10 rounded-xl border border-watchman-accent/20">
+                          <div className="flex items-center gap-2">
+                            <Crown className="w-5 h-5 text-watchman-accent" />
+                            <p className="font-medium text-watchman-accent">Pro access active</p>
                           </div>
-                        </div>
-                      )}
-
-                      {subscription?.tier === 'pro' && !subscription.current_period_end && (
-                        <div className="mt-4 space-y-4">
-                          <div className="p-4 bg-watchman-accent/10 rounded-xl border border-watchman-accent/20">
-                            <div className="flex items-center gap-2">
-                              <Crown className="w-5 h-5 text-watchman-accent" />
-                              <p className="font-medium text-watchman-accent">Pro Access Active</p>
-                            </div>
-                            <p className="text-sm text-watchman-muted mt-1">
-                              Your Pro subscription is active. Manage your payment through emails from Paystack.
-                            </p>
-                          </div>
-                          <Button
-                            variant="secondary"
-                            onClick={handleCancelSubscription}
-                            className="gap-2 text-watchman-error hover:text-watchman-error hover:bg-watchman-error/10"
-                          >
-                            Cancel Subscription
-                          </Button>
+                          <p className="text-sm text-watchman-muted mt-1">
+                            Pro is a one-time Paystack payment. It does not renew, so there is no subscription to cancel here.
+                          </p>
                         </div>
                       )}
                     </CardContent>
@@ -752,7 +688,7 @@ export default function SettingsPage() {
                             <Receipt className="w-12 h-12 mx-auto text-watchman-muted/30 mb-3" />
                             <p className="text-watchman-muted">No payment records yet</p>
                             <p className="text-sm text-watchman-muted/70 mt-1">
-                              Your payment history will appear here after your first billing cycle
+                              Your payment history will appear here after a payment
                             </p>
                           </div>
                         )}
@@ -1184,25 +1120,6 @@ export default function SettingsPage() {
         variant="warning"
       />
 
-      {/* Cancel Subscription Confirmation Modal */}
-      <ConfirmModal
-        isOpen={cancelSubscriptionModal}
-        onClose={() => setCancelSubscriptionModal(false)}
-        onConfirm={confirmCancelSubscription}
-        title="Cancel Subscription?"
-        message={
-          <div className="space-y-2">
-            <p>Are you sure you want to cancel your Pro subscription?</p>
-            <p className="text-xs text-watchman-muted">
-              You will retain access to Pro features until the end of your current billing period.
-            </p>
-          </div>
-        }
-        confirmText="Cancel Subscription"
-        variant="warning"
-        loading={cancellingSubscription}
-      />
-
       {/* Upgrade to Pro Modal */}
       {showUpgradeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -1232,8 +1149,13 @@ export default function SettingsPage() {
                 <div className="bg-watchman-bg rounded-xl p-4 mb-6">
                   <div className="flex items-baseline justify-center gap-2">
                     <span className="text-4xl font-bold">${pricingInfo?.usd_price || 12}</span>
-                    <span className="text-watchman-muted">/month</span>
+                    <span className="text-watchman-muted">one time</span>
                   </div>
+                  <p className="text-center text-xs text-watchman-muted mt-2">
+                    {pricingInfo?.display_ghs
+                      ? `Charged in cedis, about ${pricingInfo.display_ghs}.`
+                      : 'Charged in Ghanaian cedis at checkout.'}
+                  </p>
                 </div>
 
                 <div className="space-y-2 mb-6">
@@ -1275,14 +1197,14 @@ export default function SettingsPage() {
                     ) : (
                       <>
                         <CreditCard className="w-4 h-4" />
-                        Subscribe Now
+                        Pay with Paystack
                       </>
                     )}
                   </Button>
                 </div>
 
                 <p className="text-center text-xs text-watchman-muted mt-4">
-                  Secure payment via Paystack. Cancel anytime.
+                  Secure one-time payment via Paystack. This checkout does not renew automatically.
                 </p>
               </>
             )}

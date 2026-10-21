@@ -42,8 +42,8 @@ const tiers = [
   {
     name: 'Pro',
     price: '$12',
-    period: '/month',
-    description: 'For professionals who need intelligent parsing and full control.',
+    period: 'one time',
+    description: 'Paid once through Paystack. This checkout does not renew automatically.',
     icon: Crown,
     gradient: 'from-watchman-accent to-watchman-purple',
     glow: 'shadow-watchman-accent/30',
@@ -59,7 +59,7 @@ const tiers = [
       'Calendar sharing',
     ],
     limitations: [],
-    cta: 'Start Pro Trial',
+    cta: 'Upgrade to Pro',
     variant: 'gradient' as const,
     popular: true,
   },
@@ -75,8 +75,8 @@ const faqs = [
     answer: 'Every new user gets 3 days of full Pro features (except exports) to experience weighted constraints, unlimited Watchman Agent, and leave planning. No credit card required.',
   },
   {
-    question: 'Can I upgrade or downgrade anytime?',
-    answer: 'Yes. Upgrade instantly, downgrade at the end of your billing period. No lock-in, no hidden fees.',
+    question: 'Does Pro renew automatically?',
+    answer: 'No. Pro is a one-time $12 payment processed by Paystack and charged in Ghanaian cedis at checkout. Watchman does not bill you again unless you start another checkout.',
   },
   {
     question: 'What does "binary constraints" mean?',
@@ -188,7 +188,7 @@ export default function PricingPage() {
             </h1>
             <p className="text-xl text-watchman-muted max-w-2xl mx-auto">
               Start free with a 3-day Pro trial. Upgrade when you need unlimited access.
-              No hidden fees. Cancel anytime.
+              No hidden fees. Pro does not renew automatically.
             </p>
           </motion.div>
         </div>
