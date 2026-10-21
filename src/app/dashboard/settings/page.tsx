@@ -265,7 +265,14 @@ export default function SettingsPage() {
     try {
       setSaving(true);
       setError(null);
-      await api.settings.update(settings);
+      await api.settings.update({
+        timezone: settings.timezone,
+        notifications_email: settings.notifications_email,
+        notifications_push: settings.notifications_push,
+        theme: settings.theme,
+        weighted_mode_enabled: settings.weighted_mode,
+        constraint_mode: settings.weighted_mode ? 'weighted' : 'binary',
+      });
       setSuccess('Settings saved successfully');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
