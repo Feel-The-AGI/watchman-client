@@ -3,8 +3,11 @@ import { describe, it } from 'node:test'
 import {
   authNavChoice,
   passwordRules,
+  resendConfirmationFeedback,
   resendCooldownRemaining,
   RESEND_COOLDOWN_SECONDS,
+  RESEND_RATE_LIMIT_MESSAGE,
+  RESEND_SENT_MESSAGE,
 } from './signup-flow.ts'
 
 describe('password rules', () => {
@@ -25,6 +28,23 @@ describe('resend confirmation cooldown', () => {
     assert.equal(resendCooldownRemaining(started, started + 1_000), RESEND_COOLDOWN_SECONDS - 1)
     assert.equal(resendCooldownRemaining(started, started + 60_000), 0)
     assert.equal(resendCooldownRemaining(started, started + 90_000), 0)
+  })
+})
+
+describe('resend confirmation feedback', () => {
+  it('says the email was sent again when Supabase accepts the resend', () => {
+    assert.deepEqual(resendConfirmationFeedback(null), {
+      tone: 'success',
+      text: RESEND_SENT_MESSAGE,
+    })
+  })
+
+  it('explains a rate limit instead of only restarting the countdown', () => {
+    assert.equal(
+      resendConfirmationFeedback({ status: 429, message: 'email rate limit exceeded', code: 'over_email_send_rate_limit' }).text,
+      RESEND_RATE_LIMIT_MESSAGE,
+    )
+    assert.equal(resendConfirmationFeedback({ message: 'Email rate limit exceeded' }).tone, 'error')
   })
 })
 

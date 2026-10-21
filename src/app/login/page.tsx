@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Logo } from '@/components/ui/Logo';
 import { useAuth } from '@/hooks/useAuth';
-import { passwordRules, resendCooldownRemaining } from '@/lib/signup-flow';
+import { passwordRules, resendConfirmationFeedback, resendCooldownRemaining } from '@/lib/signup-flow';
 
 type AuthMode = 'signin' | 'signup' | 'magic';
 
@@ -27,6 +27,7 @@ export default function LoginPage() {
   const [resendStartedAt, setResendStartedAt] = useState<number | null>(null);
   const [resendNow, setResendNow] = useState(() => Date.now());
   const [resendError, setResendError] = useState('');
+  const [resendNotice, setResendNotice] = useState('');
   const [resending, setResending] = useState(false);
   const submittingRef = useRef(false);
 
@@ -114,12 +115,15 @@ export default function LoginPage() {
     if (resendRemaining > 0 || resending || !email) return;
     setResending(true);
     setResendError('');
+    setResendNotice('');
     const { error: resendFailure } = await resendSignupConfirmation(email);
     setResending(false);
-    if (resendFailure) {
-      setResendError(resendFailure.message || 'The confirmation email could not be sent. Try again in a moment.');
+    const feedback = resendConfirmationFeedback(resendFailure);
+    if (feedback.tone === 'error') {
+      setResendError(feedback.text);
       return;
     }
+    setResendNotice(feedback.text);
     setResendStartedAt(Date.now());
   };
 
@@ -168,12 +172,13 @@ export default function LoginPage() {
                     ? 'Sending…'
                     : 'Resend confirmation email'}
               </Button>
+              {resendNotice && <p className="text-sm text-emerald-400 mt-3">{resendNotice}</p>}
               {resendError && <p className="text-sm text-red-400 mt-3">{resendError}</p>}
             </div>
           )}
           <Button 
             variant="glass" 
-            onClick={() => { setMagicLinkSent(false); setEmailConfirmationSent(false); }}
+            onClick={() => { setMagicLinkSent(false); setEmailConfirmationSent(false); setResendError(''); setResendNotice(''); }}
             className="gap-2"
           >
             <ArrowRight className="w-4 h-4 rotate-180" />
