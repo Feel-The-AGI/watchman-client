@@ -115,6 +115,168 @@ export function proposalAppliedText(...sources: unknown[]): string {
   return 'Done! Changes applied successfully.'
 }
 
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function commandRecord(source: unknown): Record<string, unknown> | null {
+  if (!source || typeof source !== 'object') return null
+  const record = source as Record<string, unknown>
+  if (record.command && typeof record.command === 'object') return record.command as Record<string, unknown>
+  return record
+}
+
+function payloadRecord(source: unknown): Record<string, unknown> | null {
+  const command = commandRecord(source)
+  const payload = command?.payload
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null
+  return payload as Record<string, unknown>
+}
+
+function clockLabel(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})/)
+  if (!match) return ''
+  return `${match[1].padStart(2, '0')}:${match[2]}`
+}
+
+function localDay(value: unknown): Date | null {
+  if (typeof value !== 'string') return null
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const local = new Date(year, month - 1, day)
+  if (local.getFullYear() !== year || local.getMonth() !== month - 1 || local.getDate() !== day) return null
+  return local
+}
+
+/**
+ * Past-tense Apply line for add_commitment and add_leave.
+ * Other actions keep the older Done line. The future-tense explanation is not used.
+ */
+export function appliedConfirmation(proposal: unknown): string | null {
+  const actionValue = commandRecord(proposal)?.action
+  const action = typeof actionValue === 'string' ? actionValue : ''
+  if (action !== 'add_commitment' && action !== 'add_leave') return null
+  const payload = payloadRecord(proposal)
+  if (!payload) return null
+  const startDay = localDay(typeof payload.start_date === 'string' ? payload.start_date : payload.date)
+  if (!startDay) return null
+  const name = typeof payload.name === 'string' ? payload.name.trim() : ''
+  const label = action === 'add_leave'
+    ? (name && !['leave', 'other'].includes(name.toLowerCase()) ? name : 'Leave')
+    : name
+  if (!label) return null
+  if (action === 'add_leave') {
+    const endDay = localDay(payload.end_date)
+    if (endDay && endDay.getTime() !== startDay.getTime()) {
+      const sameMonth = endDay.getFullYear() === startDay.getFullYear() && endDay.getMonth() === startDay.getMonth()
+      const startText = sameMonth
+        ? `${WEEKDAY_LABELS[startDay.getDay()]} ${startDay.getDate()}`
+        : `${WEEKDAY_LABELS[startDay.getDay()]} ${startDay.getDate()} ${MONTH_LABELS[startDay.getMonth()]}`
+      const endText = `${WEEKDAY_LABELS[endDay.getDay()]} ${endDay.getDate()} ${MONTH_LABELS[endDay.getMonth()]}`
+      return `Added: ${label}, ${startText} – ${endText}`
+    }
+  }
+  const when = `${WEEKDAY_LABELS[startDay.getDay()]} ${startDay.getDate()} ${MONTH_LABELS[startDay.getMonth()]}`
+  const start = clockLabel(payload.time_start)
+  const end = clockLabel(payload.time_end)
+  const clock = start && end ? `${start}-${end}` : start
+  return clock ? `Added: ${label} on ${when}, ${clock}.` : `Added: ${label} on ${when}.`
+}
+
+function translateToolName(name: string): string {
+  if (name.toLowerCase() === 'add_leave') return 'Adding leave'
+  if (name.toLowerCase() === 'add_commitment') return 'Adding a commitment'
+  return 'Updating your calendar'
+}
+
+/** Display-only cleanup for assistant text. Stored messages stay as they are. */
+export function sanitizeChatDisplay(content: unknown): string | null {
+  const text = chatMessageText(content)
+  if (!text) return null
+  if (isRawToolText(text)) {
+    const name = text.replace(/^(?:executing|running)\s+/i, '').replace(/[.!]$/, '')
+    const sentence = translateToolName(name)
+    return sentence.endsWith('.') ? sentence : `${sentence}.`
+  }
+  return text.replace(
+    /\b(?:executing|running)\s+(add_commitment|add_leave)\b[.!?]?/gi,
+    (_, name: string) => translateToolName(name),
+  )
+}
+
+export type ChatTextPart =
+  | { kind: 'text'; text: string }
+  | { kind: 'bold'; text: string }
+  | { kind: 'em'; text: string }
+  | { kind: 'code'; text: string }
+
+/** Assistant markdown as text parts. Angle brackets stay in the text; React escapes them. */
+export function chatTextParts(content: unknown): ChatTextPart[] {
+  const source = sanitizeChatDisplay(content)
+  if (!source) return []
+  const parts: ChatTextPart[] = []
+  let buffer = ''
+  const flush = () => {
+    if (!buffer) return
+    parts.push({ kind: 'text', text: buffer })
+    buffer = ''
+  }
+  for (let index = 0; index < source.length; index += 1) {
+    if (source.startsWith('**', index)) {
+      const end = source.indexOf('**', index + 2)
+      if (end > index + 2) {
+        flush()
+        parts.push({ kind: 'bold', text: source.slice(index + 2, end) })
+        index = end + 1
+        continue
+      }
+    }
+    if (source[index] === '`') {
+      const end = source.indexOf('`', index + 1)
+      if (end > index + 1) {
+        flush()
+        parts.push({ kind: 'code', text: source.slice(index + 1, end) })
+        index = end
+        continue
+      }
+    }
+    if (source[index] === '*' && source[index + 1] !== '*') {
+      const end = source.indexOf('*', index + 1)
+      if (end > index + 1) {
+        flush()
+        parts.push({ kind: 'em', text: source.slice(index + 1, end) })
+        index = end
+        continue
+      }
+    }
+    buffer += source[index]
+  }
+  flush()
+  return parts
+}
+
+/** User text is shown as typed. Markdown and tool-name cleanup apply to assistant text only. */
+export function displayedChatParts(role: string, content: unknown): ChatTextPart[] {
+  if (role === 'user') {
+    return typeof content === 'string' && content.length > 0 ? [{ kind: 'text', text: content }] : []
+  }
+  return chatTextParts(content)
+}
+
+/** Distance from the top of the chat scroller to the newest message. */
+export function chatScrollTop(scrollHeight: number, clientHeight: number): number {
+  if (!Number.isFinite(scrollHeight) || !Number.isFinite(clientHeight)) return 0
+  return Math.max(0, scrollHeight - clientHeight)
+}
+
+/** History should jump to the end. Later messages can animate. */
+export function chatScrollBehavior(historySettled: boolean): ScrollBehavior {
+  return historySettled ? 'smooth' : 'auto'
+}
+
 export function chatInputLocked(pendingProposal: unknown, isReviewing: boolean): boolean {
   return Boolean(pendingProposal) || isReviewing
 }

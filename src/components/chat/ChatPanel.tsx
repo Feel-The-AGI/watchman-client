@@ -1,14 +1,19 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, Loader2, Bot, User, Undo2, Redo2, CheckCircle, XCircle, AlertTriangle, Sparkles, Command } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
 import {
+  appliedConfirmation,
   chatInputLocked,
   chatMessageText,
+  chatScrollBehavior,
+  chatScrollTop,
+  chatTextParts,
+  displayedChatParts,
   friendlyChatError,
   isInternalChatMessage,
   mergeChatHistory,
@@ -16,7 +21,28 @@ import {
   proposalAppliedText,
   proposalCardText,
   REVIEW_FAILURE_MESSAGE,
+  type ChatTextPart,
 } from '@/lib/chat-display'
+
+function ChatBubbleText({ role, content, fallback }: { role?: string; content: unknown; fallback?: string }) {
+  const parts = displayedChatParts(role || 'assistant', content)
+  const shown = parts.length > 0 ? parts : chatTextParts(fallback)
+  if (shown.length === 0) return null
+  return (
+    <>
+      {shown.map((part, index) => (
+        <ChatTextPartView key={index} part={part} />
+      ))}
+    </>
+  )
+}
+
+function ChatTextPartView({ part }: { part: ChatTextPart }) {
+  if (part.kind === 'bold') return <strong>{part.text}</strong>
+  if (part.kind === 'em') return <em>{part.text}</em>
+  if (part.kind === 'code') return <code className="font-mono text-[0.85em]">{part.text}</code>
+  return <span>{part.text}</span>
+}
 
 function errorText(error: unknown, fallback: string) {
   return friendlyChatError(error, fallback)
@@ -103,7 +129,6 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
   const [isReviewing, setIsReviewing] = useState(false)
   const [historyLimitReached, setHistoryLimitReached] = useState(false)
   const [historyError, setHistoryError] = useState<string | null>(null)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [initialLoadComplete, setInitialLoadComplete] = useState(false)
@@ -112,21 +137,24 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
     loadHistory()
   }, [])
 
-  // Scroll within container only, not the whole page
-  useEffect(() => {
-    if (messagesContainerRef.current && messages.length > 0) {
-      const container = messagesContainerRef.current
-      // Only animate scroll after initial load
-      if (initialLoadComplete) {
-        container.scrollTo({
-          top: container.scrollHeight,
-          behavior: 'smooth'
-        })
-      } else {
-        // Instant scroll on initial load (no animation)
-        container.scrollTop = container.scrollHeight
-      }
+  // Stay inside the chat scroller. The first history paint jumps to the newest message.
+  useLayoutEffect(() => {
+    const container = messagesContainerRef.current
+    if (!container || messages.length === 0) return
+    const pin = () => {
+      const node = messagesContainerRef.current
+      if (!node) return
+      node.scrollTop = chatScrollTop(node.scrollHeight, node.clientHeight)
     }
+    if (!initialLoadComplete) {
+      pin()
+      const frame = requestAnimationFrame(pin)
+      return () => cancelAnimationFrame(frame)
+    }
+    container.scrollTo({
+      top: chatScrollTop(container.scrollHeight, container.clientHeight),
+      behavior: chatScrollBehavior(true),
+    })
   }, [messages, initialLoadComplete])
 
   const loadHistory = async () => {
@@ -187,7 +215,9 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
     }
 
     setMessages((current) => mergeChatHistory(current, history))
-    setTimeout(() => setInitialLoadComplete(true), 100)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setInitialLoadComplete(true))
+    })
   }
 
   const sendMessage = async (e?: React.FormEvent) => {
@@ -293,7 +323,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       setMessages(prev => [...prev, {
         id: `success-${Date.now()}`,
         role: 'assistant',
-        content: proposalAppliedText(proposal, result),
+        content: appliedConfirmation(proposal) || proposalAppliedText(proposal, result),
         created_at: new Date().toISOString()
       }])
       setPendingProposal(null)
@@ -444,7 +474,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       )}
 
       {/* Messages */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && !historyError && (
           <motion.div 
             className="text-center py-8"
@@ -487,9 +517,14 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
                   : 'glass border border-white/5 text-watchman-text rounded-bl-lg'
               )}>
                 <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                  {message.proposal
-                    ? proposalCardText(message.proposal, message.content)
-                    : chatMessageText(message.content)}
+                  <ChatBubbleText
+                    role={message.role}
+                    content={message.role === 'user'
+                      ? message.content
+                      : message.proposal
+                        ? proposalCardText(message.proposal, message.content)
+                        : message.content}
+                  />
                 </p>
                 
                 {/* Proposal approval buttons */}
@@ -497,7 +532,11 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
                   <div className="mt-4 pt-3 border-t border-white/10">
                     {message.proposal.validation?.valid === false && message.proposal.validation?.violations?.[0]?.message && (
                       <div className="mb-3 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs">
-                        {chatMessageText(message.proposal.validation.violations[0].message) || 'That change is not allowed.'} Decline this change, or edit the request.
+                        <ChatBubbleText
+                          content={message.proposal.validation.violations[0].message}
+                          fallback="That change is not allowed."
+                        />
+                        {' '}Decline this change, or edit the request.
                       </div>
                     )}
                     {message.proposal.validation?.warnings?.length > 0 && (
@@ -508,7 +547,9 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
                       >
                         <div className="flex items-start gap-2 text-amber-400 text-xs">
                           <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                          <span>{chatMessageText(message.proposal.validation.warnings[0].message) || 'Review this warning before applying the change.'}</span>
+                          <span>
+                            <ChatBubbleText content={message.proposal.validation.warnings[0].message || 'Review this warning before applying the change.'} />
+                          </span>
                         </div>
                       </motion.div>
                     )}
@@ -579,7 +620,6 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
           </motion.div>
         )}
         
-        <div ref={messagesEndRef} />
       </div>
 
       {/* History Limit Notice for Free Users */}

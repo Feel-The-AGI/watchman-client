@@ -1,14 +1,20 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
+  appliedConfirmation,
   chatInputLocked,
   chatMessageText,
+  chatScrollBehavior,
+  chatScrollTop,
+  chatTextParts,
+  displayedChatParts,
   isInternalChatMessage,
   mergeChatHistory,
   messagesAfterSend,
   proposalAppliedText,
   proposalCardText,
   REVIEW_FAILURE_MESSAGE,
+  sanitizeChatDisplay,
 } from './chat-display.ts'
 
 describe('chat display', () => {
@@ -101,6 +107,71 @@ describe('chat display', () => {
       [earlier, { id: 'srv-other', role: 'user', content: 'book a dentist', created_at: '' }],
     )
     assert.equal(merged.filter((message) => message.id === 'temp-2').length, 1)
+  })
+
+  it('translates legacy tool text and keeps markdown as text parts', () => {
+    assert.equal(sanitizeChatDisplay('Executing add_commitment'), 'Adding a commitment.')
+    assert.equal(sanitizeChatDisplay('Executing add_leave'), 'Adding leave.')
+    const parts = chatTextParts('See **this** <script>alert(1)</script> and `code`')
+    assert.equal(parts.some((part) => part.kind === 'text' && part.text.includes('<script>alert(1)</script>')), true)
+    assert.deepEqual(parts.filter((part) => part.kind === 'bold'), [{ kind: 'bold', text: 'this' }])
+    assert.deepEqual(parts.filter((part) => part.kind === 'code'), [{ kind: 'code', text: 'code' }])
+    const lines = chatTextParts('First line\n*second*')
+    assert.equal(lines[0].kind, 'text')
+    assert.equal(lines[0].text.includes('\n'), true)
+    assert.equal(lines[1].kind, 'em')
+  })
+
+  it('confirms an applied commitment in the past tense from the payload date', () => {
+    const proposal = {
+      command: {
+        action: 'add_commitment',
+        explanation: "I'll add the haircut on Thursday.",
+        payload: {
+          name: 'Haircut',
+          type: 'personal',
+          start_date: '2026-11-05',
+          time_start: '16:00',
+          time_end: '17:00',
+        },
+      },
+    }
+    const line = appliedConfirmation(proposal)
+    assert.equal(line, 'Added: Haircut on Thu 5 Nov, 16:00-17:00.')
+    assert.equal(line?.includes("I'll"), false)
+    assert.equal(appliedConfirmation({ command: { explanation: "I'll add the haircut next week." } }), null)
+  })
+
+  it('names a multi-day leave by its start and end dates', () => {
+    assert.equal(appliedConfirmation({
+      command: {
+        action: 'add_leave',
+        payload: { name: 'Leave', start_date: '2026-12-20', end_date: '2026-12-27' },
+      },
+    }), 'Added: Leave, Sun 20 – Sun 27 Dec')
+  })
+
+  it('leaves a removed commitment on the older Done line', () => {
+    assert.equal(appliedConfirmation({
+      command: {
+        action: 'remove_commitment',
+        explanation: "I'll remove the dentist.",
+        payload: { name: 'Dentist', start_date: '2026-10-27' },
+      },
+    }), null)
+  })
+
+  it('renders a user message exactly as typed', () => {
+    const typed = 'Meeting with <John> at 2*3*4'
+    assert.deepEqual(displayedChatParts('user', typed), [{ kind: 'text', text: typed }])
+    assert.deepEqual(displayedChatParts('user', 'add_commitment'), [{ kind: 'text', text: 'add_commitment' }])
+  })
+
+  it('jumps to the newest message before later messages animate', () => {
+    assert.equal(chatScrollTop(900, 420), 480)
+    assert.equal(chatScrollTop(100, 420), 0)
+    assert.equal(chatScrollBehavior(false), 'auto')
+    assert.equal(chatScrollBehavior(true), 'smooth')
   })
 
   it('does not repeat a user message already stored when the proposal reply echoes it', () => {
