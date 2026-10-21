@@ -33,7 +33,7 @@ export default function PrivacyPolicyPage() {
             </div>
             <div>
               <h1 className="text-3xl font-bold">Privacy Policy</h1>
-              <p className="text-watchman-muted">Last updated: December 2025</p>
+              <p className="text-watchman-muted">Last updated: October 2026</p>
             </div>
           </div>
 
@@ -71,7 +71,7 @@ export default function PrivacyPolicyPage() {
                   <div>
                     <h3 className="font-medium text-white">Payment Information</h3>
                     <p className="text-watchman-text-secondary leading-relaxed">
-                      For Pro subscriptions, payment processing is handled by Stripe. We do not store your full credit card numbers. We only receive and store a customer identifier to manage your subscription.
+                      Pro payments are processed by Paystack. We do not store your full card number. We store a Paystack customer identifier and payment references so we can record the payment on your account.
                     </p>
                   </div>
                 </div>
@@ -96,7 +96,7 @@ export default function PrivacyPolicyPage() {
                   We do not sell your personal information. We may share your information only in the following circumstances:
                 </p>
                 <ul className="list-disc list-inside text-watchman-text-secondary space-y-2">
-                  <li><strong>Service Providers:</strong> With trusted third-party services that help us operate our platform (Supabase for database, Stripe for payments, Resend for emails)</li>
+                  <li><strong>Service Providers:</strong> With trusted third-party services that help us operate our platform (Supabase for database and authentication, Paystack for payments, Resend for emails)</li>
                   <li><strong>Calendar Sharing:</strong> If you choose to share your calendar via a share link, only the information you select will be visible to those with the link</li>
                   <li><strong>Legal Requirements:</strong> If required by law or to protect our rights and the safety of users</li>
                 </ul>

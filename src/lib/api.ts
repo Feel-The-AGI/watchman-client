@@ -203,6 +203,7 @@ class APIService {
       currency: string;
       display_price: string;
       display_ghs: string;
+      period_days?: number;
       note: string;
     }>('/api/payments/pricing'),
   }

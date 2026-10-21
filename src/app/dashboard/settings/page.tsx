@@ -35,7 +35,33 @@ import { Celebration } from '@/components/ui/Celebration';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
+import { checkoutReferenceFromReturn, clearCheckoutReference, rememberCheckoutReference } from '@/lib/checkout';
 import { cn } from '@/lib/utils';
+
+function formatAccessDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function subscriptionFromStatus(paid: {
+  tier?: string;
+  active?: boolean;
+  current_period_end?: string | null;
+  cancel_at_period_end?: boolean;
+}): Subscription {
+  const tier: Subscription['tier'] = paid.tier === 'admin'
+    ? 'admin'
+    : paid.tier === 'pro' || paid.active
+      ? 'pro'
+      : 'free';
+  return {
+    tier,
+    status: paid.cancel_at_period_end ? 'cancelled' : 'active',
+    current_period_end: paid.current_period_end || undefined,
+    cancel_at_period_end: Boolean(paid.cancel_at_period_end),
+  };
+}
 
 interface UserSettings {
   timezone: string;
@@ -76,7 +102,7 @@ interface Payment {
 }
 
 export default function SettingsPage() {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, refreshProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -106,9 +132,9 @@ export default function SettingsPage() {
   // Celebration state
   const [showCelebration, setShowCelebration] = useState(false);
 
-  // Cancel subscription modal
   const [cancelSubscriptionModal, setCancelSubscriptionModal] = useState(false);
   const [cancellingSubscription, setCancellingSubscription] = useState(false);
+  const [pricingUnavailable, setPricingUnavailable] = useState(false);
 
   // Confirmation modal states
   const [deleteAccountModal, setDeleteAccountModal] = useState(false);
@@ -130,11 +156,18 @@ export default function SettingsPage() {
     ghs_amount: number;
     exchange_rate: number;
     display_ghs: string;
+    period_days?: number;
   } | null>(null);
   const [loadingPricing, setLoadingPricing] = useState(false);
 
   useEffect(() => {
-    fetchSettings();
+    const reference = checkoutReferenceFromReturn();
+    if (!reference) {
+      fetchSettings();
+      return;
+    }
+    setActiveTab('subscription');
+    verifyCheckout(reference).finally(() => fetchSettings(false));
   }, []);
 
   useEffect(() => {
@@ -161,15 +194,16 @@ export default function SettingsPage() {
     }
   }, [subscription, user?.id]);
 
-  const fetchSettings = async () => {
+  const fetchSettings = async (clearStatus = true) => {
     try {
       setLoading(true);
-      setError(null);
+      if (clearStatus) setError(null);
       
       // Fetch both in parallel, handle failures gracefully
-      const [settingsRes, subRes] = await Promise.allSettled([
+      const [settingsRes, subRes, paidRes] = await Promise.allSettled([
         api.settings.get(),
         api.settings.getSubscription(),
+        api.payments.getSubscriptionStatus(),
       ]);
       
       // Handle settings response
@@ -183,8 +217,12 @@ export default function SettingsPage() {
         });
       }
       
-      // Handle subscription response
-      if (subRes.status === 'fulfilled' && subRes.value) {
+      const paid = paidRes.status === 'fulfilled' ? paidRes.value : null;
+      // Handle subscription response. The payments status endpoint reports the
+      // paid period, including access that continues after cancellation.
+      if (paid && Object.prototype.hasOwnProperty.call(paid, 'current_period_end')) {
+        setSubscription(subscriptionFromStatus(paid));
+      } else if (subRes.status === 'fulfilled' && subRes.value) {
         setSubscription({
           tier: subRes.value?.tier || profile?.tier || 'free',
           status: subRes.value?.subscription?.status || 'active',
@@ -227,7 +265,14 @@ export default function SettingsPage() {
     try {
       setSaving(true);
       setError(null);
-      await api.settings.update(settings);
+      await api.settings.update({
+        timezone: settings.timezone,
+        notifications_email: settings.notifications_email,
+        notifications_push: settings.notifications_push,
+        theme: settings.theme,
+        weighted_mode_enabled: settings.weighted_mode,
+        constraint_mode: settings.weighted_mode ? 'weighted' : 'binary',
+      });
       setSuccess('Settings saved successfully');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
@@ -237,34 +282,64 @@ export default function SettingsPage() {
     }
   };
 
+  const verifyCheckout = async (reference: string) => {
+    try {
+      setError(null);
+      const result = await api.payments.verifyTransaction(reference);
+      const paid = await api.payments.getSubscriptionStatus().catch(() => null);
+      if (paid && Object.prototype.hasOwnProperty.call(paid, 'current_period_end')) {
+        setSubscription(subscriptionFromStatus(paid));
+      }
+      await refreshProfile();
+      const until = result?.access_until || paid?.current_period_end;
+      if (result?.status === 'paid' && until) {
+        setSuccess(`Pro until ${formatAccessDate(until)}.`);
+      } else if (result?.status === 'paid') {
+        setSuccess('Pro access is active.');
+      } else {
+        setError('The payment is not confirmed yet. If you completed checkout, refresh in a moment.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Could not confirm the payment.');
+    } finally {
+      clearCheckoutReference();
+      const url = new URL(window.location.href);
+      url.searchParams.delete('reference');
+      url.searchParams.delete('trxref');
+      url.searchParams.delete('success');
+      const next = `${url.pathname}${url.search}`;
+      window.history.replaceState({}, '', next);
+    }
+  };
+
   const handleUpgrade = async () => {
-    // Show upgrade modal and fetch pricing
     setShowUpgradeModal(true);
     setLoadingPricing(true);
+    setPricingUnavailable(false);
+    setPricingInfo(null);
     try {
       const pricing = await api.payments.getPricing();
+      if (!pricing?.display_ghs || pricing.ghs_amount == null) {
+        setPricingUnavailable(true);
+        return;
+      }
       setPricingInfo(pricing);
     } catch (err) {
       console.error('Failed to fetch pricing:', err);
-      // Use fallback pricing
-      setPricingInfo({
-        usd_price: 12,
-        ghs_amount: 174,
-        exchange_rate: 14.5,
-        display_ghs: 'GHS 174.00',
-      });
+      setPricingUnavailable(true);
     } finally {
       setLoadingPricing(false);
     }
   };
 
   const handleProceedToCheckout = async () => {
+    if (pricingUnavailable || !pricingInfo) return;
     try {
       setUpgrading(true);
       setError(null);
       const result = await api.payments.createCheckout();
+      if (result.reference) rememberCheckoutReference(result.reference);
       if (result.checkout_url) {
-        // Redirect to Paystack checkout
         window.location.href = result.checkout_url;
       }
     } catch (err: any) {
@@ -273,28 +348,28 @@ export default function SettingsPage() {
     }
   };
 
-  const handleManageSubscription = async () => {
-    // Paystack doesn't have a billing portal like Stripe
-    // Users manage subscriptions via email or cancellation
-    setActiveTab('subscription');
-    setSuccess('Subscription management: You can cancel your subscription below, or check your email from Paystack for payment method updates.');
-    setTimeout(() => setSuccess(null), 5000);
-  };
-
-  const handleCancelSubscription = () => {
-    setCancelSubscriptionModal(true);
-  };
-
   const confirmCancelSubscription = async () => {
     try {
       setCancellingSubscription(true);
-      await api.payments.cancelSubscription();
-      setSubscription({ ...subscription!, tier: 'free' });
-      setSuccess('Your subscription has been cancelled. You will retain Pro access until the end of your billing period.');
+      setError(null);
+      const result = await api.payments.cancelSubscription();
+      const paid = await api.payments.getSubscriptionStatus().catch(() => null);
+      if (paid && Object.prototype.hasOwnProperty.call(paid, 'current_period_end')) {
+        setSubscription(subscriptionFromStatus(paid));
+      } else if (result?.tier) {
+        setSubscription({
+          tier: result.tier === 'admin' ? 'admin' : result.tier === 'free' ? 'free' : 'pro',
+          status: result.tier === 'free' ? 'cancelled' : 'active',
+          current_period_end: result.access_until,
+          cancel_at_period_end: result.tier !== 'free',
+        });
+      }
+      const until = paid?.current_period_end || result?.access_until;
+      setSuccess(result?.message || (until ? `Pro until ${formatAccessDate(until)}.` : 'Updated.'));
       setCancelSubscriptionModal(false);
-      setTimeout(() => setSuccess(null), 5000);
+      await refreshProfile();
     } catch (err: any) {
-      setError(err.message || 'Failed to cancel subscription');
+      setError(err.message || 'Failed to cancel');
     } finally {
       setCancellingSubscription(false);
     }
@@ -612,48 +687,36 @@ export default function SettingsPage() {
                         </div>
                       )}
 
-                      {subscription?.tier === 'pro' && subscription.current_period_end && (
-                        <div className="mt-4 p-4 bg-watchman-bg rounded-xl">
-                          <div className="flex items-center justify-between">
+                      {subscription?.tier === 'pro' && (
+                        <div className="mt-4 p-4 bg-watchman-accent/10 rounded-xl border border-watchman-accent/20 space-y-3">
+                          <div className="flex items-center justify-between gap-4">
                             <div>
-                              <p className="text-sm text-watchman-muted">
+                              <div className="flex items-center gap-2">
+                                <Crown className="w-5 h-5 text-watchman-accent" />
+                                <p className="font-medium text-watchman-accent">
+                                  {subscription.current_period_end
+                                    ? `Pro until ${formatAccessDate(subscription.current_period_end)}`
+                                    : 'Pro access active'}
+                                </p>
+                              </div>
+                              <p className="text-sm text-watchman-muted mt-1">
                                 {subscription.cancel_at_period_end
-                                  ? 'Your plan will end on'
-                                  : 'Next billing date'}
-                              </p>
-                              <p className="font-medium">
-                                {new Date(subscription.current_period_end).toLocaleDateString()}
+                                  ? 'Cancellation is saved. Pro lasts until the end of the paid period.'
+                                  : subscription.current_period_end
+                                    ? 'Another checkout adds 30 days. This period does not bill you again on its own.'
+                                    : 'This account has Pro access without a paid end date.'}
                               </p>
                             </div>
-                            <Button
-                              variant="secondary"
-                              onClick={handleCancelSubscription}
-                              className="gap-2 text-watchman-error hover:text-watchman-error hover:bg-watchman-error/10"
-                            >
-                              Cancel Subscription
-                            </Button>
+                            {subscription.current_period_end && !subscription.cancel_at_period_end && (
+                              <Button
+                                variant="secondary"
+                                onClick={() => setCancelSubscriptionModal(true)}
+                                className="gap-2 text-watchman-error hover:text-watchman-error hover:bg-watchman-error/10"
+                              >
+                                Cancel
+                              </Button>
+                            )}
                           </div>
-                        </div>
-                      )}
-
-                      {subscription?.tier === 'pro' && !subscription.current_period_end && (
-                        <div className="mt-4 space-y-4">
-                          <div className="p-4 bg-watchman-accent/10 rounded-xl border border-watchman-accent/20">
-                            <div className="flex items-center gap-2">
-                              <Crown className="w-5 h-5 text-watchman-accent" />
-                              <p className="font-medium text-watchman-accent">Pro Access Active</p>
-                            </div>
-                            <p className="text-sm text-watchman-muted mt-1">
-                              Your Pro subscription is active. Manage your payment through emails from Paystack.
-                            </p>
-                          </div>
-                          <Button
-                            variant="secondary"
-                            onClick={handleCancelSubscription}
-                            className="gap-2 text-watchman-error hover:text-watchman-error hover:bg-watchman-error/10"
-                          >
-                            Cancel Subscription
-                          </Button>
                         </div>
                       )}
                     </CardContent>
@@ -752,7 +815,7 @@ export default function SettingsPage() {
                             <Receipt className="w-12 h-12 mx-auto text-watchman-muted/30 mb-3" />
                             <p className="text-watchman-muted">No payment records yet</p>
                             <p className="text-sm text-watchman-muted/70 mt-1">
-                              Your payment history will appear here after your first billing cycle
+                              Your payment history will appear here after a payment
                             </p>
                           </div>
                         )}
@@ -1184,21 +1247,22 @@ export default function SettingsPage() {
         variant="warning"
       />
 
-      {/* Cancel Subscription Confirmation Modal */}
       <ConfirmModal
         isOpen={cancelSubscriptionModal}
         onClose={() => setCancelSubscriptionModal(false)}
         onConfirm={confirmCancelSubscription}
-        title="Cancel Subscription?"
+        title="Cancel Pro?"
         message={
           <div className="space-y-2">
-            <p>Are you sure you want to cancel your Pro subscription?</p>
-            <p className="text-xs text-watchman-muted">
-              You will retain access to Pro features until the end of your current billing period.
-            </p>
+            <p>Cancel stops another extension. Pro stays until the end of the period you already paid for.</p>
+            {subscription?.current_period_end && (
+              <p className="text-xs text-watchman-muted">
+                Pro until {formatAccessDate(subscription.current_period_end)}.
+              </p>
+            )}
           </div>
         }
-        confirmText="Cancel Subscription"
+        confirmText="Cancel Pro"
         variant="warning"
         loading={cancellingSubscription}
       />
@@ -1227,13 +1291,31 @@ export default function SettingsPage() {
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-watchman-accent" />
               </div>
+            ) : pricingUnavailable || !pricingInfo ? (
+              <div className="text-center py-4">
+                <p className="font-medium">Pricing unavailable. Try again.</p>
+                <p className="text-sm text-watchman-muted mt-2">
+                  The exchange rate could not be loaded, so checkout stays closed. No estimated price is shown.
+                </p>
+                <div className="mt-6 flex gap-3">
+                  <Button variant="glass" className="flex-1" onClick={() => setShowUpgradeModal(false)}>
+                    Close
+                  </Button>
+                  <Button variant="gradient" className="flex-1" onClick={handleUpgrade}>
+                    Try again
+                  </Button>
+                </div>
+              </div>
             ) : (
               <>
                 <div className="bg-watchman-bg rounded-xl p-4 mb-6">
                   <div className="flex items-baseline justify-center gap-2">
-                    <span className="text-4xl font-bold">${pricingInfo?.usd_price || 12}</span>
-                    <span className="text-watchman-muted">/month</span>
+                    <span className="text-4xl font-bold">${pricingInfo.usd_price}</span>
+                    <span className="text-watchman-muted">for {pricingInfo.period_days || 30} days</span>
                   </div>
+                  <p className="text-center text-xs text-watchman-muted mt-2">
+                    Charged in cedis, about {pricingInfo.display_ghs}.
+                  </p>
                 </div>
 
                 <div className="space-y-2 mb-6">
@@ -1275,14 +1357,14 @@ export default function SettingsPage() {
                     ) : (
                       <>
                         <CreditCard className="w-4 h-4" />
-                        Subscribe Now
+                        Pay with Paystack
                       </>
                     )}
                   </Button>
                 </div>
 
                 <p className="text-center text-xs text-watchman-muted mt-4">
-                  Secure payment via Paystack. Cancel anytime.
+                  Paystack checkout for {pricingInfo.period_days || 30} days. It does not bill you again on its own.
                 </p>
               </>
             )}

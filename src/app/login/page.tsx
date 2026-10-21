@@ -134,7 +134,7 @@ export default function LoginPage() {
 
   const features = [
     { icon: Clock, text: 'Deterministic scheduling' },
-    { icon: Shield, text: 'Approval-gated mutations' },
+    { icon: Shield, text: 'Chat changes wait for approval' },
     { icon: Zap, text: 'Complete statistics' },
     { icon: Sparkles, text: 'Undo / Redo anytime' },
   ];
@@ -184,7 +184,7 @@ export default function LoginPage() {
             className="text-watchman-muted leading-relaxed mb-10 text-lg"
           >
             Define your rotation. Set your constraints. 
-            Generate a year of clarity. Every change approved by you.
+            Generate a year of clarity. Review chat changes before they land on your calendar.
           </motion.p>
           
           <div className="space-y-4">

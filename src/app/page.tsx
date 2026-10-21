@@ -42,20 +42,20 @@ const features = [
     gradient: 'from-cyan-500 to-emerald-500',
   },
   {
-    title: 'Rules That Never Break',
-    description: 'No study on night shifts. Max 2 commitments per day. Set them once. Trust them forever.',
+    title: 'Rules You Can Set',
+    description: 'No study on night shifts. A cap on commitments. A chat change that breaks a hard rule is shown to you before it can be applied.',
     icon: Shield,
     gradient: 'from-rose-500 to-orange-500',
   },
   {
-    title: 'Nothing Moves Silently',
-    description: 'Every change is proposed. Every change is explained. You approve, or it doesn\'t happen.',
+    title: 'Chat Changes Wait',
+    description: 'When chat wants to edit your calendar, it proposes the change. You apply it or decline it. Edits you make in settings apply directly.',
     icon: Eye,
     gradient: 'from-violet-500 to-purple-500',
   },
   {
-    title: 'See The Whole Truth',
-    description: '365 days at once. Patterns visible. Fatigue predictable. No more calendar amnesia.',
+    title: 'See The Pattern',
+    description: 'Your rotation laid out across the calendar, so day shifts, night shifts, and days off are visible together.',
     icon: Layers,
     gradient: 'from-amber-500 to-yellow-500',
   },
@@ -66,7 +66,7 @@ const steps = [
   { num: '01', title: 'Define Your Cycle', desc: 'Tell us your rotation. It becomes the foundation of your calendar.', icon: Clock },
   { num: '02', title: 'Set Your Boundaries', desc: 'Rules that never bend. Constraints that protect you.', icon: Shield },
   { num: '03', title: 'Propose Changes', desc: 'Need leave? New commitment? Just ask.', icon: MessageSquare },
-  { num: '04', title: 'Approve & Move', desc: 'You decide. Nothing updates without your say.', icon: CheckCircle },
+  { num: '04', title: 'Review Chat Changes', desc: 'Apply or decline a proposal before it updates the calendar.', icon: CheckCircle },
 ];
 
 // Industries
@@ -1102,7 +1102,7 @@ export default function LandingPage() {
               >
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                  <span className="text-xs font-medium text-cyan-400">Live Preview</span>
+                  <span className="text-xs font-medium text-cyan-400">Demo</span>
                 </div>
               </motion.div>
 

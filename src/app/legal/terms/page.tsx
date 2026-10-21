@@ -33,7 +33,7 @@ export default function TermsOfServicePage() {
             </div>
             <div>
               <h1 className="text-3xl font-bold">Terms of Service</h1>
-              <p className="text-watchman-muted">Last updated: December 2025</p>
+              <p className="text-watchman-muted">Last updated: October 2026</p>
             </div>
           </div>
 
@@ -81,19 +81,19 @@ export default function TermsOfServicePage() {
                   <div>
                     <h3 className="font-medium text-white">Pro Plan</h3>
                     <p>
-                      The Pro plan is billed monthly and provides access to additional features including calendar sharing, PDF exports, weighted constraints, and priority support.
+                      Pro is $12 for 30 days, processed by Paystack and charged in Ghanaian cedis at the exchange rate shown at checkout. It unlocks calendar sharing, CSV and PDF exports, weighted constraints, leave planning, and unlimited Watchman messages. Checkout does not start an automatic card subscription. Another checkout adds another 30 days.
                     </p>
                   </div>
                   <div>
                     <h3 className="font-medium text-white">Payment</h3>
                     <p>
-                      All payments are processed securely through Stripe. By subscribing to Pro, you authorize us to charge your payment method on a recurring basis until you cancel.
+                      Payments are processed by Paystack. We do not store your full card number. A verified payment turns on Pro until the end of that 30-day period. We do not charge the same payment method again unless you start another checkout.
                     </p>
                   </div>
                   <div>
                     <h3 className="font-medium text-white">Cancellation</h3>
                     <p>
-                      You may cancel your Pro subscription at any time through your account settings. Upon cancellation, you will retain access to Pro features until the end of your current billing period.
+                      You can cancel from account settings. Cancellation does not end Pro early. Access lasts until the end of the period you already paid for, and the settings page shows that date.
                     </p>
                   </div>
                 </div>
@@ -103,15 +103,7 @@ export default function TermsOfServicePage() {
                 <h2 className="text-xl font-semibold text-amber-400 mb-4">5. Refund Policy</h2>
                 <div className="space-y-4 text-watchman-text-secondary">
                   <p>
-                    We offer refunds for Pro subscriptions under the following conditions:
-                  </p>
-                  <ul className="list-disc list-inside space-y-2">
-                    <li><strong>Eligibility:</strong> Refund requests must be made within <span className="text-amber-400 font-semibold">7 days</span> of the initial subscription purchase or renewal.</li>
-                    <li><strong>Process:</strong> To request a refund, contact us at support@trywatchman.app with your account email and reason for the refund.</li>
-                    <li><strong>Exclusions:</strong> Refunds are not available for subscriptions older than 7 days, or if the account has been terminated for Terms of Service violations.</li>
-                  </ul>
-                  <p className="mt-4">
-                    Approved refunds will be processed within 5-10 business days and returned to your original payment method.
+                    Refunds are not issued automatically in the app. Email support@trywatchman.app from your account address if you want to ask about a payment, and we will tell you whether that payment can be refunded.
                   </p>
                 </div>
               </section>
