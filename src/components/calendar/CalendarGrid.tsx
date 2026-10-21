@@ -17,6 +17,7 @@ import {
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, Sun, Moon, Coffee, Plane, Sparkles, Lock, Crown, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { cycleDayBadge } from '@/lib/cycle-day-badge';
 
 export interface DailyLog {
   id: string;
@@ -301,6 +302,9 @@ export function CalendarGrid({
             const hasCommitments = calendarDay?.commitments && calendarDay.commitments.length > 0;
             const isLeave = calendarDay?.is_leave;
             const isPreview = calendarDay?.is_preview;
+            const dayBadge = inCurrentMonth
+              ? cycleDayBadge(calendarDay?.work_type, calendarDay?.cycle_day)
+              : null;
 
             return (
               <motion.button
@@ -336,14 +340,9 @@ export function CalendarGrid({
                     >
                       {format(day, 'd')}
                     </span>
-                    {calendarDay?.cycle_day && calendarDay?.work_type && inCurrentMonth && (
+                    {dayBadge && (
                       <span className="hidden sm:inline text-[9px] font-medium text-watchman-muted/70 bg-white/5 px-1.5 py-0.5 rounded">
-                        {calendarDay.work_type === 'off'
-                          ? 'OFF'
-                          : calendarDay.work_type === 'work_night'
-                            ? `N${((calendarDay.cycle_day - 1) % 5) + 1}`
-                            : `D${((calendarDay.cycle_day - 1) % 5) + 1}`
-                        }
+                        {dayBadge}
                       </span>
                     )}
                   </div>
