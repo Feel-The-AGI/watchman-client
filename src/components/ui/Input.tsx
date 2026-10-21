@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import { InputHTMLAttributes, forwardRef } from 'react'
+import { InputHTMLAttributes, ReactNode, forwardRef } from 'react'
 import { Tooltip } from './Tooltip'
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -7,10 +7,11 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string
   helper?: string
   tooltip?: string
+  endAdornment?: ReactNode
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, helper, tooltip, id, ...props }, ref) => {
+  ({ className, label, error, helper, tooltip, id, endAdornment, ...props }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s/g, '-')
     
     return (
@@ -26,16 +27,24 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             {tooltip && <Tooltip content={tooltip} />}
           </div>
         )}
-        <input
-          ref={ref}
-          id={inputId}
-          className={cn(
-            'w-full px-3 py-2 bg-watchman-bg border border-watchman-border rounded-lg text-watchman-text placeholder:text-watchman-muted focus:outline-none focus:ring-2 focus:ring-watchman-accent focus:border-transparent transition-all disabled:opacity-60 disabled:cursor-not-allowed',
-            error && 'border-watchman-error focus:ring-watchman-error',
-            className
+        <div className="relative">
+          <input
+            ref={ref}
+            id={inputId}
+            className={cn(
+              'w-full px-3 py-2 bg-watchman-bg border border-watchman-border rounded-lg text-watchman-text placeholder:text-watchman-muted focus:outline-none focus:ring-2 focus:ring-watchman-accent focus:border-transparent transition-all disabled:opacity-60 disabled:cursor-not-allowed',
+              endAdornment && 'pr-16',
+              error && 'border-watchman-error focus:ring-watchman-error',
+              className
+            )}
+            {...props}
+          />
+          {endAdornment && (
+            <div className="absolute inset-y-0 right-2 flex items-center">
+              {endAdornment}
+            </div>
           )}
-          {...props}
-        />
+        </div>
         {error && (
           <p className="text-sm text-watchman-error">{error}</p>
         )}

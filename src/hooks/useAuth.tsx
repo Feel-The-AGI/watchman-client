@@ -34,6 +34,7 @@ interface AuthContextType {
   signOut: () => Promise<void>
   signInWithGoogle: () => Promise<{ error: Error | null }>
   signInWithMagicLink: (email: string) => Promise<{ error: Error | null }>
+  resendSignupConfirmation: (email: string) => Promise<{ error: Error | null }>
   refreshProfile: () => Promise<void>
 }
 
@@ -181,6 +182,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error }
   }
 
+  const resendSignupConfirmation = async (email: string) => {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: `${siteUrl}/auth/callback`,
+      },
+    })
+    return { error }
+  }
+
   const signInWithMagicLink = async (email: string) => {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
     const { error } = await supabase.auth.signInWithOtp({
@@ -204,6 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
         signInWithGoogle,
         signInWithMagicLink,
+        resendSignupConfirmation,
         refreshProfile,
       }}
     >

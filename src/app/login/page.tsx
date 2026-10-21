@@ -8,11 +8,12 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Logo } from '@/components/ui/Logo';
 import { useAuth } from '@/hooks/useAuth';
+import { passwordRules, resendCooldownRemaining } from '@/lib/signup-flow';
 
 type AuthMode = 'signin' | 'signup' | 'magic';
 
 export default function LoginPage() {
-  const { signIn, signUp, signInWithGoogle, signInWithMagicLink, loading } = useAuth();
+  const { signIn, signUp, signInWithGoogle, signInWithMagicLink, resendSignupConfirmation, loading } = useAuth();
   
   const [mode, setMode] = useState<AuthMode>('signin');
   const [email, setEmail] = useState('');
@@ -22,6 +23,11 @@ export default function LoginPage() {
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [resendStartedAt, setResendStartedAt] = useState<number | null>(null);
+  const [resendNow, setResendNow] = useState(() => Date.now());
+  const [resendError, setResendError] = useState('');
+  const [resending, setResending] = useState(false);
   const submittingRef = useRef(false);
 
   useEffect(() => {
@@ -75,6 +81,7 @@ export default function LoginPage() {
       if (error) throw error;
       if (needsEmailConfirmation) {
         setEmailConfirmationSent(true);
+        setResendStartedAt(Date.now());
         endSubmit();
       }
       // A real session is redirected by AuthProvider. Keep the form locked until then.
@@ -93,6 +100,27 @@ export default function LoginPage() {
       setError(err.message || 'Google sign in failed');
       endSubmit();
     }
+  };
+
+  useEffect(() => {
+    if (!emailConfirmationSent) return;
+    const timer = window.setInterval(() => setResendNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [emailConfirmationSent]);
+
+  const resendRemaining = resendCooldownRemaining(resendStartedAt, resendNow);
+
+  const handleResendConfirmation = async () => {
+    if (resendRemaining > 0 || resending || !email) return;
+    setResending(true);
+    setResendError('');
+    const { error: resendFailure } = await resendSignupConfirmation(email);
+    setResending(false);
+    if (resendFailure) {
+      setResendError(resendFailure.message || 'The confirmation email could not be sent. Try again in a moment.');
+      return;
+    }
+    setResendStartedAt(Date.now());
   };
 
   if (magicLinkSent || emailConfirmationSent) {
@@ -123,6 +151,26 @@ export default function LoginPage() {
             <span className="text-white font-medium">{email}</span>.
             {' '}{emailConfirmationSent ? 'Confirm your email to finish creating your account.' : 'Open the link to sign in.'}
           </p>
+          <p className="text-sm text-watchman-muted mb-6">
+            Check spam and promotions if it is not in your inbox.
+          </p>
+          {emailConfirmationSent && (
+            <div className="mb-4">
+              <Button
+                variant="gradient"
+                onClick={handleResendConfirmation}
+                disabled={resendRemaining > 0 || resending}
+                className="w-full"
+              >
+                {resendRemaining > 0
+                  ? `Resend confirmation email in ${resendRemaining}s`
+                  : resending
+                    ? 'Sending…'
+                    : 'Resend confirmation email'}
+              </Button>
+              {resendError && <p className="text-sm text-red-400 mt-3">{resendError}</p>}
+            </div>
+          )}
           <Button 
             variant="glass" 
             onClick={() => { setMagicLinkSent(false); setEmailConfirmationSent(false); }}
@@ -299,14 +347,34 @@ export default function LoginPage() {
                   >
                     <Input
                       label="Password"
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
                       required
                       minLength={8}
                       disabled={formLocked}
+                      endAdornment={(
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((current) => !current)}
+                          className="text-xs font-medium text-watchman-muted hover:text-white px-1"
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showPassword ? 'Hide' : 'Show'}
+                        </button>
+                      )}
                     />
+                    <ul className="mt-2 space-y-1" aria-live="polite">
+                      {passwordRules(password).map((rule) => (
+                        <li
+                          key={rule.id}
+                          className={rule.met ? 'text-xs text-emerald-400' : 'text-xs text-watchman-muted'}
+                        >
+                          {rule.met ? 'Met' : 'Needed'}: {rule.label}
+                        </li>
+                      ))}
+                    </ul>
                   </motion.div>
                 )}
               </AnimatePresence>

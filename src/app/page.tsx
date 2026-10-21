@@ -32,6 +32,7 @@ import { AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { authNavChoice } from '@/lib/signup-flow';
 
 // Features with emotional copy
 const features = [
@@ -860,7 +861,7 @@ export default function LandingPage() {
   const heroY = useTransform(scrollYProgress, [0, 0.3], [0, -100]);
   const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
 
-  const isLoggedIn = !!user && !loading;
+  const navChoice = authNavChoice(loading, user);
 
   // Handle day click from calendar
   const handleDayClick = (date: Date, workType: 'day_shift' | 'night_shift' | 'off') => {
@@ -961,7 +962,9 @@ export default function LandingPage() {
                 <Link href="/pricing" className="text-white/60 hover:text-white transition-colors hidden sm:block text-sm">
                   Pricing
                 </Link>
-                {isLoggedIn ? (
+                {navChoice === 'pending' ? (
+                  <span className="inline-block h-9 w-24 rounded-xl bg-white/5" aria-hidden="true" />
+                ) : navChoice === 'in' ? (
                   <div className="flex items-center gap-3">
                     <Link href="/dashboard">
                       <Button variant="primary" size="sm" className="bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 border-0">
