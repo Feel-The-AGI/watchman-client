@@ -47,8 +47,8 @@ interface MasterSettings {
   constraints: {
     id: string;
     name: string;
-    type: 'binary' | 'weighted';
-    rule: string;
+    type?: string;
+    rule: string | { type?: string; value?: string | number; activity?: string; work_types?: string[] };
     weight?: number;
     is_active: boolean;
   }[];
@@ -65,6 +65,22 @@ interface MasterSettings {
     start_date: string;
     end_date: string;
   }[];
+}
+
+function ruleLabel(rule: MasterSettings['constraints'][number]['rule']): string {
+  if (typeof rule === 'string') return rule;
+  if (!rule || typeof rule !== 'object') return '';
+  if (rule.type === 'no_study_on' && rule.value != null && rule.value !== '') {
+    return `no study on ${rule.value}`;
+  }
+  if (rule.type === 'no_activity_on') {
+    const types = Array.isArray(rule.work_types) ? rule.work_types.join(', ') : '';
+    return `no ${rule.activity || 'activity'}${types ? ` on ${types}` : ''}`;
+  }
+  if (rule.type) {
+    return rule.value != null && rule.value !== '' ? `${rule.type}: ${rule.value}` : rule.type;
+  }
+  return 'Custom rule';
 }
 
 const defaultSettings: MasterSettings = {
@@ -179,16 +195,45 @@ export default function MasterSettingsPage() {
     }
   };
 
+  const saveRotation = async (cycle: MasterSettings['cycle']) => {
+    if (!cycle.anchor_date) {
+      setError('Set an anchor date before updating the rotation.');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const active = await api.cycles.getActive();
+      const body = {
+        pattern: cycle.pattern.map((block) => ({
+          label: block.label,
+          duration: Number(block.duration) || 0,
+        })),
+        anchor_date: cycle.anchor_date,
+        anchor_cycle_day: Number(cycle.anchor_cycle_day) || 1,
+      };
+      if (active?.id) {
+        await api.cycles.update(active.id, body);
+      } else {
+        await api.cycles.create({ name: 'My Rotation', ...body });
+      }
+      await fetchSettings();
+      setSuccess('Rotation saved');
+      setTimeout(() => setSuccess(null), 3000);
+      setEditingSection(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to save rotation');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSaveCycle = () => {
-    const newSettings = {
-      ...settings,
-      cycle: {
-        pattern: editPattern,
-        anchor_date: editAnchorDate || null,
-        anchor_cycle_day: editAnchorDay,
-      },
-    };
-    saveSettings(newSettings);
+    saveRotation({
+      pattern: editPattern,
+      anchor_date: editAnchorDate || null,
+      anchor_cycle_day: editAnchorDay,
+    });
   };
 
   const handleSaveWorkHours = () => {
@@ -233,17 +278,8 @@ export default function MasterSettingsPage() {
   };
 
   const confirmRegenerateCalendar = async () => {
-    try {
-      setSaving(true);
-      setRegenerateModal(false);
-      await api.calendar.regenerate(new Date().getFullYear());
-      setSuccess('Calendar regenerated successfully');
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to regenerate calendar');
-    } finally {
-      setSaving(false);
-    }
+    setRegenerateModal(false);
+    await saveRotation(settings.cycle);
   };
 
   const totalCycleDays = settings.cycle.pattern.reduce((sum, b) => sum + b.duration, 0);
@@ -623,7 +659,7 @@ export default function MasterSettingsPage() {
                 >
                   <div>
                     <p className="font-medium group-hover:text-watchman-accent transition-colors">{c.name}</p>
-                    <p className="text-xs text-watchman-muted font-mono">{c.rule}</p>
+                    <p className="text-xs text-watchman-muted font-mono">{ruleLabel(c.rule)}</p>
                   </div>
                   <span className={cn(
                     'px-3 py-1 rounded-lg text-xs font-medium',
@@ -631,7 +667,7 @@ export default function MasterSettingsPage() {
                       ? 'bg-red-500/20 text-red-400' 
                       : 'bg-emerald-500/20 text-emerald-400'
                   )}>
-                    {c.type}
+                    {c.type || 'Rule'}
                   </span>
                 </motion.div>
               ))}

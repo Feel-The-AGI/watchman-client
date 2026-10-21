@@ -27,6 +27,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Logo } from '@/components/ui/Logo';
 import { api } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 
 interface CycleBlock {
@@ -78,8 +79,7 @@ const PRESET_CYCLES = [
   },
 ];
 
-// No local parsing - let the LLM understand natural language directly
-// The backend Gemini integration handles all natural language understanding
+// Natural language is sent to the chat API. The server saves calendar changes as proposals.
 
 const PRESET_CONSTRAINTS = [
   { name: 'No study on night shifts', rule: 'no_study_on:work_night', icon: Moon },
@@ -88,8 +88,17 @@ const PRESET_CONSTRAINTS = [
   { name: 'No study on work days', rule: 'no_study_on:work_day', icon: Sun },
 ];
 
+// POST /api/settings/constraints requires rule to be an object, matching ConstraintRequest.
+function constraintRule(encoded: string): { type: string; value: string | number } {
+  const splitAt = encoded.indexOf(':');
+  const type = splitAt === -1 ? encoded : encoded.slice(0, splitAt);
+  const raw = splitAt === -1 ? '' : encoded.slice(splitAt + 1);
+  return { type, value: /^-?\d+$/.test(raw) ? Number(raw) : raw };
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
+  const { refreshProfile } = useAuth();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -180,32 +189,39 @@ export default function OnboardingPage() {
       setLoading(true);
       setError(null);
 
-      // Create cycle
-      await api.cycles.create({
-        name: cycleName,
-        pattern,
-        anchor_date: anchorDate,
-        anchor_cycle_day: anchorCycleDay,
-        total_days: totalDays,
-        is_active: true,
-      });
-
-      // Create constraints
+      // Rules first. Cycle creation is the one calendar write, and it reads
+      // constraints that already exist. Night-shift rules use { type, value }.
       for (const rule of selectedConstraints) {
         const preset = PRESET_CONSTRAINTS.find(p => p.rule === rule);
         if (preset) {
           await api.settings.createConstraint({
             name: preset.name,
-            rule: preset.rule,
-            type: 'binary',
+            rule: constraintRule(preset.rule),
             is_active: true,
           });
         }
       }
 
-      // Generate calendar
-      const currentYear = new Date().getFullYear();
-      await api.calendar.regenerate(currentYear);
+      await api.auth.completeOnboarding();
+
+      const saved = await api.settings.getConstraints().catch(() => []);
+      const master = await api.masterSettings.get().catch(() => null);
+      const documentRules = Array.isArray(master?.settings?.constraints) ? master.settings.constraints : [];
+      const known = new Set(documentRules.map((item: { id?: string }) => item?.id).filter(Boolean));
+      const missing = (Array.isArray(saved) ? saved : []).filter(
+        (row: { id?: string }) => row?.id && !known.has(row.id)
+      );
+      if (missing.length > 0) {
+        await api.masterSettings.updateSection('constraints', [...documentRules, ...missing]);
+      }
+
+      await api.cycles.create({
+        name: cycleName,
+        pattern,
+        anchor_date: anchorDate,
+        anchor_cycle_day: anchorCycleDay,
+      });
+      await refreshProfile();
 
       setTimeout(() => {
         addMessage('assistant', "All done! Your calendar is ready. Welcome to Watchman! 🎉");
@@ -288,7 +304,7 @@ export default function OnboardingPage() {
       return;
     }
 
-    // For other steps, send to Gemini via backend
+    // Later steps stay in the same chat. The server does not apply changes from here.
     try {
       setLoading(true);
       const response = await api.chat.sendMessage(userMessage);
