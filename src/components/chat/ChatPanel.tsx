@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, Loader2, Bot, User, Undo2, Redo2, CheckCircle, XCircle, AlertTriangle, Sparkles, Command } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import api from '@/lib/api'
+import api, { APIError } from '@/lib/api'
 
 interface Message {
   id: string
@@ -29,6 +29,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
   const [isLoading, setIsLoading] = useState(false)
   const [pendingProposal, setPendingProposal] = useState<any>(null)
   const [historyLimitReached, setHistoryLimitReached] = useState(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -68,10 +69,12 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
           setHistoryLimitReached(true)
         }
       }
+      setHistoryError(null)
       // Mark initial load as complete after a small delay to ensure scroll happens first
       setTimeout(() => setInitialLoadComplete(true), 100)
     } catch (error) {
       console.error('Failed to load chat history:', error)
+      setHistoryError(error instanceof APIError ? error.message : 'Chat history is unavailable right now.')
       setInitialLoadComplete(true)
     }
   }
@@ -127,7 +130,9 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       setMessages(prev => [...prev, {
         id: `error-${Date.now()}`,
         role: 'assistant',
-        content: 'Sorry, I had trouble processing that. Please try again.',
+        content: error instanceof APIError
+          ? error.message
+          : 'Sorry, I had trouble processing that. Please try again.',
         created_at: new Date().toISOString()
       }])
     } finally {
@@ -270,9 +275,15 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
         </div>
       </div>
 
+      {historyError && (
+        <div className="mx-4 mt-3 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-300">
+          {historyError}
+        </div>
+      )}
+
       {/* Messages */}
       <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth">
-        {messages.length === 0 && (
+        {messages.length === 0 && !historyError && (
           <motion.div 
             className="text-center py-8"
             initial={{ opacity: 0, y: 10 }}

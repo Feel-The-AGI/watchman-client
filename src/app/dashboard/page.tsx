@@ -148,6 +148,21 @@ export default function DashboardPage() {
     ? calendarDays.find(d => d.date === format(selectedDate, 'yyyy-MM-dd')) || null
     : null;
 
+  if (!loading && error && !hasSetup) {
+    return (
+      <div className="max-w-xl mx-auto py-16 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-6">
+          <AlertCircle className="w-8 h-8 text-red-400" />
+        </div>
+        <h1 className="text-2xl font-bold mb-3">Watchman is unavailable</h1>
+        <p className="text-watchman-text-secondary mb-8">{error}</p>
+        <Button variant="primary" onClick={() => fetchCalendarData()}>
+          Try again
+        </Button>
+      </div>
+    );
+  }
+
   // No setup state - Premium empty state
   if (!loading && !hasSetup) {
     return (

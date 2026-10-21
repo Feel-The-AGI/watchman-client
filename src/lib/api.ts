@@ -3,29 +3,50 @@
  * Centralized API communication layer
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://watchman-api-dnm0.onrender.com'
+export const BACKEND_NOT_CONFIGURED_MESSAGE =
+  'Watchman is not connected to a server. Set NEXT_PUBLIC_API_URL and reload.'
 
-class APIError extends Error {
-  constructor(public status: number, message: string) {
+export const BACKEND_UNAVAILABLE_MESSAGE =
+  'Watchman can’t reach its server right now. Nothing was changed. Try again once the connection is back.'
+
+export function getApiBaseUrl(): string | null {
+  const configured = process.env.NEXT_PUBLIC_API_URL?.trim()
+  if (!configured) return null
+  return configured.replace(/\/$/, '')
+}
+
+function messageFromPayload(payload: unknown, fallback: string): string {
+  if (typeof payload === 'string' && payload.trim()) return payload
+  if (payload && typeof payload === 'object') {
+    const record = payload as { message?: unknown; error?: unknown; detail?: unknown }
+    if (typeof record.message === 'string' && record.message.trim()) return record.message
+    if (typeof record.detail === 'string' && record.detail.trim()) return record.detail
+    if (record.detail) return messageFromPayload(record.detail, fallback)
+  }
+  return fallback
+}
+
+export class APIError extends Error {
+  constructor(public status: number, message: string, public detail?: unknown) {
     super(message)
     this.name = 'APIError'
   }
 }
 
 class APIService {
-  private baseUrl: string
   private token: string | null = null
-
-  constructor() {
-    this.baseUrl = API_URL
-  }
 
   setToken(token: string | null) {
     this.token = token
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`
+    const baseUrl = getApiBaseUrl()
+    if (!baseUrl) {
+      throw new APIError(0, BACKEND_NOT_CONFIGURED_MESSAGE)
+    }
+
+    const url = `${baseUrl}${endpoint}`
     
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
@@ -36,14 +57,24 @@ class APIService {
       (headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`
     }
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    })
+    let response: Response
+    try {
+      response = await fetch(url, {
+        ...options,
+        headers,
+      })
+    } catch {
+      throw new APIError(0, BACKEND_UNAVAILABLE_MESSAGE)
+    }
 
     if (!response.ok) {
       const data = await response.json().catch(() => ({}))
-      throw new APIError(response.status, data.detail || data.message || 'An error occurred')
+      const detail = data?.detail ?? data?.message
+      throw new APIError(
+        response.status,
+        messageFromPayload(detail, 'Something went wrong while talking to Watchman.'),
+        detail,
+      )
     }
 
     // Handle blob responses for exports
