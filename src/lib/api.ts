@@ -5,11 +5,21 @@
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://watchman-api-dnm0.onrender.com'
 
-class APIError extends Error {
-  constructor(public status: number, message: string) {
+export class APIError extends Error {
+  constructor(public status: number, message: string, public detail?: unknown) {
     super(message)
     this.name = 'APIError'
   }
+}
+
+function messageFromPayload(payload: unknown, fallback: string): string {
+  if (typeof payload === 'string' && payload.trim()) return payload
+  if (payload && typeof payload === 'object') {
+    const record = payload as { message?: unknown; detail?: unknown }
+    if (typeof record.message === 'string' && record.message.trim()) return record.message
+    if (record.detail) return messageFromPayload(record.detail, fallback)
+  }
+  return fallback
 }
 
 class APIService {
@@ -43,7 +53,12 @@ class APIService {
 
     if (!response.ok) {
       const data = await response.json().catch(() => ({}))
-      throw new APIError(response.status, data.detail || data.message || 'An error occurred')
+      const detail = data?.detail ?? data?.message
+      throw new APIError(
+        response.status,
+        messageFromPayload(detail, 'An error occurred'),
+        detail,
+      )
     }
 
     // Handle blob responses for exports
