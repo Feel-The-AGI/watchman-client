@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Check, ArrowRight, Zap, Crown, X, Sparkles, Shield, Clock, Loader2 } from 'lucide-react';
@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { authNavChoice } from '@/lib/signup-flow';
 import { api } from '@/lib/api';
 import { cedisChargeLine, OPENING_CHECKOUT_LABEL, plainCheckoutError, type PricingAmounts } from '@/lib/billing';
+import { pricingRowMotion } from '@/lib/pricing-display';
 import { rememberCheckoutReference } from '@/lib/checkout';
 
 const tiers = [
@@ -30,11 +31,10 @@ const tiers = [
       'Binary constraints only',
       '100 Watchman messages/month',
       'Basic dashboard stats',
-      '3-day Pro trial included',
+      'Leave planning',
     ],
     limitations: [
       'No weighted constraints',
-      'No leave planning',
       'No CSV/PDF exports',
       'No calendar sharing',
     ],
@@ -74,10 +74,6 @@ const faqs = [
     answer: 'Watchman is your AI scheduling assistant. Chat naturally to add commitments, plan study sessions, or modify your calendar. Free users get 100 messages/month, Pro users get unlimited access.',
   },
   {
-    question: 'What is the 3-day Pro trial?',
-    answer: 'Every new user gets 3 days of full Pro features (except exports) to experience weighted constraints, unlimited Watchman Agent, and leave planning. No credit card required.',
-  },
-  {
     question: 'Does Pro renew automatically?',
     answer: 'Checkout does not start an automatic card subscription. $12 through Paystack covers 30 days. Another checkout adds 30 more days. If you cancel, Pro stays until the end of the days you already paid for.',
   },
@@ -93,6 +89,7 @@ const faqs = [
 
 export default function PricingPage() {
   const { user, profile, loading: authLoading } = useAuth();
+  const reduceMotion = useReducedMotion();
   const router = useRouter();
   const [upgrading, setUpgrading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -211,7 +208,7 @@ export default function PricingPage() {
               Simple, <span className="text-gradient">Honest</span> Pricing
             </h1>
             <p className="text-xl text-watchman-muted max-w-2xl mx-auto">
-              Start free with a 3-day Pro trial. Pro is $12 for 30 days through Paystack.
+              Start on the free plan. Pro is $12 for 30 days through Paystack.
               It does not bill you again on its own.
             </p>
           </motion.div>
@@ -353,14 +350,9 @@ export default function PricingPage() {
       {/* Compare Section */}
       <section className="relative py-16 px-6 border-t border-white/5">
         <div className="max-w-4xl mx-auto">
-          <motion.h2
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            className="text-2xl font-bold text-center mb-12"
-          >
+          <h2 className="text-2xl font-bold text-center mb-12">
             Feature Comparison
-          </motion.h2>
+          </h2>
           
           <div className="glass rounded-2xl border border-white/10 overflow-hidden">
             <table className="w-full">
@@ -380,17 +372,14 @@ export default function PricingPage() {
                   { feature: 'Commitments', free: '2', pro: 'Unlimited' },
                   { feature: 'Watchman Agent', free: '100/month', pro: 'Unlimited' },
                   { feature: 'Weighted constraints', free: false, pro: true },
-                  { feature: 'Leave planning', free: false, pro: true },
+                  { feature: 'Leave planning', free: true, pro: true },
                   { feature: 'Exports (CSV/PDF)', free: false, pro: true },
                   { feature: 'Calendar sharing', free: false, pro: true },
-                  { feature: '3-day Pro trial', free: true, pro: '—' },
                 ].map((row, i) => (
                   <motion.tr
                     key={row.feature}
-                    initial={{ opacity: 0, y: 10 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.03 }}
+                    {...pricingRowMotion(reduceMotion)}
+                    transition={{ delay: reduceMotion ? 0 : i * 0.03 }}
                     className="border-b border-white/5 last:border-0"
                   >
                     <td className="py-4 px-6">{row.feature}</td>
@@ -415,24 +404,17 @@ export default function PricingPage() {
       {/* FAQ Section */}
       <section className="relative py-16 px-6 border-t border-white/5">
         <div className="max-w-3xl mx-auto">
-          <motion.h2
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            className="text-2xl font-bold text-center mb-12"
-          >
+          <h2 className="text-2xl font-bold text-center mb-12">
             Frequently Asked Questions
-          </motion.h2>
+          </h2>
           
           <div className="space-y-4">
             {faqs.map((faq, index) => (
               <motion.div
                 key={faq.question}
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}
-                whileHover={{ scale: 1.01 }}
+                {...pricingRowMotion(reduceMotion)}
+                transition={{ duration: 0.3, delay: reduceMotion ? 0 : index * 0.05 }}
+                whileHover={reduceMotion ? undefined : { scale: 1.01 }}
                 className="p-6 glass rounded-2xl border border-white/5"
               >
                 <h3 className="font-semibold mb-3 flex items-center gap-3">
@@ -451,11 +433,7 @@ export default function PricingPage() {
       {/* CTA Section */}
       <section className="relative py-24 px-6 border-t border-white/5">
         <div className="max-w-3xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-          >
+          <motion.div {...pricingRowMotion(reduceMotion)}>
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-watchman-accent/20 to-watchman-purple/20 flex items-center justify-center mx-auto mb-8">
               <Clock className="w-8 h-8 text-watchman-accent" />
             </div>

@@ -751,10 +751,9 @@ export default function SettingsPage() {
                           { feature: 'Commitments', free: '2', pro: 'Unlimited' },
                           { feature: 'Watchman Agent', free: '100/mo', pro: 'Unlimited' },
                           { feature: 'Weighted constraints', free: '—', pro: '✓' },
-                          { feature: 'Leave planning', free: '—', pro: '✓' },
+                          { feature: 'Leave planning', free: '✓', pro: '✓' },
                           { feature: 'CSV/PDF exports', free: '—', pro: '✓' },
                           { feature: 'Calendar sharing', free: '—', pro: '✓' },
-                          { feature: '3-day Pro trial', free: '✓', pro: '—' },
                         ].map((row) => (
                           <div key={row.feature} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
                             <span className="text-sm">{row.feature}</span>
