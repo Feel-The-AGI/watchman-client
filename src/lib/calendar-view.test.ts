@@ -5,6 +5,8 @@ import {
   headerYear,
   monthArrowLabel,
   monthToShow,
+  selectedDateAfterMonthChange,
+  UPGRADE_AHEAD_LABEL,
   shiftViewedMonth,
   yearToLoad,
 } from './calendar-view.ts'
@@ -39,6 +41,14 @@ describe('calendar view across years', () => {
     assert.ok(opened)
     assert.equal(opened.getFullYear(), 2027)
     assert.equal(opened.getMonth(), 9)
+  })
+
+  it('closes the day panel when the month changes', () => {
+    const selected = new Date(2026, 11, 22)
+    assert.equal(selectedDateAfterMonthChange(selected, new Date(2027, 0, 1)), null)
+    const kept = selectedDateAfterMonthChange(selected, new Date(2026, 11, 1))
+    assert.equal(kept?.getDate(), 22)
+    assert.equal(UPGRADE_AHEAD_LABEL, 'Upgrade to see further ahead')
   })
 
   it('names the month arrows for assistive tech', () => {
