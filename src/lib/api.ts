@@ -216,10 +216,11 @@ class APIService {
 
   // New overhaul endpoints
   chat = {
-    sendMessage: (content: string, autoExecute: boolean = false) =>
+    sendMessage: (content: string, _autoExecute: boolean = false) =>
       this.request<any>('/api/chat/message', {
         method: 'POST',
-        body: JSON.stringify({ content, auto_execute: autoExecute }),
+        // The server accepts only auto_execute: false. Commands are saved as proposals.
+        body: JSON.stringify({ content, auto_execute: false }),
       }),
     getHistory: (limit: number = 50) =>
       this.request<any>(`/api/chat/history?limit=${limit}`),

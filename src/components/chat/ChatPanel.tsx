@@ -87,9 +87,6 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [initialLoadComplete, setInitialLoadComplete] = useState(false)
 
-  // Message limit based on tier
-  const messageLimit = userTier === 'pro' ? 500 : 50
-
   useEffect(() => {
     loadHistory()
   }, [])
@@ -114,12 +111,12 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
   const loadHistory = async () => {
     let history: Message[] = []
     try {
-      const response = await api.chat.getHistory(messageLimit)
+      // The server caps free history at history_limit (50) and allows up to 500 otherwise.
+      const response = await api.chat.getHistory(500)
       history = Array.isArray(response?.messages) ? [...response.messages].reverse() : []
       setHistoryError(null)
-      if (userTier === 'free' && history.length >= messageLimit) {
-        setHistoryLimitReached(true)
-      }
+      const historyLimit = typeof response?.history_limit === 'number' ? response.history_limit : null
+      setHistoryLimitReached(historyLimit !== null && history.length >= historyLimit)
     } catch (error) {
       console.error('Failed to load chat history:', error)
       setHistoryError(errorText(error, 'Chat history is unavailable right now. You can try again in a moment.'))
@@ -193,7 +190,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       setMessages(prev => [...prev, {
         id: `error-${Date.now()}`,
         role: 'assistant',
-        content: 'Sorry, I had trouble processing that. Please try again.',
+        content: errorText(error, 'Sorry, I had trouble processing that. Please try again.'),
         created_at: new Date().toISOString()
       }])
     } finally {
@@ -272,10 +269,16 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       await loadNextProposal()
     } catch (error) {
       console.error('Failed to decline proposal:', error)
+      if (apiStatus(error) === 409) {
+        setPendingProposal(null)
+        await loadNextProposal()
+      }
       setMessages(prev => [...prev, {
         id: `error-${Date.now()}`,
         role: 'assistant',
-        content: 'The change was not declined. Please try again.',
+        content: apiStatus(error) === 409
+          ? 'That proposal was already reviewed.'
+          : 'The change was not declined. It is still waiting for review.',
         created_at: new Date().toISOString(),
       }])
     } finally {
