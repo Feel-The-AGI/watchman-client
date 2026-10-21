@@ -19,6 +19,7 @@ import { ChevronLeft, ChevronRight, Sun, Moon, Coffee, Plane, Sparkles, Lock, Cr
 import { cn } from '@/lib/utils';
 import { cycleDayBadge } from '@/lib/cycle-day-badge';
 import { calendarCellKind } from '@/lib/calendar-day';
+import { isFreeMonthLocked, isYearMonthVisible } from '@/lib/free-calendar-access';
 
 export interface DailyLog {
   id: string;
@@ -138,17 +139,9 @@ export function CalendarGrid({
     }
   }, [initialMonth]);
 
-  // Calculate max allowed month for free users (6 months from now)
-  const FREE_MONTH_LIMIT = 6;
-  const isFreeTier = userTier === 'free';
   const today = new Date();
-  const maxFreeMonth = new Date(today.getFullYear(), today.getMonth() + FREE_MONTH_LIMIT, 1);
 
-  // Check if a month is beyond the free tier limit
-  const isMonthLocked = (month: Date) => {
-    if (!isFreeTier) return false;
-    return month >= maxFreeMonth;
-  };
+  const isMonthLocked = (month: Date) => isFreeMonthLocked(month, today, userTier);
 
   const daysMap = useMemo(() => {
     const map = new Map<string, CalendarDay>();
@@ -519,14 +512,12 @@ export function YearOverview({ days, year, onSelectMonth, userTier = 'free' }: Y
     });
   }, [year, daysMap]);
 
-  // Free users can only see first 6 months
-  const FREE_MONTH_LIMIT = 6;
-  const isFreeTier = userTier === 'free';
+  const today = new Date();
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
       {months.map(({ month, days, stats }, index) => {
-        const isLocked = isFreeTier && index >= FREE_MONTH_LIMIT;
+        const isLocked = !isYearMonthVisible(index, year, today, userTier);
 
         if (isLocked) {
           return (
