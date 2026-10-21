@@ -46,7 +46,7 @@ import { toast } from '@/components/ui/Toast';
 import { IncidentModal, LogModal } from '@/components/ui/IncidentModal';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
-import { dayCommitments, dayPanelSummary } from '@/lib/calendar-day';
+import { commitmentPanelLine, dayCommitments, dayPanelSummary } from '@/lib/calendar-day';
 import type { CalendarDay, DailyLog, Incident } from './CalendarGrid';
 
 interface DayInspectorProps {
@@ -890,16 +890,7 @@ export function DayInspector({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate group-hover:text-watchman-accent transition-colors">
-                        {commitment.name}
-                      </p>
-                      <p className="text-xs text-watchman-muted capitalize">
-                        {commitment.type}
-                        {commitment.hours && (
-                          <span className="ml-2 inline-flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {commitment.hours}h
-                          </span>
-                        )}
+                        {commitmentPanelLine(commitment)}
                       </p>
                     </div>
                   </motion.div>

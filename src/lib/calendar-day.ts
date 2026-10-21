@@ -10,6 +10,8 @@ export interface NormalizedCalendarDay {
     type: string
     name: string
     hours?: number
+    time_start?: string
+    time_end?: string
   }[]
   is_preview?: boolean
   logs?: unknown[]
@@ -62,7 +64,9 @@ function commitmentChip(raw: Record<string, unknown>): NormalizedCalendarDay['co
       : name
   const type = typeof raw.type === 'string' ? raw.type : ''
   const hours = typeof raw.hours === 'number' ? raw.hours : undefined
-  return { id, type, name, hours }
+  const time_start = typeof raw.time_start === 'string' && raw.time_start ? raw.time_start : undefined
+  const time_end = typeof raw.time_end === 'string' && raw.time_end ? raw.time_end : undefined
+  return { id, type, name, hours, time_start, time_end }
 }
 
 /**
@@ -80,6 +84,38 @@ export function dayCommitments(day: { commitments?: unknown; state_json?: unknow
 
 export function commitmentCellCount(day: { commitments?: unknown; state_json?: unknown } | null | undefined): number {
   return dayCommitments(day).length
+}
+
+function clockLabel(value?: string): string {
+  if (!value) return ''
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})/)
+  if (!match) return ''
+  return `${match[1].padStart(2, '0')}:${match[2]}`
+}
+
+/** "Haircut, Personal, 16:00–17:00" when the row has clock times. */
+export function commitmentPanelLine(item: {
+  name: string
+  type?: string
+  hours?: number
+  time_start?: string
+  time_end?: string
+}): string {
+  const type = item.type ? item.type.charAt(0).toUpperCase() + item.type.slice(1) : ''
+  const start = clockLabel(item.time_start)
+  const end = clockLabel(item.time_end)
+  const clock = start && end ? `${start}–${end}` : start
+  const hours = !clock && item.hours ? `${item.hours}h` : ''
+  return [item.name, type, clock || hours].filter(Boolean).join(', ')
+}
+
+/** Hover and title text. Leave wins over the stored shift name. */
+export function calendarHoverLabel(day: { work_type?: string | null; is_leave?: boolean } | null | undefined): string {
+  if (calendarCellKind(day) === 'leave') return 'On Leave'
+  if (day?.work_type === 'work_night') return 'Night Shift'
+  if (day?.work_type === 'off') return 'Off Day'
+  if (day?.work_type === 'work_day') return 'Day Shift'
+  return 'No schedule'
 }
 
 export function dayPanelSummary(day: { work_type?: string | null; is_leave?: boolean } | null | undefined): {

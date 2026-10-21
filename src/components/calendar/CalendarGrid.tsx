@@ -18,9 +18,10 @@ import {
 import { ChevronLeft, ChevronRight, Sun, Moon, Coffee, Plane, Sparkles, Lock, Crown, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { cycleDayBadge } from '@/lib/cycle-day-badge';
-import { calendarCellKind, dayCommitments } from '@/lib/calendar-day';
+import { calendarCellKind, calendarHoverLabel, dayCommitments } from '@/lib/calendar-day';
 import { isFreeMonthLocked, isYearMonthVisible } from '@/lib/free-calendar-access';
-import { monthArrowLabel } from '@/lib/calendar-view';
+import { monthArrowLabel, UPGRADE_AHEAD_LABEL } from '@/lib/calendar-view';
+import Link from 'next/link';
 
 export interface DailyLog {
   id: string;
@@ -252,7 +253,7 @@ export function CalendarGrid({
               ? "cursor-not-allowed opacity-60"
               : "hover:bg-white/10"
           )}
-          title={isNextMonthLocked ? "Upgrade to Pro to view more months" : "Next month"}
+          title={isNextMonthLocked ? UPGRADE_AHEAD_LABEL : "Next month"}
         >
           {isNextMonthLocked ? (
             <Lock className="w-5 h-5 text-watchman-muted" />
@@ -261,6 +262,13 @@ export function CalendarGrid({
           )}
         </motion.button>
       </div>
+      {isNextMonthLocked && (
+        <p className="px-6 pb-3 -mt-2 text-center text-xs text-watchman-muted">
+          <Link href="/pricing" className="text-watchman-accent hover:underline">
+            {UPGRADE_AHEAD_LABEL}
+          </Link>
+        </p>
+      )}
 
       <div className="relative">
       {/* Week Days Header */}
@@ -316,6 +324,7 @@ export function CalendarGrid({
             return (
               <motion.button
                 key={dateStr}
+                title={calendarHoverLabel(calendarDay)}
                 onClick={() => onSelectDate(day)}
                 onMouseEnter={() => setHoveredDate(dateStr)}
                 onMouseLeave={() => setHoveredDate(null)}
@@ -426,7 +435,7 @@ export function CalendarGrid({
                       >
                         <div className="glass-strong px-3 py-2 rounded-xl shadow-xl border border-white/10 whitespace-nowrap">
                           <p className="text-xs font-medium">
-                            {workConfig?.label || 'No schedule'}
+                            {calendarHoverLabel(calendarDay)}
                           </p>
                           {hasCommitments && (
                             <p className="text-[10px] text-watchman-muted">
@@ -450,7 +459,9 @@ export function CalendarGrid({
             <Sparkles className="w-5 h-5 text-watchman-accent" />
           </div>
           <p className="text-xs font-medium text-white mb-1">Upgrade to Pro</p>
-          <p className="text-[10px] text-watchman-muted">6 months on Free</p>
+          <Link href="/pricing" className="text-[10px] text-watchman-accent hover:underline">
+            {UPGRADE_AHEAD_LABEL}
+          </Link>
         </div>
       )}
       </div>
@@ -580,7 +591,9 @@ export function YearOverview({ days, year, onSelectMonth, userTier = 'free' }: Y
                   <Sparkles className="w-5 h-5 text-watchman-accent" />
                 </div>
                 <p className="text-xs font-medium text-white mb-1">Upgrade to Pro</p>
-                <p className="text-[10px] text-watchman-muted">View full year</p>
+                <Link href="/pricing" className="text-[10px] text-watchman-accent hover:underline" title={UPGRADE_AHEAD_LABEL}>
+                  {UPGRADE_AHEAD_LABEL}
+                </Link>
               </div>
             </motion.div>
           );

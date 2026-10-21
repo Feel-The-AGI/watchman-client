@@ -34,6 +34,17 @@ export function monthArrowLabel(direction: 'previous' | 'next'): string {
   return direction === 'previous' ? 'Previous month' : 'Next month'
 }
 
+export const UPGRADE_AHEAD_LABEL = 'Upgrade to see further ahead'
+
+/** A different month closes the day panel. The same month keeps the selection. */
+export function selectedDateAfterMonthChange(selected: Date | null, nextMonth: Date): Date | null {
+  if (!selected) return null
+  if (selected.getFullYear() === nextMonth.getFullYear() && selected.getMonth() === nextMonth.getMonth()) {
+    return selected
+  }
+  return null
+}
+
 export function yearToLoad(loadedYear: number, viewedMonth: Date): number | null {
   const year = headerYear(viewedMonth)
   return year === loadedYear ? null : year

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { format } from 'date-fns';
-import { gridMonthAfterViewToggle, headerYear, monthToShow, shiftViewedMonth, yearToLoad } from '@/lib/calendar-view';
+import { gridMonthAfterViewToggle, headerYear, monthToShow, selectedDateAfterMonthChange, shiftViewedMonth, yearToLoad } from '@/lib/calendar-view';
 import { 
   Calendar as CalendarIcon, 
   Grid3X3, 
@@ -160,6 +160,7 @@ export default function DashboardPage() {
     const tier = profile?.tier === 'pro' || profile?.tier === 'admin' ? profile.tier : 'free';
     const next = monthToShow(month, new Date(), tier);
     if (!next) return;
+    setSelectedDate((current) => selectedDateAfterMonthChange(current, next));
     viewedYearRef.current = headerYear(next);
     setViewedMonth(next);
     const year = yearToLoad(currentYearRef.current, next);

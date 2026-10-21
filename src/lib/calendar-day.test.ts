@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { calendarCellKind, commitmentCellCount, dayCommitments, dayPanelSummary, normalizeCalendarDays } from './calendar-day.ts'
+import { calendarCellKind, calendarHoverLabel, commitmentCellCount, commitmentPanelLine, dayCommitments, dayPanelSummary, normalizeCalendarDays } from './calendar-day.ts'
 
 describe('leave on the calendar', () => {
   it('reads is_leave from state_json and paints Dec 20–27 as leave', () => {
@@ -75,5 +75,24 @@ describe('leave day panel', () => {
 
   it('keeps the shift card on a working day', () => {
     assert.equal(dayPanelSummary({ work_type: 'work_day', is_leave: false }).showShiftCard, true)
+  })
+})
+
+describe('leave cell label and commitment times', () => {
+  it('names a leave cell On Leave even when the stored shift is a day shift', () => {
+    assert.equal(calendarHoverLabel({ work_type: 'work_day', is_leave: true }), 'On Leave')
+    assert.equal(calendarHoverLabel({ work_type: 'work_day', is_leave: false }), 'Day Shift')
+  })
+
+  it('includes the clock time in the day panel line', () => {
+    assert.equal(
+      commitmentPanelLine({ name: 'Haircut', type: 'personal', time_start: '16:00:00', time_end: '17:00:00' }),
+      'Haircut, Personal, 16:00–17:00',
+    )
+    const [day] = normalizeCalendarDays([{
+      date: '2026-11-05',
+      commitments: [{ name: 'Haircut', type: 'personal', time_start: '16:00', time_end: '17:00' }],
+    }])
+    assert.equal(commitmentPanelLine(dayCommitments(day)[0]), 'Haircut, Personal, 16:00–17:00')
   })
 })
