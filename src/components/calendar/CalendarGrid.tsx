@@ -132,12 +132,16 @@ export function CalendarGrid({
   const [direction, setDirection] = useState(0);
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
 
-  // Update currentMonth when initialMonth changes (e.g., from year view)
+  // Follow the month the dashboard is showing. Ignore a new Date for the same month
+  // so picking a day, or switching Month/Year, does not jump back to the selection.
   useEffect(() => {
-    if (initialMonth) {
-      setCurrentMonth(initialMonth);
-    }
-  }, [initialMonth]);
+    if (!initialMonth) return
+    setCurrentMonth((current) => (
+      current.getFullYear() === initialMonth.getFullYear() && current.getMonth() === initialMonth.getMonth()
+        ? current
+        : initialMonth
+    ))
+  }, [initialMonth])
 
   const today = new Date();
 
@@ -253,6 +257,7 @@ export function CalendarGrid({
         </motion.button>
       </div>
 
+      <div className="relative">
       {/* Week Days Header */}
       <div className="grid grid-cols-7 border-b border-white/5 bg-white/[0.02]">
         {weekDays.map((day, i) => (
@@ -433,6 +438,16 @@ export function CalendarGrid({
           })}
         </motion.div>
       </AnimatePresence>
+      {isCurrentMonthLocked && (
+        <div className="absolute inset-0 z-20 bg-watchman-bg/80 backdrop-blur-sm flex flex-col items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-watchman-accent/20 to-watchman-purple/20 flex items-center justify-center mb-2 border border-white/10">
+            <Sparkles className="w-5 h-5 text-watchman-accent" />
+          </div>
+          <p className="text-xs font-medium text-white mb-1">Upgrade to Pro</p>
+          <p className="text-[10px] text-watchman-muted">6 months on Free</p>
+        </div>
+      )}
+      </div>
 
       {/* Legend */}
       <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 sm:gap-x-6 gap-y-2 px-3 sm:px-6 py-3 sm:py-4 border-t border-white/5 text-[10px] sm:text-xs bg-white/[0.02]">

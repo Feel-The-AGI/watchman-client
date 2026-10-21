@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { format } from 'date-fns';
+import { gridMonthAfterViewToggle, headerYear, monthToShow, shiftViewedMonth, yearToLoad } from '@/lib/calendar-view';
 import { 
   Calendar as CalendarIcon, 
   Grid3X3, 
@@ -50,6 +51,8 @@ export default function DashboardPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [viewedMonth, setViewedMonth] = useState(() => gridMonthAfterViewToggle(new Date()));
+  const viewedYearRef = useRef(headerYear(viewedMonth));
   const [initialYearSet, setInitialYearSet] = useState(false);
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   const [stats, setStats] = useState<CalendarStats | null>(null);
@@ -71,6 +74,7 @@ export default function DashboardPage() {
 
     try {
       const snapshot = await loadDashboardSnapshot(api, yearToFetch);
+      if (yearToFetch !== viewedYearRef.current) return;
       if (Array.isArray(snapshot.cycles)) {
         setHasSetup(snapshot.cycles.length > 0);
       }
@@ -96,6 +100,8 @@ export default function DashboardPage() {
       return refreshCalendarSilently();
     }
 
+    let fetchYear = yearToFetch;
+
     try {
       setLoading(true);
       setError(null);
@@ -105,23 +111,22 @@ export default function DashboardPage() {
       }
 
       const cyclesResponse = await api.cycles.list();
+      if (yearToFetch !== viewedYearRef.current) return;
       if (!cyclesResponse || cyclesResponse.length === 0) {
         setHasSetup(false);
-        setLoading(false);
         return;
       }
       setHasSetup(true);
 
       const activeCycle = cyclesResponse.find((c: any) => c.is_active) || cyclesResponse[0];
 
-      // Determine which year to fetch - only adjust on FIRST load
-      let fetchYear = yearToFetch;
-
       // Only set anchor year on FIRST load, not every navigation
       if (!initialYearSet && activeCycle?.anchor_date) {
         const anchorYear = new Date(activeCycle.anchor_date).getFullYear();
         if (anchorYear >= new Date().getFullYear() && anchorYear !== yearToFetch) {
           setCurrentYear(anchorYear);
+          setViewedMonth((current) => new Date(anchorYear, current.getMonth(), 1));
+          viewedYearRef.current = anchorYear;
           fetchYear = anchorYear;
         }
         setInitialYearSet(true);
@@ -129,15 +134,20 @@ export default function DashboardPage() {
 
       // Fetch calendar data for the correct year
       const calendarResponse = await api.calendar.getYear(fetchYear);
+      if (fetchYear !== viewedYearRef.current) return;
       setCalendarDays(normalizeCalendarDays(calendarResponse) as CalendarDay[]);
 
       const statsResponse = await api.stats.getSummary(fetchYear);
+      if (fetchYear !== viewedYearRef.current) return;
       setStats(statsResponse || null);
     } catch (err: any) {
+      if (fetchYear !== viewedYearRef.current) return;
       console.error('Failed to fetch calendar:', err);
       setError(err.message || 'Failed to load calendar');
     } finally {
-      setLoading(false);
+      if (fetchYear === viewedYearRef.current) {
+        setLoading(false);
+      }
     }
   }, [initialYearSet, calendarDays.length, refreshCalendarSilently]);
 
@@ -145,6 +155,19 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchCalendarData();
   }, []);
+
+  const showMonth = (month: Date) => {
+    const tier = profile?.tier === 'pro' || profile?.tier === 'admin' ? profile.tier : 'free';
+    const next = monthToShow(month, new Date(), tier);
+    if (!next) return;
+    viewedYearRef.current = headerYear(next);
+    setViewedMonth(next);
+    const year = yearToLoad(currentYearRef.current, next);
+    if (year !== null) {
+      setCurrentYear(year);
+      fetchCalendarData(year);
+    }
+  };
 
   const selectedDayData = selectedDate 
     ? calendarDays.find(d => d.date === format(selectedDate, 'yyyy-MM-dd')) || null
@@ -216,11 +239,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2 sm:gap-4">
             {/* Year Navigation */}
             <motion.button
-              onClick={() => {
-                const newYear = currentYear - 1;
-                setCurrentYear(newYear);
-                fetchCalendarData(newYear);
-              }}
+              onClick={() => showMonth(shiftViewedMonth(viewedMonth, -12))}
               className="p-2 sm:p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -231,7 +250,7 @@ export default function DashboardPage() {
 
             <div className="text-center sm:text-left">
               <h1 className="text-lg sm:text-2xl font-bold tracking-tight">
-                <span className="text-gradient">{currentYear}</span> <span className="hidden sm:inline">Calendar</span>
+                <span className="text-gradient">{headerYear(viewedMonth)}</span> <span className="hidden sm:inline">Calendar</span>
               </h1>
               <p className="text-watchman-text-secondary text-xs sm:text-sm hidden sm:block">
                 {profile?.name ? `${profile.name}'s schedule` : 'Your schedule overview'}
@@ -239,11 +258,7 @@ export default function DashboardPage() {
             </div>
 
             <motion.button
-              onClick={() => {
-                const newYear = currentYear + 1;
-                setCurrentYear(newYear);
-                fetchCalendarData(newYear);
-              }}
+              onClick={() => showMonth(shiftViewedMonth(viewedMonth, 12))}
               className="p-2 sm:p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -351,17 +366,18 @@ export default function DashboardPage() {
                   days={calendarDays}
                   selectedDate={selectedDate}
                   onSelectDate={setSelectedDate}
-                  initialMonth={selectedDate || undefined}
+                  initialMonth={gridMonthAfterViewToggle(viewedMonth)}
+                  onMonthChange={showMonth}
                   userTier={profile?.tier as 'free' | 'pro' | 'admin' || 'free'}
                 />
               ) : (
                 <div className="p-6">
                   <YearOverview
                     days={calendarDays}
-                    year={currentYear}
+                    year={headerYear(viewedMonth)}
                     onSelectMonth={(month) => {
+                      showMonth(month);
                       setViewMode('month');
-                      setSelectedDate(month);
                     }}
                     userTier={profile?.tier as 'free' | 'pro' | 'admin' || 'free'}
                   />
