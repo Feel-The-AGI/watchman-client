@@ -53,8 +53,9 @@ describe('chat display', () => {
     const afterFailure = { pendingProposal: null, isReviewing: false }
     assert.equal(chatInputLocked(afterFailure.pendingProposal, afterFailure.isReviewing), false)
     assert.equal(chatInputLocked({ id: 'proposal-1' }, false), true)
-    assert.equal(REVIEW_FAILURE_MESSAGE.includes('add_commitment'), false)
-    assert.match(REVIEW_FAILURE_MESSAGE, /didn't go through/)
-    assert.match(REVIEW_FAILURE_MESSAGE, /send another message/)
+    assert.equal(
+      REVIEW_FAILURE_MESSAGE,
+      "That didn't go through. You can try again or send another message.",
+    )
   })
 })

@@ -92,7 +92,7 @@ function commandOf(source: unknown): unknown {
 
 export const PROPOSAL_CARD_FALLBACK = 'Review this proposed change.'
 
-export const REVIEW_FAILURE_MESSAGE = "That didn't go through. Nothing was changed. You can send another message."
+export const REVIEW_FAILURE_MESSAGE = "That didn't go through. You can try again or send another message."
 
 /** Card copy prefers the server's human explanation and never a raw tool name. */
 export function proposalCardText(
