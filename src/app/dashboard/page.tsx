@@ -29,6 +29,7 @@ import { BlockSkeleton, LoadingState } from '@/components/ui/LoadingState';
 import { Card, CardContent, CardHeader, CardTitle, BentoCard } from '@/components/ui/Card';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
+import { loadDashboardSnapshot } from '@/lib/dashboard-refresh';
 import Link from 'next/link';
 
 type ViewMode = 'month' | 'year';
@@ -68,15 +69,15 @@ export default function DashboardPage() {
     setIsRefreshing(true);
 
     try {
-      // Fetch new data without clearing existing
-      const calendarResponse = await api.calendar.getYear(yearToFetch);
-      if (calendarResponse) {
-        setCalendarDays(calendarResponse);
+      const snapshot = await loadDashboardSnapshot(api, yearToFetch);
+      if (Array.isArray(snapshot.cycles)) {
+        setHasSetup(snapshot.cycles.length > 0);
       }
-
-      const statsResponse = await api.stats.getSummary(yearToFetch);
-      if (statsResponse) {
-        setStats(statsResponse);
+      if (snapshot.calendar) {
+        setCalendarDays(snapshot.calendar as CalendarDay[]);
+      }
+      if (snapshot.stats) {
+        setStats(snapshot.stats as CalendarStats);
       }
     } catch (err: any) {
       console.error('Background refresh failed:', err);
