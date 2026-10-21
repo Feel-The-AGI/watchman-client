@@ -9,7 +9,7 @@ test.describe('authentication', () => {
       await expect(page.getByLabel('Full Name')).toBeVisible()
       await expect(page.getByPlaceholder('Your name')).toBeVisible()
       await expect(page.getByLabel('Email')).toBeVisible()
-      await expect(page.getByLabel('Password')).toBeVisible()
+      await expect(page.getByLabel('Password', { exact: true })).toBeVisible()
     }
   })
 
@@ -23,16 +23,16 @@ test.describe('authentication', () => {
 
     await page.getByLabel('Full Name').fill('Test User')
     await page.getByLabel('Email').fill('not-an-email')
-    await page.getByLabel('Password').fill('longenough')
+    await page.getByLabel('Password', { exact: true }).fill('longenough')
     await page.getByRole('button', { name: 'Create Account' }).click()
     const emailMessage = await page.getByLabel('Email').evaluate((element: HTMLInputElement) => element.validationMessage)
     expect(emailMessage).toMatch(/@|email/i)
     await expect(page).toHaveURL(/\/login/)
 
     await page.getByLabel('Email').fill('person@example.com')
-    await page.getByLabel('Password').fill('short')
+    await page.getByLabel('Password', { exact: true }).fill('short')
     await page.getByRole('button', { name: 'Create Account' }).click()
-    const passwordMessage = await page.getByLabel('Password').evaluate((element: HTMLInputElement) => element.validationMessage)
+    const passwordMessage = await page.getByLabel('Password', { exact: true }).evaluate((element: HTMLInputElement) => element.validationMessage)
     expect(passwordMessage.length).toBeGreaterThan(0)
     await expect(page).toHaveURL(/\/login/)
   })
@@ -43,7 +43,7 @@ test.describe('authentication', () => {
     await page.getByRole('button', { name: 'Magic Link' }).click()
     await expect(page.getByRole('heading', { name: 'Sign in with magic link' })).toBeVisible()
     await expect(page.getByLabel('Email')).toBeVisible()
-    await expect(page.getByLabel('Password')).toHaveCount(0)
+    await expect(page.getByLabel('Password', { exact: true })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Send Magic Link' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Check Your Email' })).toHaveCount(0)
   })
@@ -62,13 +62,13 @@ test.describe('authentication', () => {
     await expect(page.getByLabel('Full Name')).toBeEnabled()
     await page.getByLabel('Full Name').fill('Test User')
     await page.getByLabel('Email').fill('e2e-blocked@example.com')
-    await page.getByLabel('Password').fill('long-enough-password')
+    await page.getByLabel('Password', { exact: true }).fill('long-enough-password')
     await page.getByRole('button', { name: 'Create Account' }).click()
 
     await expect(page.getByRole('button', { name: /Creating your account/ })).toBeVisible()
     await expect(page.getByLabel('Full Name')).toBeDisabled()
     await expect(page.getByLabel('Email')).toBeDisabled()
-    await expect(page.getByLabel('Password')).toBeDisabled()
+    await expect(page.getByLabel('Password', { exact: true })).toBeDisabled()
     release()
   })
 

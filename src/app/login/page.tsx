@@ -365,16 +365,18 @@ export default function LoginPage() {
                         </button>
                       )}
                     />
-                    <ul className="mt-2 space-y-1" aria-live="polite">
-                      {passwordRules(password).map((rule) => (
-                        <li
-                          key={rule.id}
-                          className={rule.met ? 'text-xs text-emerald-400' : 'text-xs text-watchman-muted'}
-                        >
-                          {rule.met ? 'Met' : 'Needed'}: {rule.label}
-                        </li>
-                      ))}
-                    </ul>
+                    {mode === 'signup' && (
+                      <ul className="mt-2 space-y-1" aria-live="polite">
+                        {passwordRules(password).map((rule) => (
+                          <li
+                            key={rule.id}
+                            className={rule.met ? 'text-xs text-emerald-400' : 'text-xs text-watchman-muted'}
+                          >
+                            {rule.met ? 'Met' : 'Needed'}: {rule.label}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>

@@ -29,9 +29,9 @@ describe('resend confirmation cooldown', () => {
 })
 
 describe('auth nav', () => {
-  it('does not show Sign In while the session is loading', () => {
+  it('shows Dashboard as soon as the user is known', () => {
     assert.equal(authNavChoice(true, null), 'pending')
-    assert.equal(authNavChoice(true, { id: 'user' }), 'pending')
+    assert.equal(authNavChoice(true, { id: 'user' }), 'in')
     assert.equal(authNavChoice(false, null), 'out')
     assert.equal(authNavChoice(false, { id: 'user' }), 'in')
   })

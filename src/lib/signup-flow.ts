@@ -27,8 +27,9 @@ export function resendCooldownRemaining(startedAt: number | null, now: number): 
 
 export type AuthNavChoice = 'pending' | 'in' | 'out'
 
-/** While the session is loading, the public nav must not show Sign In. */
+/** Sign In stays hidden only until a user is known. A slow profile fetch must not blank a signed-in nav. */
 export function authNavChoice(loading: boolean, user: unknown): AuthNavChoice {
+  if (user) return 'in'
   if (loading) return 'pending'
-  return user ? 'in' : 'out'
+  return 'out'
 }
