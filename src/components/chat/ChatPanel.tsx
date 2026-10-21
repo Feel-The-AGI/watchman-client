@@ -6,6 +6,57 @@ import { Send, Loader2, Bot, User, Undo2, Redo2, CheckCircle, XCircle, AlertTria
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
 
+function errorText(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message && !error.message.includes('[object Object]')) {
+    return error.message
+  }
+  return fallback
+}
+
+function apiStatus(error: unknown): number | null {
+  if (typeof error === 'object' && error !== null && 'status' in error) {
+    const status = (error as { status: unknown }).status
+    return typeof status === 'number' ? status : null
+  }
+  return null
+}
+
+function withProposalCard(messages: Message[], proposal: any | null): Message[] {
+  if (!proposal?.id) return messages
+
+  const existingIndex = messages.findIndex(message => message.proposal?.id === proposal.id)
+  if (existingIndex >= 0) {
+    const next = [...messages]
+    next[existingIndex] = { ...next[existingIndex], isProposal: true, proposal }
+    return next
+  }
+
+  // The saved proposal points at the user message that triggered it. Attach the
+  // review controls to the assistant reply that followed, instead of repeating it.
+  const userIndex = proposal.message_id
+    ? messages.findIndex(message => message.id === proposal.message_id)
+    : -1
+  if (userIndex >= 0) {
+    const assistantIndex = messages.findIndex((message, index) => (
+      index > userIndex && message.role === 'assistant' && !message.proposal
+    ))
+    if (assistantIndex >= 0) {
+      const next = [...messages]
+      next[assistantIndex] = { ...next[assistantIndex], isProposal: true, proposal }
+      return next
+    }
+  }
+
+  return [...messages, {
+    id: `proposal-${proposal.id}`,
+    role: 'assistant',
+    content: proposal.command?.explanation || 'Review this proposed change.',
+    created_at: proposal.created_at || new Date().toISOString(),
+    isProposal: true,
+    proposal,
+  }]
+}
+
 interface Message {
   id: string
   role: 'user' | 'assistant' | 'system'
@@ -28,14 +79,13 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [pendingProposal, setPendingProposal] = useState<any>(null)
+  const [isReviewing, setIsReviewing] = useState(false)
   const [historyLimitReached, setHistoryLimitReached] = useState(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [initialLoadComplete, setInitialLoadComplete] = useState(false)
-
-  // Message limit based on tier
-  const messageLimit = userTier === 'pro' ? 500 : 50
 
   useEffect(() => {
     loadHistory()
@@ -59,27 +109,40 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
   }, [messages, initialLoadComplete])
 
   const loadHistory = async () => {
+    let history: Message[] = []
     try {
-      const response = await api.chat.getHistory(messageLimit)
-      if (response.messages) {
-        setMessages(response.messages.reverse())
-        // Check if we've hit the limit (for free users)
-        if (userTier === 'free' && response.messages.length >= messageLimit) {
-          setHistoryLimitReached(true)
-        }
-      }
-      // Mark initial load as complete after a small delay to ensure scroll happens first
-      setTimeout(() => setInitialLoadComplete(true), 100)
+      // The server caps free history at history_limit (50) and allows up to 500 otherwise.
+      const response = await api.chat.getHistory(500)
+      history = Array.isArray(response?.messages) ? [...response.messages].reverse() : []
+      setHistoryError(null)
+      const historyLimit = typeof response?.history_limit === 'number' ? response.history_limit : null
+      setHistoryLimitReached(historyLimit !== null && history.length >= historyLimit)
     } catch (error) {
       console.error('Failed to load chat history:', error)
-      setInitialLoadComplete(true)
+      setHistoryError(errorText(error, 'Chat history is unavailable right now. You can try again in a moment.'))
     }
+
+    try {
+      const pending = await api.commands.pendingProposals()
+      const proposal = pending?.proposals?.[0] || null
+      setPendingProposal(proposal)
+      history = withProposalCard(history, proposal)
+    } catch (error) {
+      console.error('Failed to load pending proposals:', error)
+      setHistoryError(previous => previous || errorText(
+        error,
+        'Could not check for calendar changes waiting on your review. Refresh before sending a new message.'
+      ))
+    }
+
+    setMessages(history)
+    setTimeout(() => setInitialLoadComplete(true), 100)
   }
 
   const sendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault()
     
-    if (!input.trim() || isLoading) return
+    if (!input.trim() || isLoading || pendingProposal || isReviewing) return
     
     const userMessage = input.trim()
     setInput('')
@@ -127,7 +190,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       setMessages(prev => [...prev, {
         id: `error-${Date.now()}`,
         role: 'assistant',
-        content: 'Sorry, I had trouble processing that. Please try again.',
+        content: errorText(error, 'Sorry, I had trouble processing that. Please try again.'),
         created_at: new Date().toISOString()
       }])
     } finally {
@@ -135,57 +198,92 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
     }
   }
 
-  const approveProposal = async (proposalId: string) => {
+  const loadNextProposal = async () => {
     try {
-      const proposal = pendingProposal
-      if (proposal?.command) {
-        // Use the direct command execution endpoint
-        const result = await api.commands.execute({
-          action: proposal.command.action,
-          payload: proposal.command.payload,
-          explanation: proposal.command.explanation
-        })
-
-        if (result.success) {
-          setMessages(prev => [...prev, {
-            id: `success-${Date.now()}`,
-            role: 'assistant',
-            content: `Done! ${proposal.command.explanation || 'Changes applied successfully.'}`,
-            created_at: new Date().toISOString()
-          }])
-          // Small delay to ensure database write completes
-          await new Promise(resolve => setTimeout(resolve, 500))
-          onCalendarUpdate?.()
-        } else {
-          setMessages(prev => [...prev, {
-            id: `error-${Date.now()}`,
-            role: 'assistant',
-            content: `There was an issue: ${result.error || 'Unknown error'}`,
-            created_at: new Date().toISOString()
-          }])
-        }
-      }
-      setPendingProposal(null)
+      const pending = await api.commands.pendingProposals()
+      const proposal = pending?.proposals?.[0] || null
+      setPendingProposal(proposal)
+      setMessages(prev => withProposalCard(prev, proposal))
     } catch (error) {
-      console.error('Failed to approve proposal:', error)
-      setMessages(prev => [...prev, {
-        id: `error-${Date.now()}`,
-        role: 'assistant',
-        content: 'Sorry, I had trouble applying that change. Please try again.',
-        created_at: new Date().toISOString()
-      }])
-      setPendingProposal(null)
+      console.error('Failed to reload pending proposals:', error)
     }
   }
 
-  const rejectProposal = () => {
-    setMessages(prev => [...prev, {
-      id: `rejected-${Date.now()}`,
-      role: 'assistant',
-      content: 'No problem, I won\'t make that change. Is there something else I can help with?',
-      created_at: new Date().toISOString()
-    }])
-    setPendingProposal(null)
+  const approveProposal = async (proposalId: string) => {
+    if (isReviewing || !proposalId) return
+    setIsReviewing(true)
+    try {
+      const proposal = pendingProposal?.id === proposalId ? pendingProposal : null
+      const result = await api.commands.reviewProposal(proposalId, 'approve')
+
+      if (result?.success) {
+        setMessages(prev => [...prev, {
+          id: `success-${Date.now()}`,
+          role: 'assistant',
+          content: `Done! ${proposal?.command?.explanation || 'Changes applied successfully.'}`,
+          created_at: new Date().toISOString()
+        }])
+        await new Promise(resolve => setTimeout(resolve, 500))
+        onCalendarUpdate?.()
+      } else {
+        setMessages(prev => [...prev, {
+          id: `error-${Date.now()}`,
+          role: 'assistant',
+          content: `That change was not applied: ${result?.error || 'Unknown error'}`,
+          created_at: new Date().toISOString()
+        }])
+      }
+      setPendingProposal(null)
+      await loadNextProposal()
+    } catch (error) {
+      console.error('Failed to approve proposal:', error)
+      if (apiStatus(error) === 409) {
+        setPendingProposal(null)
+        await loadNextProposal()
+      }
+      setMessages(prev => [...prev, {
+        id: `error-${Date.now()}`,
+        role: 'assistant',
+        content: apiStatus(error) === 409
+          ? 'That proposal was already reviewed.'
+          : 'Sorry, I had trouble applying that change. It is still waiting for review.',
+        created_at: new Date().toISOString()
+      }])
+    } finally {
+      setIsReviewing(false)
+    }
+  }
+
+  const rejectProposal = async () => {
+    if (!pendingProposal || isReviewing) return
+    setIsReviewing(true)
+    try {
+      await api.commands.reviewProposal(pendingProposal.id, 'reject')
+      setMessages(prev => [...prev, {
+        id: `rejected-${Date.now()}`,
+        role: 'assistant',
+        content: 'The proposed change was declined.',
+        created_at: new Date().toISOString()
+      }])
+      setPendingProposal(null)
+      await loadNextProposal()
+    } catch (error) {
+      console.error('Failed to decline proposal:', error)
+      if (apiStatus(error) === 409) {
+        setPendingProposal(null)
+        await loadNextProposal()
+      }
+      setMessages(prev => [...prev, {
+        id: `error-${Date.now()}`,
+        role: 'assistant',
+        content: apiStatus(error) === 409
+          ? 'That proposal was already reviewed.'
+          : 'The change was not declined. It is still waiting for review.',
+        created_at: new Date().toISOString(),
+      }])
+    } finally {
+      setIsReviewing(false)
+    }
   }
 
   const handleUndo = async () => {
@@ -270,9 +368,15 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
         </div>
       </div>
 
+      {historyError && (
+        <div className="mx-4 mt-3 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-300">
+          {historyError}
+        </div>
+      )}
+
       {/* Messages */}
       <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth">
-        {messages.length === 0 && (
+        {messages.length === 0 && !historyError && (
           <motion.div 
             className="text-center py-8"
             initial={{ opacity: 0, y: 10 }}
@@ -318,6 +422,11 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
                 {/* Proposal approval buttons */}
                 {message.isProposal && message.proposal && pendingProposal?.id === message.proposal.id && (
                   <div className="mt-4 pt-3 border-t border-white/10">
+                    {message.proposal.validation?.valid === false && message.proposal.validation?.violations?.[0]?.message && (
+                      <div className="mb-3 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs">
+                        {message.proposal.validation.violations[0].message} Decline this change, or edit the request.
+                      </div>
+                    )}
                     {message.proposal.validation?.warnings?.length > 0 && (
                       <motion.div 
                         className="mb-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20"
@@ -333,18 +442,20 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
                     <div className="flex gap-2">
                       <motion.button
                         onClick={() => approveProposal(message.proposal.id)}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-watchman-success/20 hover:bg-watchman-success/30 text-watchman-success rounded-xl text-xs font-medium transition-colors border border-watchman-success/20"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        disabled={isReviewing || message.proposal.validation?.valid === false}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-watchman-success/20 hover:bg-watchman-success/30 text-watchman-success rounded-xl text-xs font-medium transition-colors border border-watchman-success/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                        whileHover={isReviewing ? undefined : { scale: 1.02 }}
+                        whileTap={isReviewing ? undefined : { scale: 0.98 }}
                       >
-                        <CheckCircle className="w-4 h-4" />
+                        {isReviewing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
                         Apply
                       </motion.button>
                       <motion.button
                         onClick={rejectProposal}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-medium transition-colors border border-red-500/20"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        disabled={isReviewing}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-medium transition-colors border border-red-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                        whileHover={isReviewing ? undefined : { scale: 1.02 }}
+                        whileTap={isReviewing ? undefined : { scale: 0.98 }}
                       >
                         <XCircle className="w-4 h-4" />
                         Decline
@@ -426,15 +537,16 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Tell me about your schedule..."
+              placeholder={pendingProposal ? 'Apply or decline the proposed change first' : 'Tell me about your schedule...'}
+              disabled={!!pendingProposal || isReviewing}
               rows={1}
-              className="w-full px-3 sm:px-4 py-2.5 sm:py-3 glass border border-white/10 rounded-xl text-xs sm:text-sm text-watchman-text placeholder-watchman-muted focus:outline-none focus:ring-2 focus:ring-watchman-accent focus:border-transparent resize-none transition-all"
+              className="w-full px-3 sm:px-4 py-2.5 sm:py-3 glass border border-white/10 rounded-xl text-xs sm:text-sm text-watchman-text placeholder-watchman-muted focus:outline-none focus:ring-2 focus:ring-watchman-accent focus:border-transparent resize-none transition-all disabled:cursor-not-allowed disabled:opacity-60"
               style={{ minHeight: '44px', maxHeight: '120px' }}
             />
           </div>
           <motion.button
             type="submit"
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || !!pendingProposal || isReviewing}
             className={cn(
               'px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all flex items-center justify-center',
               input.trim() && !isLoading
