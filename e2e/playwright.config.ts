@@ -1,6 +1,8 @@
+import path from 'path'
 import { defineConfig, devices } from '@playwright/test'
 
 const baseURL = process.env.BASE_URL || 'https://www.trywatchman.app'
+const artifacts = path.resolve(process.cwd(), 'e2e/artifacts')
 
 export default defineConfig({
   testDir: '.',
@@ -12,9 +14,9 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: [
     ['list'],
-    ['json', { outputFile: 'e2e/artifacts/results.json' }],
+    ['json', { outputFile: path.join(artifacts, 'results.json') }],
     ['./reporters/matrix-reporter.ts'],
-    ['html', { outputFolder: 'e2e/artifacts/html-report', open: 'never' }],
+    ['html', { outputFolder: path.join(artifacts, 'html-report'), open: 'never' }],
   ],
   use: {
     baseURL,

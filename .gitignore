@@ -6,6 +6,7 @@ node_modules
 .DS_Store
 .vercel
 e2e/artifacts/
+e2e/**/artifacts/
 test-results/
 playwright-report/
 blob-report/
