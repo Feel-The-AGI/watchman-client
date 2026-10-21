@@ -1286,13 +1286,18 @@ export default function SettingsPage() {
               </div>
             ) : pricingUnavailable || !pricingInfo ? (
               <div className="text-center py-4">
-                <p className="font-medium">Pricing is temporarily unavailable</p>
+                <p className="font-medium">Pricing unavailable. Try again.</p>
                 <p className="text-sm text-watchman-muted mt-2">
-                  The exchange rate could not be loaded, so checkout is closed until it is back.
+                  The exchange rate could not be loaded, so checkout stays closed. No estimated price is shown.
                 </p>
-                <Button variant="glass" className="mt-6" onClick={() => setShowUpgradeModal(false)}>
-                  Close
-                </Button>
+                <div className="mt-6 flex gap-3">
+                  <Button variant="glass" className="flex-1" onClick={() => setShowUpgradeModal(false)}>
+                    Close
+                  </Button>
+                  <Button variant="gradient" className="flex-1" onClick={handleUpgrade}>
+                    Try again
+                  </Button>
+                </div>
               </div>
             ) : (
               <>
