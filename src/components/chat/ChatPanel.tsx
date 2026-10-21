@@ -3,27 +3,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, Loader2, Bot, User, Undo2, Redo2, CheckCircle, XCircle, AlertTriangle, Sparkles, Command } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import Link from 'next/link'
-import api, { APIError } from '@/lib/api'
-
-// watchman-server app/routes/chat.py
-const FREE_MONTHLY_USER_MESSAGES = 100
-const HISTORY_REQUEST_LIMIT = 500
-
-function monthlyLimitMessage(error: unknown): string | null {
-  if (!(error instanceof APIError) || error.status !== 403) return null
-  const detail = error.detail
-  const code = detail && typeof detail === 'object' && 'error' in detail
-    ? (detail as { error?: unknown }).error
-    : null
-  if (code === 'message_limit_reached' || /month/i.test(error.message)) {
-    return error.message.includes('[object Object]') || error.message === 'An error occurred'
-      ? `You've used all ${FREE_MONTHLY_USER_MESSAGES} Watchman messages for this month. Upgrade to Pro for unlimited conversations.`
-      : error.message
-  }
-  return null
-}
+import { cn } from '@/lib/utils'
+import api from '@/lib/api'
 
 interface Message {
   id: string
@@ -39,7 +21,7 @@ interface ChatPanelProps {
   onCalendarUpdate?: () => void
   className?: string
   autoExecute?: boolean  // If false, shows approval popup for commands
-  userTier?: 'free' | 'pro' | 'admin'
+  userTier?: 'free' | 'pro'
 }
 
 export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, userTier = 'free' }: ChatPanelProps) {
@@ -48,17 +30,13 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
   const [isLoading, setIsLoading] = useState(false)
   const [pendingProposal, setPendingProposal] = useState<any>(null)
   const [historyLimitReached, setHistoryLimitReached] = useState(false)
-  const [historyWindow, setHistoryWindow] = useState<number | null>(null)
-  const [messagesRemaining, setMessagesRemaining] = useState<number | null>(null)
-  const [monthlyLimitReached, setMonthlyLimitReached] = useState(false)
-  const [serverTier, setServerTier] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [initialLoadComplete, setInitialLoadComplete] = useState(false)
 
-  const effectiveTier = serverTier ?? userTier
-  const isFreeTier = effectiveTier === 'free'
+  // Message limit based on tier
+  const messageLimit = userTier === 'pro' ? 500 : 50
 
   useEffect(() => {
     loadHistory()
@@ -83,14 +61,11 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
 
   const loadHistory = async () => {
     try {
-      const response = await api.chat.getHistory(HISTORY_REQUEST_LIMIT)
-      if (typeof response?.tier === 'string') setServerTier(response.tier)
-      const windowLimit = typeof response?.history_limit === 'number' ? response.history_limit : null
-      setHistoryWindow(windowLimit)
+      const response = await api.chat.getHistory(messageLimit)
       if (response.messages) {
         setMessages(response.messages.reverse())
-        const tier = response.tier ?? userTier
-        if (tier === 'free' && windowLimit !== null && response.messages.length >= windowLimit) {
+        // Check if we've hit the limit (for free users)
+        if (userTier === 'free' && response.messages.length >= messageLimit) {
           setHistoryLimitReached(true)
         }
       }
@@ -105,7 +80,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
   const sendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault()
     
-    if (!input.trim() || isLoading || monthlyLimitReached) return
+    if (!input.trim() || isLoading) return
     
     const userMessage = input.trim()
     setInput('')
@@ -147,23 +122,13 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       if (response.proposal) {
         setPendingProposal(response.proposal)
       }
-
-      if (typeof response.messages_remaining === 'number') {
-        setMessagesRemaining(response.messages_remaining)
-        if (response.messages_remaining <= 0) setMonthlyLimitReached(true)
-      }
       
     } catch (error) {
       console.error('Failed to send message:', error)
-      const limitMessage = monthlyLimitMessage(error)
-      if (limitMessage) {
-        setMonthlyLimitReached(true)
-        setMessagesRemaining(0)
-      }
       setMessages(prev => [...prev, {
         id: `error-${Date.now()}`,
         role: 'assistant',
-        content: limitMessage || (error instanceof APIError ? error.message : 'Sorry, I had trouble processing that. Please try again.'),
+        content: 'Sorry, I had trouble processing that. Please try again.',
         created_at: new Date().toISOString()
       }])
     } finally {
@@ -435,7 +400,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       </div>
 
       {/* History Limit Notice for Free Users */}
-      {historyLimitReached && isFreeTier && historyWindow !== null && (
+      {historyLimitReached && userTier === 'free' && (
         <motion.div
           className="mx-4 mb-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20"
           initial={{ opacity: 0, y: 10 }}
@@ -444,20 +409,13 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
           <div className="flex items-start gap-2 text-amber-400 text-xs">
             <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <div>
-              <span className="font-medium">Showing the latest {historyWindow} messages.</span>
-              <span className="text-amber-400/80"> Free accounts can still send {FREE_MONTHLY_USER_MESSAGES} messages each month. </span>
+              <span className="font-medium">Showing the latest 50 messages.</span>
+              <span className="text-amber-400/80"> That is the free history window. Free accounts can still send 100 messages each month. </span>
               <Link href="/pricing" className="text-watchman-accent hover:underline">Upgrade to Pro</Link>
               <span className="text-amber-400/80"> for a longer history.</span>
             </div>
           </div>
         </motion.div>
-      )}
-
-      {monthlyLimitReached && (
-        <div className="mx-4 mb-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
-          You&apos;ve used all {FREE_MONTHLY_USER_MESSAGES} Watchman messages for this month.{' '}
-          <Link href="/pricing" className="text-watchman-accent hover:underline">Upgrade to Pro</Link>
-        </div>
       )}
 
       {/* Input */}
@@ -469,8 +427,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={monthlyLimitReached ? 'Monthly message limit reached' : 'Tell me about your schedule...'}
-              disabled={monthlyLimitReached}
+              placeholder="Tell me about your schedule..."
               rows={1}
               className="w-full px-3 sm:px-4 py-2.5 sm:py-3 glass border border-white/10 rounded-xl text-xs sm:text-sm text-watchman-text placeholder-watchman-muted focus:outline-none focus:ring-2 focus:ring-watchman-accent focus:border-transparent resize-none transition-all"
               style={{ minHeight: '44px', maxHeight: '120px' }}
@@ -478,15 +435,15 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
           </div>
           <motion.button
             type="submit"
-            disabled={!input.trim() || isLoading || monthlyLimitReached}
+            disabled={!input.trim() || isLoading}
             className={cn(
               'px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all flex items-center justify-center',
-              input.trim() && !isLoading && !monthlyLimitReached
+              input.trim() && !isLoading
                 ? 'bg-watchman-accent hover:bg-watchman-accent-hover text-white shadow-lg shadow-watchman-accent/20'
                 : 'glass border border-white/10 text-watchman-muted cursor-not-allowed'
             )}
-            whileHover={input.trim() && !isLoading && !monthlyLimitReached ? { scale: 1.05 } : {}}
-            whileTap={input.trim() && !isLoading && !monthlyLimitReached ? { scale: 0.95 } : {}}
+            whileHover={input.trim() && !isLoading ? { scale: 1.05 } : {}}
+            whileTap={input.trim() && !isLoading ? { scale: 0.95 } : {}}
           >
             {isLoading ? (
               <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
@@ -495,11 +452,6 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
             )}
           </motion.button>
         </div>
-        {isFreeTier && messagesRemaining !== null && !monthlyLimitReached && (
-          <p className="text-[10px] text-watchman-muted mt-2 text-center">
-            {messagesRemaining} of {FREE_MONTHLY_USER_MESSAGES} messages left this month
-          </p>
-        )}
         <p className="text-[9px] sm:text-[10px] text-watchman-muted mt-1.5 sm:mt-2 text-center opacity-70 hidden sm:block">
           Enter to send · Shift+Enter for new line
         </p>
