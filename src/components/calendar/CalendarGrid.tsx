@@ -132,12 +132,16 @@ export function CalendarGrid({
   const [direction, setDirection] = useState(0);
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
 
-  // Update currentMonth when initialMonth changes (e.g., from year view)
+  // Follow the month the dashboard is showing. Ignore a new Date for the same month
+  // so picking a day, or switching Month/Year, does not jump back to the selection.
   useEffect(() => {
-    if (initialMonth) {
-      setCurrentMonth(initialMonth);
-    }
-  }, [initialMonth]);
+    if (!initialMonth) return
+    setCurrentMonth((current) => (
+      current.getFullYear() === initialMonth.getFullYear() && current.getMonth() === initialMonth.getMonth()
+        ? current
+        : initialMonth
+    ))
+  }, [initialMonth])
 
   const today = new Date();
 

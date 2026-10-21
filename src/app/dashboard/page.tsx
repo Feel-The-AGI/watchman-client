@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { format } from 'date-fns';
+import { gridMonthAfterViewToggle, headerYear, shiftViewedMonth, yearToLoad } from '@/lib/calendar-view';
 import { 
   Calendar as CalendarIcon, 
   Grid3X3, 
@@ -50,6 +51,7 @@ export default function DashboardPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [viewedMonth, setViewedMonth] = useState(() => gridMonthAfterViewToggle(new Date(), null));
   const [initialYearSet, setInitialYearSet] = useState(false);
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   const [stats, setStats] = useState<CalendarStats | null>(null);
@@ -122,6 +124,7 @@ export default function DashboardPage() {
         const anchorYear = new Date(activeCycle.anchor_date).getFullYear();
         if (anchorYear >= new Date().getFullYear() && anchorYear !== yearToFetch) {
           setCurrentYear(anchorYear);
+          setViewedMonth((current) => new Date(anchorYear, current.getMonth(), 1));
           fetchYear = anchorYear;
         }
         setInitialYearSet(true);
@@ -145,6 +148,16 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchCalendarData();
   }, []);
+
+  const showMonth = (month: Date) => {
+    const next = gridMonthAfterViewToggle(month, selectedDate);
+    setViewedMonth(next);
+    const year = yearToLoad(currentYearRef.current, next);
+    if (year !== null) {
+      setCurrentYear(year);
+      fetchCalendarData(year);
+    }
+  };
 
   const selectedDayData = selectedDate 
     ? calendarDays.find(d => d.date === format(selectedDate, 'yyyy-MM-dd')) || null
@@ -216,11 +229,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2 sm:gap-4">
             {/* Year Navigation */}
             <motion.button
-              onClick={() => {
-                const newYear = currentYear - 1;
-                setCurrentYear(newYear);
-                fetchCalendarData(newYear);
-              }}
+              onClick={() => showMonth(shiftViewedMonth(viewedMonth, -12))}
               className="p-2 sm:p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -231,7 +240,7 @@ export default function DashboardPage() {
 
             <div className="text-center sm:text-left">
               <h1 className="text-lg sm:text-2xl font-bold tracking-tight">
-                <span className="text-gradient">{currentYear}</span> <span className="hidden sm:inline">Calendar</span>
+                <span className="text-gradient">{headerYear(viewedMonth)}</span> <span className="hidden sm:inline">Calendar</span>
               </h1>
               <p className="text-watchman-text-secondary text-xs sm:text-sm hidden sm:block">
                 {profile?.name ? `${profile.name}'s schedule` : 'Your schedule overview'}
@@ -239,11 +248,7 @@ export default function DashboardPage() {
             </div>
 
             <motion.button
-              onClick={() => {
-                const newYear = currentYear + 1;
-                setCurrentYear(newYear);
-                fetchCalendarData(newYear);
-              }}
+              onClick={() => showMonth(shiftViewedMonth(viewedMonth, 12))}
               className="p-2 sm:p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -351,17 +356,18 @@ export default function DashboardPage() {
                   days={calendarDays}
                   selectedDate={selectedDate}
                   onSelectDate={setSelectedDate}
-                  initialMonth={selectedDate || undefined}
+                  initialMonth={gridMonthAfterViewToggle(viewedMonth, selectedDate)}
+                  onMonthChange={showMonth}
                   userTier={profile?.tier as 'free' | 'pro' | 'admin' || 'free'}
                 />
               ) : (
                 <div className="p-6">
                   <YearOverview
                     days={calendarDays}
-                    year={currentYear}
+                    year={headerYear(viewedMonth)}
                     onSelectMonth={(month) => {
+                      showMonth(month);
                       setViewMode('month');
-                      setSelectedDate(month);
                     }}
                     userTier={profile?.tier as 'free' | 'pro' | 'admin' || 'free'}
                   />
