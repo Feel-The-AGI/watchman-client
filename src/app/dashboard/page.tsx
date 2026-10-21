@@ -30,6 +30,7 @@ import { Card, CardContent, CardHeader, CardTitle, BentoCard } from '@/component
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import { loadDashboardSnapshot } from '@/lib/dashboard-refresh';
+import { normalizeCalendarDays } from '@/lib/calendar-day';
 import Link from 'next/link';
 
 type ViewMode = 'month' | 'year';
@@ -74,7 +75,7 @@ export default function DashboardPage() {
         setHasSetup(snapshot.cycles.length > 0);
       }
       if (snapshot.calendar) {
-        setCalendarDays(snapshot.calendar as CalendarDay[]);
+        setCalendarDays(normalizeCalendarDays(snapshot.calendar) as CalendarDay[]);
       }
       if (snapshot.stats) {
         setStats(snapshot.stats as CalendarStats);
@@ -128,7 +129,7 @@ export default function DashboardPage() {
 
       // Fetch calendar data for the correct year
       const calendarResponse = await api.calendar.getYear(fetchYear);
-      setCalendarDays(calendarResponse || []);
+      setCalendarDays(normalizeCalendarDays(calendarResponse) as CalendarDay[]);
 
       const statsResponse = await api.stats.getSummary(fetchYear);
       setStats(statsResponse || null);
