@@ -38,7 +38,8 @@ export function capTouchString(value: string): string {
 const TOKEN_PATH_PREFIXES = ['/shared']
 
 export function publicLandingPath(pathname: string): string {
-  const path = pathname && pathname.startsWith('/') ? pathname : `/${pathname || ''}`
+  const normalized = pathname && pathname.startsWith('/') ? pathname : `/${pathname || ''}`
+  const path = (normalized.split(/[?#]/, 1)[0] ?? '').replace(/\/{2,}/g, '/')
   for (const prefix of TOKEN_PATH_PREFIXES) {
     if (path === prefix || path.startsWith(`${prefix}/`)) return prefix
   }
@@ -99,7 +100,7 @@ export function rebuildFirstTouch(value: unknown): FirstTouch | null {
   const touch: FirstTouch = {
     landing_path: publicLandingPath(typeof record.landing_path === 'string' ? record.landing_path : '/'),
     referrer_host: cappedKnownString(record.referrer_host),
-    captured_at: typeof record.captured_at === 'string' ? capTouchString(record.captured_at) : '',
+    captured_at: typeof record.captured_at === 'string' && Number.isFinite(Date.parse(record.captured_at)) ? capTouchString(record.captured_at) : '',
   }
   let hasTrackedParam = false
   for (const key of TRACKED_PARAMS) {
@@ -108,9 +109,7 @@ export function rebuildFirstTouch(value: unknown): FirstTouch | null {
     touch[key] = capped
     hasTrackedParam = true
   }
-  if (!hasTrackedParam && typeof record.landing_path !== 'string' && typeof record.captured_at !== 'string') {
-    return null
-  }
+  if (!hasTrackedParam) return null
   return touch
 }
 

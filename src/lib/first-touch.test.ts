@@ -257,4 +257,56 @@ describe('first touch', () => {
     assert.deepEqual(first, { data: { first_touch: touch } })
     assert.equal(second, null)
   })
+
+  it('drops a captured_at that is not a real time', () => {
+    const unparsed = memoryStorage(JSON.stringify({
+      utm_source: 'ad',
+      landing_path: '/',
+      captured_at: 'not-a-time',
+    }))
+    const numeric = memoryStorage(JSON.stringify({
+      utm_source: 'ad',
+      landing_path: '/',
+      captured_at: 123,
+    }))
+    const valid = memoryStorage(JSON.stringify({
+      utm_source: 'ad',
+      landing_path: '/',
+      captured_at: capturedAt,
+    }))
+    assert.equal(readFirstTouch(unparsed)?.captured_at, '')
+    assert.equal(readFirstTouch(numeric)?.captured_at, '')
+    assert.equal(readFirstTouch(valid)?.captured_at, capturedAt)
+  })
+
+  it('strips a query, a hash, and repeated slashes before keeping /shared', () => {
+    assert.equal(publicLandingPath('/shared?t=x'), '/shared')
+    assert.equal(publicLandingPath('/shared#x'), '/shared')
+    assert.equal(publicLandingPath('//shared/abc'), '/shared')
+    assert.equal(publicLandingPath('/shared?t=x').includes('t=x'), false)
+    assert.equal(publicLandingPath('//shared/abc').includes('abc'), false)
+  })
+
+  it('does not send a stored record that has no source param', () => {
+    const storage = memoryStorage(JSON.stringify({
+      landing_path: '/pricing',
+      referrer_host: 'news.example',
+      captured_at: capturedAt,
+    }))
+    assert.equal(readFirstTouch(storage), null)
+    assert.deepEqual(emailSignupData('Ada', storage), { name: 'Ada' })
+    assert.equal(magicLinkSignupData(storage), undefined)
+    const blankSource = memoryStorage(JSON.stringify({
+      utm_source: '',
+      landing_path: '/pricing',
+      captured_at: capturedAt,
+    }))
+    assert.equal(readFirstTouch(blankSource), null)
+    const withRef = memoryStorage(JSON.stringify({
+      ref: 'friend',
+      landing_path: '/pricing',
+      captured_at: capturedAt,
+    }))
+    assert.equal(readFirstTouch(withRef)?.ref, 'friend')
+  })
 })
