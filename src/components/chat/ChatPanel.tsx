@@ -18,8 +18,12 @@ import {
   isInternalChatMessage,
   mergeChatHistory,
   messagesAfterSend,
+  blankDaysProposalIdsToDecline,
+  newestVisibleProposal,
   proposalAppliedText,
   proposalCardText,
+  proposalModelNote,
+  stalePendingCards,
   REVIEW_FAILURE_MESSAGE,
   type ChatTextPart,
 } from '@/lib/chat-display'
@@ -130,6 +134,8 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
   const [historyLimitReached, setHistoryLimitReached] = useState(false)
   const [historyError, setHistoryError] = useState<string | null>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const rawHistoryRef = useRef<Message[]>([])
+  const historyLoadedRef = useRef(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [initialLoadComplete, setInitialLoadComplete] = useState(false)
 
@@ -157,6 +163,21 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
     })
   }, [messages, initialLoadComplete])
 
+  const choosePendingProposal = async () => {
+    const pending = await api.commands.pendingProposals()
+    const list = Array.isArray(pending?.proposals) ? pending.proposals : []
+    const rawHistory = rawHistoryRef.current
+    const historyLoaded = historyLoadedRef.current
+    await Promise.all(blankDaysProposalIdsToDecline(list, rawHistory, historyLoaded).map(async (id) => {
+      try {
+        await api.commands.reviewProposal(id, 'reject')
+      } catch (error) {
+        console.error('Failed to decline an unrequested proposal:', error)
+      }
+    }))
+    return newestVisibleProposal(list, rawHistory, historyLoaded)
+  }
+
   const loadHistory = async () => {
     let history: Message[] = []
     let historyLoaded = false
@@ -165,6 +186,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
     const pullHistory = async () => {
       const response = await api.chat.getHistory(limit)
       const raw = Array.isArray(response?.messages) ? response.messages as Message[] : []
+      rawHistoryRef.current = raw
       history = raw
         .filter((message) => !isInternalChatMessage(message))
         .map((message) => ({
@@ -176,6 +198,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       const historyLimit = typeof response?.history_limit === 'number' ? response.history_limit : null
       setHistoryLimitReached(historyLimit !== null && history.length >= historyLimit)
       historyLoaded = true
+      historyLoadedRef.current = true
       setHistoryError(null)
     }
 
@@ -198,8 +221,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
     }
 
     try {
-      const pending = await api.commands.pendingProposals()
-      const proposal = pending?.proposals?.[0] || null
+      const proposal = await choosePendingProposal()
       setPendingProposal(proposal)
       history = withProposalCard(history, proposal)
       if (historyLoaded) setHistoryError(null)
@@ -223,7 +245,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
   const sendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault()
     
-    if (!input.trim() || isLoading || pendingProposal || isReviewing) return
+    if (!input.trim() || isLoading || isReviewing) return
     
     const userMessage = input.trim()
     setInput('')
@@ -235,9 +257,18 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       content: userMessage,
       created_at: new Date().toISOString()
     }
-    setMessages(prev => [...prev, tempUserMessage])
+    const replacedId = pendingProposal?.id
+    setPendingProposal(null)
+    setMessages(prev => [...stalePendingCards(prev), tempUserMessage])
 
     try {
+      if (replacedId) {
+        try {
+          await api.commands.reviewProposal(replacedId, 'reject')
+        } catch (error) {
+          console.error('Failed to decline the replaced proposal:', error)
+        }
+      }
       const response = await api.chat.sendMessage(userMessage, autoExecute)
       
       const assistantText = response.assistant_message
@@ -289,10 +320,9 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
 
   const loadNextProposal = async () => {
     try {
-      const pending = await api.commands.pendingProposals()
-      const proposal = pending?.proposals?.[0] || null
-      setPendingProposal(proposal)
-      setMessages(prev => withProposalCard(prev, proposal))
+      const visible = await choosePendingProposal()
+      setPendingProposal(visible)
+      setMessages(prev => withProposalCard(prev, visible))
     } catch (error) {
       console.error('Failed to reload pending proposals:', error)
     }
@@ -526,6 +556,11 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
                         : message.content}
                   />
                 </p>
+                {message.proposal && proposalModelNote(message.proposal) && (
+                  <p className="mt-2 text-xs text-watchman-muted whitespace-pre-wrap">
+                    {proposalModelNote(message.proposal)}
+                  </p>
+                )}
                 
                 {/* Proposal approval buttons */}
                 {message.isProposal && message.proposal && pendingProposal?.id === message.proposal.id && (
@@ -650,7 +685,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={pendingProposal ? 'Apply or decline the proposed change first' : 'Tell me about your schedule...'}
+              placeholder="Tell me about your schedule..."
               disabled={chatInputLocked(pendingProposal, isReviewing)}
               rows={1}
               className="w-full px-3 sm:px-4 py-2.5 sm:py-3 glass border border-white/10 rounded-xl text-xs sm:text-sm text-watchman-text placeholder-watchman-muted focus:outline-none focus:ring-2 focus:ring-watchman-accent focus:border-transparent resize-none transition-all disabled:cursor-not-allowed disabled:opacity-60"

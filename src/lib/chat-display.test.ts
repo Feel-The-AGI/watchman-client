@@ -11,8 +11,13 @@ import {
   isInternalChatMessage,
   mergeChatHistory,
   messagesAfterSend,
+  blankDaysProposalIdsToDecline,
+  newestVisibleProposal,
   proposalAppliedText,
   proposalCardText,
+  proposalModelNote,
+  stalePendingCards,
+  userAskedToClearDays,
   REVIEW_FAILURE_MESSAGE,
   sanitizeChatDisplay,
 } from './chat-display.ts'
@@ -60,7 +65,8 @@ describe('chat display', () => {
   it('unlocks the chat input after a failed review', () => {
     const afterFailure = { pendingProposal: null, isReviewing: false }
     assert.equal(chatInputLocked(afterFailure.pendingProposal, afterFailure.isReviewing), false)
-    assert.equal(chatInputLocked({ id: 'proposal-1' }, false), true)
+    assert.equal(chatInputLocked({ id: 'proposal-1' }, false), false)
+    assert.equal(chatInputLocked(null, true), true)
     assert.equal(
       REVIEW_FAILURE_MESSAGE,
       "That didn't go through. You can try again or send another message.",
@@ -172,6 +178,116 @@ describe('chat display', () => {
     assert.equal(chatScrollTop(100, 420), 0)
     assert.equal(chatScrollBehavior(false), 'auto')
     assert.equal(chatScrollBehavior(true), 'smooth')
+  })
+
+  it('does not treat unclear or clearly as a request to clear days', () => {
+    assert.equal(userAskedToClearDays('the schedule is unclear'), false)
+    assert.equal(userAskedToClearDays('clearly a day shift'), false)
+    assert.equal(userAskedToClearDays('please clear the days before Oct 22'), true)
+    assert.equal(userAskedToClearDays('clearing the days before Jan'), true)
+    assert.equal(userAskedToClearDays('blanked days'), true)
+    assert.equal(userAskedToClearDays('mark them blank'), true)
+    assert.equal(userAskedToClearDays('leave those days untracked'), true)
+  })
+
+  it('shows the newer card when the oldest blank-days proposal is hidden', () => {
+    const hidden = {
+      id: 'old',
+      created_at: '2026-10-22T01:00:00Z',
+      message_id: 'u-setup',
+      command: {
+        action: 'override_days',
+        explanation: 'Clear every day before the anchor',
+        payload: { work_type: 'blank', start_date: '2026-01-01', end_date: '2026-10-21', description: 'incident body' },
+      },
+    }
+    const newer = {
+      id: 'new',
+      created_at: '2026-10-22T02:00:00Z',
+      message_id: 'u-hair',
+      command: {
+        action: 'add_commitment',
+        explanation: 'Add Haircut on Thu 5 Nov, 16:00-17:00',
+        model_text: "I'll add the haircut.",
+        payload: { name: 'Haircut', start_date: '2026-11-05', description: 'not a change label' },
+      },
+    }
+    const turns = [
+      { id: 'u-setup', role: 'user', content: 'I work 5 days, 5 nights, 5 off' },
+      { id: 'u-hair', role: 'user', content: 'Book a haircut on Thursday' },
+    ]
+    assert.deepEqual(blankDaysProposalIdsToDecline([hidden, newer], turns, true), ['old'])
+    assert.equal(newestVisibleProposal([hidden, newer], turns)?.id, 'new')
+    assert.equal(proposalCardText(newer), 'Add Haircut on Thu 5 Nov, 16:00-17:00')
+    assert.equal(proposalModelNote(newer), "I'll add the haircut.")
+    assert.equal(proposalCardText(newer).includes('not a change label'), false)
+  })
+
+  it('shows the newest pending proposal after a reload', () => {
+    const older = {
+      id: 'older',
+      created_at: '2026-10-22T01:00:00Z',
+      message_id: 'u1',
+      command: { action: 'add_leave', explanation: 'Mark Tue 27 Oct as leave', payload: { start_date: '2026-10-27' } },
+    }
+    const newest = {
+      id: 'newest',
+      created_at: '2026-10-22T03:00:00Z',
+      message_id: 'u2',
+      command: { action: 'add_commitment', explanation: 'Add Haircut on Thu 5 Nov', payload: { name: 'Haircut' } },
+    }
+    const turns = [
+      { id: 'u1', role: 'user', content: 'I need leave on 27 Oct' },
+      { id: 'u2', role: 'user', content: 'Book a haircut' },
+    ]
+    assert.equal(newestVisibleProposal([older, newest], turns)?.id, 'newest')
+    assert.equal(newestVisibleProposal([newest, older], turns)?.id, 'newest')
+  })
+
+  it('hides a blank-days card without declining when history did not load', () => {
+    const proposal = {
+      id: 'p-blank',
+      message_id: 'u-setup',
+      command: { action: 'override_days', payload: { work_type: 'blank' } },
+    }
+    assert.deepEqual(blankDaysProposalIdsToDecline([proposal], [], false), [])
+    assert.equal(newestVisibleProposal([proposal], [], false), null)
+  })
+
+  it('hides a blank-days card without declining when its source message is missing', () => {
+    const proposal = {
+      id: 'p-blank',
+      message_id: 'missing',
+      command: { action: 'override_days', payload: { work_type: 'blank' } },
+    }
+    const raw = [{ id: 'other', role: 'user', content: 'Book a haircut' }]
+    assert.deepEqual(blankDaysProposalIdsToDecline([proposal], raw, true), [])
+    assert.equal(newestVisibleProposal([proposal], raw, true), null)
+  })
+
+  it('declines a blank-days card whose source is the onboarding prompt', () => {
+    const proposal = {
+      id: 'p-blank',
+      message_id: 'u-parse',
+      command: { action: 'override_days', payload: { work_type: 'blank' } },
+    }
+    const raw = [{
+      id: 'u-parse',
+      role: 'user',
+      content: 'The user is describing their work shift rotation pattern: "5-5-5". Respond in this EXACT JSON format.',
+    }]
+    assert.deepEqual(blankDaysProposalIdsToDecline([proposal], raw, true), ['p-blank'])
+    assert.equal(newestVisibleProposal([proposal], raw, true), null)
+  })
+
+  it('shows one copy of a message sent while a proposal card is pending', () => {
+    const saved = { id: 'srv-1', role: 'user', content: 'Book a haircut', created_at: '' }
+    const card = { id: 'asst-1', role: 'assistant', content: 'Clear the days before Oct 22', created_at: '', proposal: { id: 'p1' } }
+    const optimistic = { id: 'temp-1', role: 'user', content: 'Book a haircut', created_at: '' }
+    const shown = messagesAfterSend([saved, card, optimistic], 'temp-1', saved, null)
+    assert.equal(shown.filter((message) => message.role === 'user' && message.content === 'Book a haircut').length, 1)
+    const dismissed = stalePendingCards(shown)
+    assert.equal(dismissed.find((message) => message.id === 'asst-1')?.isProposal, false)
   })
 
   it('does not repeat a user message already stored when the proposal reply echoes it', () => {

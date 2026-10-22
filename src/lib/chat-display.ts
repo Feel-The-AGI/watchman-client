@@ -94,7 +94,7 @@ export const PROPOSAL_CARD_FALLBACK = 'Review this proposed change.'
 
 export const REVIEW_FAILURE_MESSAGE = "That didn't go through. You can try again or send another message."
 
-/** Card copy prefers the server's human explanation and never a raw tool name. */
+/** Card copy is the server summary in command.explanation, never a raw tool name. */
 export function proposalCardText(
   proposal: { command?: { explanation?: unknown } } | null | undefined,
   messageContent?: unknown,
@@ -104,6 +104,17 @@ export function proposalCardText(
   const content = chatMessageText(messageContent)
   if (content && !isRawToolText(content)) return content
   return PROPOSAL_CARD_FALLBACK
+}
+
+/** The model's own sentence, shown under the summary when the server sent one. */
+export function proposalModelNote(
+  proposal: { command?: { explanation?: unknown; model_text?: unknown } } | null | undefined,
+): string | null {
+  const note = proposal?.command?.model_text
+  if (typeof note !== 'string' || !note.trim() || isRawToolText(note)) return null
+  const main = explanationFromCommand(proposal?.command)
+  if (main && note.trim() === main.trim()) return null
+  return note.trim()
 }
 
 /** Post-apply line. Same explanation, never "Executing add_commitment". */
@@ -277,8 +288,98 @@ export function chatScrollBehavior(historySettled: boolean): ScrollBehavior {
   return historySettled ? 'smooth' : 'auto'
 }
 
-export function chatInputLocked(pendingProposal: unknown, isReviewing: boolean): boolean {
-  return Boolean(pendingProposal) || isReviewing
+/** A review click can disable the buttons. A waiting card must not block typing. */
+export function chatInputLocked(_pendingProposal: unknown, isReviewing: boolean): boolean {
+  return isReviewing
+}
+
+type ProposalRecord = {
+  id?: string
+  message_id?: string
+  created_at?: string
+  command?: {
+    action?: string
+    payload?: { work_type?: unknown }
+  }
+}
+
+function proposalRecord(proposal: unknown): ProposalRecord | null {
+  if (!proposal || typeof proposal !== 'object') return null
+  return proposal as ProposalRecord
+}
+
+const CLEAR_DAYS_WORD = /\b(blank|clear|untrack)(?:s|ed|ing)?\b/i
+
+/** Whole words in the user's message. "unclear" and "clearly" do not count. */
+export function userAskedToClearDays(text: string): boolean {
+  return CLEAR_DAYS_WORD.test(text)
+}
+
+type ChatTurn = { id?: string; role?: string; content?: string }
+
+function isBlankDaysOverride(proposal: unknown): boolean {
+  const record = proposalRecord(proposal)
+  return Boolean(record?.id)
+    && record?.command?.action === 'override_days'
+    && record?.command?.payload?.work_type === 'blank'
+}
+
+/**
+ * show: the user asked for it.
+ * decline: history loaded and the source message is an onboarding prompt or a user
+ * message that does not ask to clear days.
+ * hide: keep it pending, but do not show the card.
+ */
+export function blankDaysProposalFate(
+  proposal: unknown,
+  rawHistory: ChatTurn[],
+  historyLoaded: boolean,
+): 'show' | 'hide' | 'decline' {
+  if (!isBlankDaysOverride(proposal)) return 'show'
+  if (!historyLoaded) return 'hide'
+  const record = proposalRecord(proposal)
+  const source = rawHistory.find((message) => message.id && message.id === record?.message_id)
+  if (!source) return 'hide'
+  if (isInternalChatMessage(source)) return 'decline'
+  const text = typeof source.content === 'string' ? source.content : ''
+  if (source.role === 'user' && !userAskedToClearDays(text)) return 'decline'
+  if (source.role === 'user' && userAskedToClearDays(text)) return 'show'
+  return 'hide'
+}
+
+export function blankDaysProposalIdsToDecline(
+  proposals: unknown[] | null | undefined,
+  rawHistory: ChatTurn[],
+  historyLoaded: boolean,
+): string[] {
+  const ids: string[] = []
+  for (const proposal of proposals || []) {
+    const record = proposalRecord(proposal)
+    if (record?.id && blankDaysProposalFate(proposal, rawHistory, historyLoaded) === 'decline') ids.push(record.id)
+  }
+  return ids
+}
+
+/** Newest by created_at. The pending list itself is oldest first. */
+export function newestVisibleProposal<T>(
+  proposals: T[] | null | undefined,
+  rawHistory: ChatTurn[],
+  historyLoaded = true,
+): T | null {
+  const visible = (proposals || []).filter((proposal) => {
+    const record = proposalRecord(proposal)
+    return Boolean(record?.id) && blankDaysProposalFate(proposal, rawHistory, historyLoaded) === 'show'
+  })
+  if (visible.length === 0) return null
+  return [...visible].sort((left, right) => {
+    const leftAt = proposalRecord(left)?.created_at || ''
+    const rightAt = proposalRecord(right)?.created_at || ''
+    return rightAt.localeCompare(leftAt)
+  })[0]
+}
+
+export function stalePendingCards<T extends { isProposal?: boolean; proposal?: unknown }>(messages: T[]): T[] {
+  return messages.map((message) => (message.proposal ? { ...message, isProposal: false } : message))
 }
 
 export interface ChatListMessage {
@@ -319,8 +420,10 @@ export function messagesAfterSend<T extends ChatListMessage>(
   assistant: T | null | undefined,
 ): T[] {
   const base = user?.id ? current.filter((message) => message.id !== optimisticId) : current
-  const withUser = user?.id ? [...base, user] : base
-  const withAssistant = assistant?.id ? [...withUser, assistant] : withUser
+  const withUser = user?.id && !base.some((message) => message.id === user.id) ? [...base, user] : base
+  const withAssistant = assistant?.id && !withUser.some((message) => message.id === assistant.id)
+    ? [...withUser, assistant]
+    : withUser
   return collapseUserEchoes(withAssistant)
 }
 
