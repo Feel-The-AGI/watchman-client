@@ -2,7 +2,7 @@ export const ROTATION_FEATURE = '"5 days, 5 nights, 5 off. January 1st is Day 4.
 
 export const RULES_FEATURE = 'No study on night shifts. A study commitment on a night shift is shown to you before it can be applied.'
 
-export const BOUNDARY_STEP = 'Rules for your rotation, nights, and leave. Constraints that protect your days off.'
+export const BOUNDARY_STEP = 'Set hard rules for your rotation, like no study on night shifts.'
 
 export const CLOSING_LINE = 'Define your rules. See the rotation. See the truth.'
 

@@ -66,7 +66,7 @@ const features = [
 // How it works - simplified
 const steps = [
   { num: '01', title: 'Define Your Cycle', desc: 'Tell us your rotation. It becomes the foundation of your calendar.', icon: Clock },
-  { num: '02', title: 'Set Your Boundaries', desc: BOUNDARY_STEP, icon: Shield },
+  { num: '02', title: 'Set your hard rules', desc: BOUNDARY_STEP, icon: Shield },
   { num: '03', title: 'Propose Changes', desc: 'Need leave? New commitment? Just ask.', icon: MessageSquare },
   { num: '04', title: 'Review Chat Changes', desc: 'Apply or decline a proposal before it updates the calendar.', icon: CheckCircle },
 ];
