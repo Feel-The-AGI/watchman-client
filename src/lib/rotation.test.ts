@@ -7,6 +7,8 @@ import {
   parseRotation,
   ROTATION_PARSE_MARKER,
   ROTATION_PRESETS,
+  anchorFromChatResponse,
+  onboardingChatRequest,
   rotationFromAssistantText,
   rotationParsePrompt,
 } from './rotation.ts'
@@ -86,6 +88,42 @@ describe('parseRotation', () => {
     for (const name of ['14/14', '21/7', '28/28', '2-2-3', '4 on / 4 off']) {
       assert.ok(names.includes(name), name)
     }
+  })
+})
+
+describe('onboarding chat pattern and anchor', () => {
+  const fiveFiveFive = [
+    { label: 'work_day' as const, duration: 5 },
+    { label: 'work_night' as const, duration: 5 },
+    { label: 'off' as const, duration: 5 },
+  ]
+
+  it('sends the chosen pattern only when onboarding has one', () => {
+    assert.deepEqual(onboardingChatRequest('Today Oct 22 is day 1', fiveFiveFive), {
+      content: 'Today Oct 22 is day 1',
+      auto_execute: false,
+      pattern: fiveFiveFive,
+    })
+    assert.deepEqual(onboardingChatRequest('5 on 5 off', []), {
+      content: '5 on 5 off',
+      auto_execute: false,
+    })
+  })
+
+  it('applies an anchor that fits the pattern and ignores one that does not', () => {
+    assert.deepEqual(
+      anchorFromChatResponse({ anchor: { date: '2026-10-22', cycle_day: 1 }, response: 'Anchored.' }, fiveFiveFive),
+      { date: '2026-10-22', cycle_day: 1 },
+    )
+    assert.equal(anchorFromChatResponse({ response: 'Tell me the pattern.' }, fiveFiveFive), null)
+    assert.deepEqual(
+      anchorFromChatResponse({ anchor: { date: '2026-10-22', cycle_day: 15 } }, fiveFiveFive),
+      { date: '2026-10-22', cycle_day: 15 },
+    )
+    assert.equal(anchorFromChatResponse({ anchor: { date: '2026-10-22', cycle_day: 16 } }, fiveFiveFive), null)
+    assert.equal(anchorFromChatResponse({ anchor: { date: '2026-10-22', cycle_day: 0 } }, fiveFiveFive), null)
+    assert.equal(anchorFromChatResponse({ anchor: { date: '2026-02-31', cycle_day: 1 } }, fiveFiveFive), null)
+    assert.equal(anchorFromChatResponse({ anchor: { date: '2026-10-22', cycle_day: 1 } }, []), null)
   })
 })
 

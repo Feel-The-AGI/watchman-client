@@ -299,6 +299,44 @@ export function rotationFromAssistantText(responseText: string): ChatRotationPar
   return { understood: false, message }
 }
 
+/** Body for POST /api/chat/message during onboarding. An empty pattern is omitted. */
+export function onboardingChatRequest(
+  content: string,
+  pattern: CycleBlock[] | null | undefined,
+): { content: string; auto_execute: false; pattern?: CycleBlock[] } {
+  const blocks = (pattern ?? []).filter((block) =>
+    (block.label === 'work_day' || block.label === 'work_night' || block.label === 'off')
+    && Number.isInteger(block.duration)
+    && block.duration > 0
+  )
+  if (blocks.length === 0) return { content, auto_execute: false }
+  return { content, auto_execute: false, pattern: blocks.map((block) => ({ label: block.label, duration: block.duration })) }
+}
+
+export function cycleLength(pattern: CycleBlock[] | null | undefined): number {
+  return (pattern ?? []).reduce((sum, block) => sum + (Number.isFinite(block.duration) ? block.duration : 0), 0)
+}
+
+/**
+ * Anchor values for the date picker and day slider.
+ * Missing, invalid, or out-of-range anchors are ignored. Nothing is saved here.
+ */
+export function anchorFromChatResponse(
+  response: unknown,
+  pattern: CycleBlock[] | null | undefined,
+): { date: string; cycle_day: number } | null {
+  if (!response || typeof response !== 'object') return null
+  const anchor = (response as { anchor?: unknown }).anchor
+  if (!anchor || typeof anchor !== 'object') return null
+  const date = (anchor as { date?: unknown }).date
+  const cycleDay = (anchor as { cycle_day?: unknown }).cycle_day
+  if (typeof date !== 'string' || !parseLocalDate(date)) return null
+  if (typeof cycleDay !== 'number' || !Number.isInteger(cycleDay)) return null
+  const length = cycleLength(pattern)
+  if (cycleDay < 1 || cycleDay > length) return null
+  return { date, cycle_day: cycleDay }
+}
+
 export function rotationFromChatResponse(response: unknown): ChatRotationParse | null {
   if (typeof response === 'string') return rotationFromAssistantText(response)
   if (!response || typeof response !== 'object') return null
