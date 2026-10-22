@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit && tsc -p e2e/tsconfig.json",
     "test:unit": "node --import tsx --test src/lib/*.test.ts",
+    "test:date-zones": "node --import tsx --test src/lib/date-only.test.ts",
     "e2e": "playwright test -c e2e/playwright.config.ts"
   },
   "dependencies": {
