@@ -71,7 +71,7 @@ export default function PrivacyPolicyPage() {
                   <div>
                     <h3 className="font-medium text-white">Payment Information</h3>
                     <p className="text-watchman-text-secondary leading-relaxed">
-                      Pro payments are processed by Paystack. We do not store your full card number. We store a Paystack customer identifier and payment references so we can record the payment on your account.
+                      Pro payments are processed by Paystack. We do not store your payment details. We store a Paystack customer identifier and payment references so we can record the payment on your account.
                     </p>
                   </div>
                 </div>

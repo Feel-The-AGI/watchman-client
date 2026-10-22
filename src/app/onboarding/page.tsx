@@ -155,7 +155,7 @@ export default function OnboardingPage() {
     setAnchorCycleDay(cycleDay);
     setShowQuickActions(false);
     setTimeout(() => {
-      addMessage('assistant', 'Great! Finally, set hard rules for your rotation, like no study on night shifts. Watchman keeps those rules.');
+      addMessage('assistant', 'Great! Finally, set hard rules for your rotation, like no study on night shifts.');
       setStep(3);
       setTimeout(() => setShowQuickActions(true), 500);
     }, 600);

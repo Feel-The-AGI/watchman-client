@@ -87,7 +87,7 @@ export default function TermsOfServicePage() {
                   <div>
                     <h3 className="font-medium text-white">Payment</h3>
                     <p>
-                      Payments are processed by Paystack. We do not store your full card number. A verified payment turns on Pro until the end of that 30-day period. We do not charge the same payment method again unless you start another checkout.
+                      Payments are processed by Paystack. We do not store your payment details. A verified payment turns on Pro until the end of that 30-day period. We do not charge the same payment method again unless you start another checkout.
                     </p>
                   </div>
                   <div>
