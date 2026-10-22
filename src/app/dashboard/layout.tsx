@@ -21,6 +21,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { isSignOutNavigationPending } from '@/lib/auth-session';
+import { configureCalendarRefresh, invalidateCalendar, isCalendarRefreshPending, watchCalendarFocus } from '@/lib/calendar-sync';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { cn } from '@/lib/utils';
@@ -58,6 +60,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       router.push('/login');
     }
   }, [user, loading, router]);
+
+  configureCalendarRefresh({
+    cycles: api.cycles,
+    calendar: api.calendar,
+    stats: api.stats,
+  });
+
+  useEffect(() => {
+    return watchCalendarFocus(() => {
+      if (isCalendarRefreshPending()) return
+      void invalidateCalendar();
+    });
+  }, []);
 
   const handleSignOut = () => {
     void signOut();
@@ -305,6 +320,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-30 flex items-center justify-between px-6 py-4 glass-subtle border-b border-white/5 lg:px-8">
           <div className="flex items-center gap-4">
             <button
+              aria-label="Open menu"
               className="lg:hidden p-2.5 -ml-2 hover:bg-white/5 rounded-xl transition-colors"
               onClick={() => setSidebarOpen(true)}
             >

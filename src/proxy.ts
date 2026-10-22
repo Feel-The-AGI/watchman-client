@@ -23,6 +23,10 @@ function supabaseEnv(): { url: string; key: string } | null {
  * getUser() leaves the request and its cookies alone.
  */
 export async function proxy(request: NextRequest) {
+  if (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_E2E_AUTH === '1') {
+    return NextResponse.next()
+  }
+
   const cookieHeader = request.headers.get('cookie')
   const hasAuthCookie = requestHasAuthSessionCookie(cookieHeader)
   let response = NextResponse.next({ request })

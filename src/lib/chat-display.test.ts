@@ -14,11 +14,17 @@ import {
   blankDaysProposalFate,
   blankDaysProposalIdsToDecline,
   newestVisibleProposal,
+  EXPIRED_SUGGESTION_MESSAGE,
+  isNoChangeReview,
+  noChangeMessage,
   proposalAppliedText,
   proposalCardText,
   proposalModelNote,
+  proposalsToResurface,
   stalePendingCards,
   userAskedToClearDays,
+  withoutLingeringCalendarStatus,
+  NO_CHANGE_MESSAGE,
   REVIEW_FAILURE_MESSAGE,
   sanitizeChatDisplay,
 } from './chat-display.ts'
@@ -245,7 +251,7 @@ describe('chat display', () => {
     ]
     assert.deepEqual(blankDaysProposalIdsToDecline([hidden, newer], turns, true), ['old'])
     assert.equal(newestVisibleProposal([hidden, newer], turns)?.id, 'new')
-    assert.equal(proposalCardText(newer), 'Add Haircut on Thu 5 Nov, 16:00-17:00')
+    assert.equal(proposalCardText(newer), 'Add Haircut on Thu 5 Nov, 16:00-17:00 (November 5, 2026).')
     assert.equal(proposalModelNote(newer), "I'll add the haircut.")
     assert.equal(proposalCardText(newer).includes('not a change label'), false)
   })
@@ -346,5 +352,54 @@ describe('chat display', () => {
     const shown = messagesAfterSend([saved, optimistic], 'temp-1', saved, card)
     assert.equal(shown.filter((message) => message.role === 'user').length, 1)
     assert.equal(shown.filter((message) => message.role === 'user')[0].id, 'srv-1')
+  })
+
+  it('shows the target date in words when the card would otherwise hide it', () => {
+    const proposal = {
+      id: 'p-oct',
+      command: {
+        action: 'override_days',
+        explanation: 'Executing override_days',
+        payload: { date: '2026-10-15', work_type: 'off' },
+      },
+    }
+    assert.equal(proposalCardText(proposal), 'Review this proposed change for October 15, 2026.')
+    const range = {
+      command: {
+        action: 'add_leave',
+        payload: { start_date: '2026-10-15', end_date: '2026-10-17' },
+      },
+    }
+    assert.equal(proposalCardText(range), 'Review this proposed change for October 15-17, 2026.')
+  })
+
+  it('does not resurface a pending proposal older than 7 days', () => {
+    const now = Date.parse('2026-10-22T12:00:00.000Z')
+    const fresh = { id: 'fresh', created_at: '2026-10-20T12:00:00.000Z' }
+    const edge = { id: 'edge', created_at: new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString() }
+    const stale = { id: 'stale', created_at: '2025-12-22T12:00:00.000Z' }
+    const undated = { id: 'undated' }
+    assert.deepEqual(proposalsToResurface([fresh, edge, stale, undated], now).map((item) => item.id), ['fresh', 'edge'])
+    assert.deepEqual(proposalsToResurface([{ id: 'late', created_at: new Date(now - 7 * 24 * 60 * 60 * 1000 - 1).toISOString() }], now), [])
+  })
+
+  it('says nothing changed instead of Done, and drops a lingering status line', () => {
+    assert.equal(isNoChangeReview({ success: true, status: 'no_change', message: 'That day was already off.' }), true)
+    assert.equal(noChangeMessage({ success: true, status: 'no_change', message: 'That day was already off.' }), 'That day was already off.')
+    assert.equal(isNoChangeReview({ success: true, data: { updated_days: 0 } }), true)
+    assert.equal(noChangeMessage({ success: true, data: { updated_days: 0 } }), NO_CHANGE_MESSAGE)
+    assert.equal(isNoChangeReview({ success: true, days_updated: 0 }), true)
+    assert.equal(isNoChangeReview({ success: true, updated_days: 1 }), false)
+    assert.equal(EXPIRED_SUGGESTION_MESSAGE, 'This suggestion expired. Ask again.')
+
+    const visible = withoutLingeringCalendarStatus([
+      { id: 'u', role: 'user', content: 'Remove Oct 15th, I didn\'t go to work that day' },
+      { id: 'tool', role: 'assistant', content: 'Executing override_days' },
+      { id: 'card', role: 'assistant', content: 'Review this proposed change for October 15, 2026.', proposal: { id: 'p1' } },
+      { id: 'done', role: 'assistant', content: 'Done! Changes applied successfully.' },
+    ])
+    assert.equal(visible.some((message) => message.id === 'tool'), false)
+    assert.equal(visible.some((message) => message.id === 'done'), true)
+    assert.equal(sanitizeChatDisplay('Executing override_days'), 'Updating your calendar.')
   })
 })

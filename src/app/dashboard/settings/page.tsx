@@ -35,6 +35,7 @@ import { Celebration } from '@/components/ui/Celebration';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
+import { invalidateCalendar } from '@/lib/calendar-sync';
 import { checkoutReferenceFromReturn, clearCheckoutReference, rememberCheckoutReference } from '@/lib/checkout';
 import { cedisChargeLine, OPENING_CHECKOUT_LABEL, plainCheckoutError } from '@/lib/billing';
 import { BlockSkeleton, LoadingState } from '@/components/ui/LoadingState';
@@ -275,6 +276,7 @@ export default function SettingsPage() {
         weighted_mode_enabled: settings.weighted_mode,
         constraint_mode: settings.weighted_mode ? 'weighted' : 'binary',
       });
+      await invalidateCalendar();
       setSuccess('Settings saved successfully');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {

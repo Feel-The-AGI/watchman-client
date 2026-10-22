@@ -29,8 +29,15 @@ import { Button } from '@/components/ui/Button';
 import { BlockSkeleton, LoadingState } from '@/components/ui/LoadingState';
 import { Card, CardContent, CardHeader, CardTitle, BentoCard } from '@/components/ui/Card';
 import { useAuth } from '@/hooks/useAuth';
-import { api } from '@/lib/api';
-import { loadDashboardSnapshot } from '@/lib/dashboard-refresh';
+import {
+  cachedCalendarYear,
+  cachedCycles,
+  calendarLoadFailed,
+  invalidateCalendar,
+  refreshCalendarYears,
+  setViewedCalendarYear,
+  subscribeCalendarCache,
+} from '@/lib/calendar-sync';
 import { normalizeCalendarDays } from '@/lib/calendar-day';
 import { activeCyclePattern, type BadgeBlock } from '@/lib/cycle-day-badge';
 import { parseDateOnly } from '@/lib/date-only';
@@ -72,107 +79,114 @@ export default function DashboardPage() {
   const horizonLabel = parseDateOnly(freeHorizonEnd)?.year === headerYear(viewedMonth) ? horizonThroughLabel(freeHorizonEnd) : null;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [hasSetup, setHasSetup] = useState(false);
 
   // Use ref to track current year to avoid stale closures
   const currentYearRef = useRef(currentYear);
   currentYearRef.current = currentYear;
 
-  // Track if we're doing a background refresh (no loading spinner)
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Silent refresh - updates data in background without loading state or clearing existing data
-  const refreshCalendarSilently = useCallback(async () => {
-    const yearToFetch = currentYearRef.current;
-    setIsRefreshing(true);
-
-    try {
-      const snapshot = await loadDashboardSnapshot(api, yearToFetch);
-      if (yearToFetch !== viewedYearRef.current) return;
-      if (Array.isArray(snapshot.cycles)) {
-        setHasSetup(snapshot.cycles.length > 0);
-        setRotationPattern(activeCyclePattern(snapshot.cycles));
-      }
-      if (snapshot.calendar) {
-        const view = readCalendarYearPayload(snapshot.calendar);
-        setCalendarDays(normalizeCalendarDays(view.days) as CalendarDay[]);
-        setFreeHorizonEnd(view.horizonEnd);
-      }
-      if (snapshot.stats) {
-        setStats(snapshot.stats as CalendarStats);
-      }
-    } catch (err: any) {
-      console.error('Background refresh failed:', err);
-      // Don't show error for background refreshes
-    } finally {
-      setIsRefreshing(false);
+  const applyCachedYear = useCallback((year: number) => {
+    const cycleList = cachedCycles();
+    if (Array.isArray(cycleList)) {
+      setHasSetup(cycleList.length > 0);
+      setRotationPattern(activeCyclePattern(cycleList));
     }
+    const entry = cachedCalendarYear(year);
+    if (!entry?.calendar) return;
+    const view = readCalendarYearPayload(entry.calendar);
+    setCalendarDays(normalizeCalendarDays(view.days) as CalendarDay[]);
+    setFreeHorizonEnd(view.horizonEnd);
+    if (entry.stats) setStats(entry.stats as CalendarStats);
+    setLoadFailed(false);
+    setError(null);
   }, []);
 
-  const fetchCalendarData = useCallback(async (yearOverride?: number, silent: boolean = false) => {
-    const yearToFetch = yearOverride ?? currentYearRef.current;
-
-    // If silent mode and we have existing data, just refresh in background
-    if (silent && calendarDays.length > 0) {
-      return refreshCalendarSilently();
+  const fetchCalendarData = useCallback(async (yearOverride?: number) => {
+    let yearToFetch = yearOverride ?? currentYearRef.current;
+    const sameYear = yearToFetch === viewedYearRef.current;
+    const cached = cachedCalendarYear(yearToFetch);
+    if (!sameYear && cached?.calendar) {
+      applyCachedYear(yearToFetch);
+    } else if (calendarDays.length === 0 || !sameYear) {
+      setLoading(true);
+      setError(null);
+      if (!sameYear && !cached?.calendar) setCalendarDays([]);
     }
 
     let fetchYear = yearToFetch;
 
     try {
-      setLoading(true);
-      setError(null);
-      // Only clear data if not a silent refresh
-      if (!silent) {
-        setCalendarDays([]);
-      }
-
-      const cyclesResponse = await api.cycles.list();
+      const loaded = await refreshCalendarYears([yearToFetch]);
       if (yearToFetch !== viewedYearRef.current) return;
-      if (!cyclesResponse || cyclesResponse.length === 0) {
+      if (calendarLoadFailed(loaded, yearToFetch)) {
+        setLoadFailed(true);
+        setError('Failed to load calendar');
+        return;
+      }
+      setLoadFailed(false);
+      const cyclesResponse = cachedCycles();
+      if (!Array.isArray(cyclesResponse) || cyclesResponse.length === 0) {
         setHasSetup(false);
         return;
       }
       setHasSetup(true);
-
-      const activeCycle = cyclesResponse.find((c: any) => c.is_active) || cyclesResponse[0];
       setRotationPattern(activeCyclePattern(cyclesResponse));
 
-      // Only set anchor year on FIRST load, not every navigation
-      if (!initialYearSet && activeCycle?.anchor_date) {
+      const activeCycle = cyclesResponse.find((c: any) => c.is_active) || cyclesResponse[0];
+      if (!initialYearSet && activeCycle?.anchor_date && yearOverride == null) {
         const anchorYear = parseDateOnly(activeCycle.anchor_date)?.year;
         if (anchorYear != null && anchorYear >= new Date().getFullYear() && anchorYear !== yearToFetch) {
           setCurrentYear(anchorYear);
           setViewedMonth((current) => new Date(anchorYear, current.getMonth(), 1));
           viewedYearRef.current = anchorYear;
+          setViewedCalendarYear(anchorYear);
           fetchYear = anchorYear;
+          const anchorLoaded = await refreshCalendarYears([anchorYear]);
+          if (fetchYear !== viewedYearRef.current) return;
+          if (calendarLoadFailed(anchorLoaded, fetchYear)) {
+            setLoadFailed(true);
+            setError('Failed to load calendar');
+            return;
+          }
         }
         setInitialYearSet(true);
       }
 
-      // Fetch calendar data for the correct year
-      const calendarResponse = await api.calendar.getYear(fetchYear);
       if (fetchYear !== viewedYearRef.current) return;
-      const view = readCalendarYearPayload(calendarResponse);
-      setCalendarDays(normalizeCalendarDays(view.days) as CalendarDay[]);
-      setFreeHorizonEnd(view.horizonEnd);
-
-      const statsResponse = await api.stats.getSummary(fetchYear);
-      if (fetchYear !== viewedYearRef.current) return;
-      setStats(statsResponse || null);
+      applyCachedYear(fetchYear);
     } catch (err: any) {
       if (fetchYear !== viewedYearRef.current) return;
       console.error('Failed to fetch calendar:', err);
-      setError(freeHorizonNotice(err) ? FREE_HORIZON_MESSAGE : (err.message || 'Failed to load calendar'));
+      setLoadFailed(true);
+      setError(freeHorizonNotice(err) ? FREE_HORIZON_MESSAGE : 'Failed to load calendar');
     } finally {
       if (fetchYear === viewedYearRef.current) {
         setLoading(false);
       }
     }
-  }, [initialYearSet, calendarDays.length, refreshCalendarSilently]);
+  }, [initialYearSet, calendarDays.length, applyCachedYear]);
 
-  // Initial fetch only
   useEffect(() => {
+    setViewedCalendarYear(headerYear(viewedMonth));
+  }, [viewedMonth]);
+
+  useEffect(() => {
+    const stop = subscribeCalendarCache(() => {
+      applyCachedYear(viewedYearRef.current);
+    });
+    return stop;
+  }, [applyCachedYear]);
+
+  // Initial fetch only. Later edits come through the shared calendar cache.
+  useEffect(() => {
+    const cached = cachedCalendarYear(currentYearRef.current);
+    if (cached?.calendar) {
+      applyCachedYear(currentYearRef.current);
+      setLoading(false);
+      void refreshCalendarYears([currentYearRef.current]);
+      return;
+    }
     fetchCalendarData();
   }, []);
 
@@ -182,6 +196,7 @@ export default function DashboardPage() {
     if (!next) return;
     setSelectedDate((current) => selectedDateAfterMonthChange(current, next));
     viewedYearRef.current = headerYear(next);
+    setViewedCalendarYear(headerYear(next));
     setViewedMonth(next);
     const year = yearToLoad(currentYearRef.current, next);
     if (year !== null) {
@@ -193,6 +208,21 @@ export default function DashboardPage() {
   const selectedDayData = selectedDate 
     ? calendarDays.find(d => d.date === format(selectedDate, 'yyyy-MM-dd')) || null
     : null;
+
+  if (!loading && loadFailed) {
+    return (
+      <div className="max-w-xl mx-auto py-16 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-6">
+          <AlertCircle className="w-8 h-8 text-red-400" />
+        </div>
+        <h1 className="text-2xl font-bold mb-3">Failed to load calendar</h1>
+        <p className="text-watchman-text-secondary mb-8">{error}</p>
+        <Button variant="primary" onClick={() => { void fetchCalendarData(); }}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
   if (!loading && error && !hasSetup) {
     return (
@@ -291,24 +321,14 @@ export default function DashboardPage() {
 
           {/* Refresh Button - always visible on the right */}
           <div className="flex items-center gap-2">
-            {isRefreshing && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="text-xs text-watchman-accent"
-              >
-                Syncing...
-              </motion.div>
-            )}
             <Button
               variant="glass"
               size="sm"
-              onClick={() => fetchCalendarData()}
+              onClick={() => { void invalidateCalendar(); }}
               disabled={loading}
               className="gap-2"
             >
-              <RefreshCw className={`w-4 h-4 ${loading || isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Refresh</span>
             </Button>
           </div>
@@ -427,7 +447,6 @@ export default function DashboardPage() {
               transition={{ duration: 0.5, delay: 0.1 }}
             >
               <ChatPanel
-                onCalendarUpdate={refreshCalendarSilently}
                 className="h-[420px]"
                 autoExecute={false}
                 userTier={profile?.tier as 'free' | 'pro' || 'free'}
@@ -558,7 +577,8 @@ interface StatCardProps {
 
 function StatCard({ icon, label, value, color, glow }: StatCardProps) {
   return (
-    <motion.div 
+    <motion.div
+      data-stat={label}
       className="p-4 rounded-2xl glass border border-white/5 hover:border-white/10 transition-all group"
       whileHover={{ y: -2 }}
     >
@@ -568,7 +588,7 @@ function StatCard({ icon, label, value, color, glow }: StatCardProps) {
         </div>
         <span className="text-xs text-watchman-muted">{label}</span>
       </div>
-      <p className="text-2xl font-bold tracking-tight">{value}</p>
+      <p data-stat-value className="text-2xl font-bold tracking-tight">{value}</p>
     </motion.div>
   );
 }

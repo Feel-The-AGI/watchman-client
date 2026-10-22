@@ -380,9 +380,12 @@ export function CalendarGrid({
               <motion.button
                 key={dateStr}
                 title={calendarHoverLabel(calendarDay)}
+                data-date={dateStr}
+                data-work-type={calendarDay?.work_type ?? ''}
+                data-selected={isSelected ? 'true' : 'false'}
                 onClick={() => { if (!pastHorizon) onSelectDate(day) }}
                 disabled={pastHorizon}
-                aria-label={pastHorizon ? `${format(day, 'MMMM d')} locked` : undefined}
+                aria-label={pastHorizon ? `${format(day, 'MMMM d')} locked` : `${format(day, 'MMMM d')}`}
                 onMouseEnter={() => setHoveredDate(dateStr)}
                 onMouseLeave={() => setHoveredDate(null)}
                 initial={{ opacity: 0, scale: 0.8 }}
@@ -721,6 +724,8 @@ export function YearOverview({ days, year, onSelectMonth, userTier = 'free', fre
                 return (
                   <div
                     key={dateStr}
+                    data-date={dateStr}
+                    data-kind={kind}
                     className={cn(
                       'w-2.5 h-2.5 rounded-sm transition-transform group-hover:scale-110',
                       kind === 'work_day' && 'bg-amber-500 shadow-sm shadow-amber-500/30',
