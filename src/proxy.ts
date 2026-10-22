@@ -1,9 +1,11 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import {
+  dashboardAuthDecision,
   expiredAuthCookieHeaders,
   requestHasAuthSessionCookie,
-  signedOutRedirect,
+  type DashboardAuthDecision,
+  type DashboardAuthError,
 } from '@/lib/auth-session'
 
 function supabaseEnv(): { url: string; key: string } | null {
@@ -15,17 +17,25 @@ function supabaseEnv(): { url: string; key: string } | null {
 }
 
 /**
- * Next.js 16 runs this before the dashboard page. With no Supabase session
- * the response redirects to /login and expires any auth cookies on the request.
+ * Next.js 16 runs this before the dashboard page. No auth cookie, or a
+ * rejected session, redirects to /login. A network or 5xx failure from
+ * getUser() leaves the request and its cookies alone.
  */
 export async function proxy(request: NextRequest) {
   const cookieHeader = request.headers.get('cookie')
+  const hasAuthCookie = requestHasAuthSessionCookie(cookieHeader)
   let response = NextResponse.next({ request })
-  let hasSession = false
+  let decision: DashboardAuthDecision = dashboardAuthDecision({
+    hasAuthCookie,
+    user: null,
+    error: null,
+  })
 
-  if (requestHasAuthSessionCookie(cookieHeader)) {
+  if (hasAuthCookie) {
     const env = supabaseEnv()
-    if (env) {
+    if (!env) {
+      decision = 'redirect-and-clear'
+    } else {
       const supabase = createServerClient(env.url, env.key, {
         cookies: {
           getAll() {
@@ -40,22 +50,47 @@ export async function proxy(request: NextRequest) {
           },
         },
       })
-      const { data } = await supabase.auth.getUser()
-      hasSession = Boolean(data.user)
+      try {
+        const { data, error } = await supabase.auth.getUser()
+        decision = dashboardAuthDecision({
+          hasAuthCookie: true,
+          user: data.user,
+          error,
+        })
+      } catch (error) {
+        decision = dashboardAuthDecision({
+          hasAuthCookie: true,
+          user: null,
+          error: thrownAuthError(error),
+        })
+      }
     }
   }
 
-  const destination = signedOutRedirect(request.nextUrl.pathname, hasSession)
-  if (!destination) return response
+  if (decision === 'allow' || decision === 'pass-through') return response
 
   const url = request.nextUrl.clone()
-  url.pathname = destination
+  url.pathname = '/login'
   url.search = ''
   const redirect = NextResponse.redirect(url)
-  for (const header of expiredAuthCookieHeaders(cookieHeader)) {
-    redirect.headers.append('Set-Cookie', header)
+  if (decision === 'redirect-and-clear') {
+    for (const header of expiredAuthCookieHeaders(cookieHeader)) {
+      redirect.headers.append('Set-Cookie', header)
+    }
   }
   return redirect
+}
+
+function thrownAuthError(error: unknown): DashboardAuthError {
+  if (error instanceof Error) {
+    const status = (error as { status?: unknown }).status
+    return {
+      name: error.name,
+      message: error.message,
+      status: typeof status === 'number' ? status : undefined,
+    }
+  }
+  return { name: 'TypeError', message: 'Failed to fetch' }
 }
 
 export const config = {

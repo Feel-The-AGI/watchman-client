@@ -7,6 +7,7 @@ import {
   browserAuthCookieExpiryLines,
   expiredAuthCookieHeaders,
   isSupabaseAuthStorageKey,
+  dashboardAuthDecision,
   requestHasAuthSessionCookie,
   signedOutRedirect,
   signedOutStorageKeys,
@@ -81,6 +82,65 @@ describe('Supabase auth cookies', () => {
         'watchman_checkout_reference',
       ],
     )
+  })
+})
+
+describe('dashboard auth check', () => {
+  it('allows a valid user', () => {
+    assert.equal(dashboardAuthDecision({
+      hasAuthCookie: true,
+      user: { id: 'user-1' },
+      error: null,
+    }), 'allow')
+  })
+
+  it('redirects and clears cookies when the session is rejected', () => {
+    assert.equal(dashboardAuthDecision({
+      hasAuthCookie: true,
+      user: null,
+      error: { name: 'AuthApiError', status: 401, message: 'invalid jwt' },
+    }), 'redirect-and-clear')
+    assert.equal(dashboardAuthDecision({
+      hasAuthCookie: true,
+      user: null,
+      error: { name: 'AuthApiError', status: 403, code: 'session_not_found' },
+    }), 'redirect-and-clear')
+    assert.equal(dashboardAuthDecision({
+      hasAuthCookie: true,
+      user: null,
+      error: { name: 'AuthSessionMissingError', status: 400, message: 'Auth session missing!' },
+    }), 'redirect-and-clear')
+  })
+
+  it('passes through a network error or 5xx and leaves cookies alone', () => {
+    assert.equal(dashboardAuthDecision({
+      hasAuthCookie: true,
+      user: null,
+      error: { name: 'AuthRetryableFetchError', status: 0, message: 'Failed to fetch' },
+    }), 'pass-through')
+    assert.equal(dashboardAuthDecision({
+      hasAuthCookie: true,
+      user: null,
+      error: { name: 'TypeError', message: 'network timeout' },
+    }), 'pass-through')
+    assert.equal(dashboardAuthDecision({
+      hasAuthCookie: true,
+      user: null,
+      error: { name: 'AuthApiError', status: 503, message: 'upstream timeout' },
+    }), 'pass-through')
+    assert.equal(dashboardAuthDecision({
+      hasAuthCookie: true,
+      user: null,
+      error: { name: 'AuthRetryableFetchError', status: 500, message: 'internal' },
+    }), 'pass-through')
+  })
+
+  it('redirects when the request has no auth cookie', () => {
+    assert.equal(dashboardAuthDecision({
+      hasAuthCookie: false,
+      user: null,
+      error: null,
+    }), 'redirect')
   })
 })
 

@@ -38,11 +38,6 @@ export function authCookieNamesFromHeader(cookieHeader: string | null | undefine
 }
 
 /**
- * One deletion per cookie, without Secure. That matches how this app stores
- * the session. A second Secure header for the same name can be collapsed by
- * the response cookie map and then fail to delete the real cookie.
- */
-/**
  * Delete each auth cookie twice. A Secure cookie is only removed by a Secure
  * Set-Cookie, and a non-Secure cookie is only removed without that flag.
  * Both are sent so a shared browser cannot keep either copy.
@@ -82,6 +77,56 @@ export function signedOutRedirect(pathname: string, hasSession: boolean): string
   if (hasSession) return null
   if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) return SIGNED_OUT_PATH
   return null
+}
+
+export interface DashboardAuthError {
+  name?: string
+  status?: number
+  message?: string
+  code?: string
+}
+
+/** What the dashboard proxy does with one getUser() result. */
+export type DashboardAuthDecision = 'allow' | 'redirect-and-clear' | 'pass-through' | 'redirect'
+
+/**
+ * A valid user stays on the dashboard. An invalid or expired session redirects
+ * to /login and the auth cookies are deleted. A network failure, timeout, or
+ * 5xx leaves the request and cookies alone. No auth cookie still redirects.
+ */
+export function dashboardAuthDecision(check: {
+  hasAuthCookie: boolean
+  user: unknown
+  error?: DashboardAuthError | null
+}): DashboardAuthDecision {
+  if (!check.hasAuthCookie) return 'redirect'
+  if (check.user) return 'allow'
+  if (isRejectedSession(check.error)) return 'redirect-and-clear'
+  return 'pass-through'
+}
+
+function isRejectedSession(error: DashboardAuthError | null | undefined): boolean {
+  if (!error) return false
+  const status = typeof error.status === 'number' ? error.status : undefined
+  if (status !== undefined && status >= 500) return false
+  if (status === 401 || status === 403) return true
+  const name = error.name || ''
+  if (name === 'AuthSessionMissingError') return true
+  if (name === 'AuthApiError') return true
+  const code = (error.code || '').toLowerCase()
+  if (
+    code === 'session_not_found'
+    || code === 'session_expired'
+    || code === 'bad_jwt'
+    || code.includes('invalid_jwt')
+    || code === 'refresh_token_not_found'
+  ) {
+    return true
+  }
+  const message = (error.message || '').toLowerCase()
+  return message.includes('session missing')
+    || message.includes('invalid jwt')
+    || message.includes('jwt expired')
 }
 
 function clearWebStorage(storage: Storage | undefined): void {
