@@ -1,3 +1,4 @@
+import { readFileSync } from 'fs'
 import { expect, test, type Browser, type Page, type TestInfo } from '@playwright/test'
 
 const EMAIL = 'jasonquist.ia+e2e3@gmail.com'
@@ -51,11 +52,61 @@ async function settle(page: Page) {
   })
 }
 
+function pngSize(file: string) {
+  const buf = readFileSync(file)
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) }
+}
+
 async function shot(page: Page, testInfo: TestInfo, name: string) {
   await settle(page)
+  const viewport = page.viewportSize()
+  expect(viewport, 'screenshot viewport').not.toBeNull()
   const file = testInfo.outputPath(`${name}.png`)
-  await page.screenshot({ path: file, fullPage: false })
+  await page.screenshot({ path: file, fullPage: false, scale: 'css' })
+  expect(pngSize(file), name).toEqual({ width: viewport!.width, height: viewport!.height })
   await testInfo.attach(name, { path: file, contentType: 'image/png' })
+}
+
+async function hoursTilesFit(page: Page) {
+  await page.evaluate(() => {
+    document.documentElement.style.scrollBehavior = 'auto'
+    const overtime = [...document.querySelectorAll('p')].find((node) => node.textContent?.trim() === 'Overtime')
+    overtime?.scrollIntoView({ block: 'center', inline: 'nearest' })
+  })
+  await settle(page)
+  const fit = await page.evaluate(() => {
+    const heading = [...document.querySelectorAll('p')].find((node) => node.textContent?.trim() === 'Hours Worked')
+    const card = heading?.closest('div.rounded-2xl')
+    if (!(card instanceof HTMLElement)) return ['missing hours card']
+    const labels = ['12h', 'Not logged', '0h', 'Expected', 'Actual', 'Overtime']
+    const problems: string[] = []
+    for (const label of labels) {
+      const element = [...card.querySelectorAll('p')].find((node) => node.textContent?.trim() === label)
+      if (!(element instanceof HTMLElement)) {
+        problems.push(`${label} missing`)
+        continue
+      }
+      const box = element.getBoundingClientRect()
+      if (box.width < 8 || box.height < 8) problems.push(`${label} has no size`)
+      if (box.top < -1 || box.left < -1 || box.bottom > window.innerHeight + 1 || box.right > window.innerWidth + 1) {
+        problems.push(`${label} is outside the viewport`)
+      }
+      let node: HTMLElement | null = element.parentElement
+      while (node) {
+        const style = getComputedStyle(node)
+        const clips = style.overflowY === 'hidden' || style.overflowY === 'clip' || style.overflowY === 'auto' || style.overflowY === 'scroll'
+        if (clips) {
+          const parent = node.getBoundingClientRect()
+          if (box.top < parent.top - 1 || box.bottom > parent.bottom + 1 || box.left < parent.left - 1 || box.right > parent.right + 1) {
+            problems.push(`${label} is clipped`)
+          }
+        }
+        node = node.parentElement
+      }
+    }
+    return problems
+  })
+  expect(fit, fit.join('; ')).toEqual([])
 }
 
 async function openNav(page: Page, width: number) {
@@ -69,6 +120,7 @@ async function openApp(browser: Browser, timezoneId: string, viewport: { width: 
   const context = await browser.newContext({
     timezoneId,
     viewport,
+    deviceScaleFactor: 1,
     hasTouch: viewport.width < 800,
     baseURL: 'http://127.0.0.1:3000',
   })
@@ -126,14 +178,16 @@ test.describe('local visual qa', () => {
           expect(hoursBox).not.toBeNull()
           expect(hoursBox!.y + hoursBox!.height).toBeGreaterThan(0)
           expect(hoursBox!.y).toBeLessThan(viewport.height)
-          await page.evaluate(() => {
-            document.documentElement.style.scrollBehavior = 'auto'
-            const summary = [...document.querySelectorAll('p')].find((node) => node.textContent?.includes('Expected:') && node.textContent?.includes('Actual:'))
-            if (!summary) return
-            const top = summary.getBoundingClientRect().top + window.scrollY - 140
-            window.scrollTo(0, Math.max(0, top))
-          })
+          await hoursTilesFit(page)
           await shot(page, testInfo, viewport.width < 800 ? `${tag}-day-sheet` : `${tag}-day-panel-hours`)
+          await page.locator('button', { hasText: 'Hours Worked' }).click()
+          await expect(page.getByText('0h', { exact: true })).toHaveCount(0)
+          await expect(page.getByText('Hours Worked')).toBeVisible()
+          await page.locator('button', { hasText: 'Hours Worked' }).evaluate((element) => {
+            document.documentElement.style.scrollBehavior = 'auto'
+            element.scrollIntoView({ block: 'center', inline: 'nearest' })
+          })
+          await shot(page, testInfo, `${tag}-hours-collapsed`)
           await page.getByRole('button', { name: 'Close', exact: true }).click()
           await expect(page.getByText('Hours Worked')).toHaveCount(0)
 

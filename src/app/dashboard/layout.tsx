@@ -25,6 +25,7 @@ import { configureCalendarRefresh, invalidateCalendar, isCalendarRefreshPending,
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { displayProfileName } from '@/lib/profile-display';
 import { cn } from '@/lib/utils';
 
 const navigation = [
@@ -97,6 +98,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   const currentTier = tierBadge[profile?.tier as keyof typeof tierBadge] || tierBadge.free;
+  const accountName = displayProfileName(profile?.name, user.email) || user.email || '';
 
   return (
     <div className="min-h-screen bg-watchman-bg text-white">
@@ -238,7 +240,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="relative">
             <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
-              title={collapsed ? (profile?.name || user.email?.split('@')[0]) : undefined}
+              title={collapsed ? accountName : undefined}
               className={cn(
                 'w-full flex items-center gap-3 rounded-xl hover:bg-white/5 transition-colors group',
                 collapsed ? 'lg:justify-center lg:p-2 px-4 py-3' : 'px-4 py-3'
@@ -252,7 +254,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 collapsed && 'lg:hidden lg:opacity-0 lg:w-0'
               )}>
                 <p className="text-sm font-medium truncate">
-                  {profile?.name || user.email?.split('@')[0]}
+                  {accountName}
                 </p>
                 <div className={cn(
                   'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs',

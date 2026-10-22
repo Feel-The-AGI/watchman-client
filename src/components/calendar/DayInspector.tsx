@@ -473,14 +473,8 @@ export function DayInspector({
               {expandedSection === 'hours' ? <ChevronUp className="w-5 h-5 text-watchman-muted" /> : <ChevronDown className="w-5 h-5 text-watchman-muted" />}
             </button>
 
-            <AnimatePresence>
-              {expandedSection === 'hours' && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="border-t border-white/5"
-                >
+            {expandedSection === 'hours' && (
+                <div className="border-t border-white/5">
                   <div className="p-4 space-y-4">
                     {editingHours ? (
                       <div className="space-y-3">
@@ -540,9 +534,8 @@ export function DayInspector({
                       </div>
                     )}
                   </div>
-                </motion.div>
+                </div>
               )}
-            </AnimatePresence>
           </motion.div>
         )}
 
