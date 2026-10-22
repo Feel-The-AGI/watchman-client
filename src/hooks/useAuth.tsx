@@ -257,7 +257,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // The callback must return before it touches the network. Supabase runs it
     // inside the auth lock, and an awaited profile fetch there blocks signOut.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event, session?.user?.email)
       // getSession() already published this. initAuth validates it with getUser().
       if (event === 'INITIAL_SESSION') return
       if (isSignOutNavigationPending()) return

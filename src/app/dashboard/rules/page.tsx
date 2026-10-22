@@ -430,20 +430,20 @@ export default function MasterSettingsPage() {
         transition={{ delay: 0.1 }}
         className="glass rounded-3xl border border-white/10 overflow-hidden"
       >
-        <div className="p-6 border-b border-white/5 bg-gradient-to-r from-watchman-accent/10 to-transparent">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-watchman-accent to-watchman-purple flex items-center justify-center shadow-lg shadow-watchman-accent/30">
-                <Clock className="w-7 h-7 text-white" />
+        <div className="p-4 sm:p-6 border-b border-white/5 bg-gradient-to-r from-watchman-accent/10 to-transparent">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 shrink-0 rounded-2xl bg-gradient-to-br from-watchman-accent to-watchman-purple flex items-center justify-center shadow-lg shadow-watchman-accent/30">
+                <Clock className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
               </div>
-              <div>
-                <h2 className="text-xl font-bold">Work Rotation Cycle</h2>
+              <div className="min-w-0">
+                <h2 className="text-lg sm:text-xl font-bold leading-tight">Work Rotation Cycle</h2>
                 <p className="text-sm text-watchman-muted">
                   {totalCycleDays} days total cycle length
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="secondary"
                 size="sm"
@@ -521,21 +521,21 @@ export default function MasterSettingsPage() {
           </div>
 
           {/* Anchor Info */}
-          <div className="flex items-center gap-6 text-sm">
-            <div className="flex items-center gap-2 px-4 py-2 glass rounded-xl">
-              <Sparkles className="w-4 h-4 text-watchman-accent" />
-              <span className="text-watchman-muted">Anchor:</span>
-              <span className="font-medium">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center text-sm">
+            <div className="flex items-center gap-2 px-4 py-2 glass rounded-xl min-w-0">
+              <Sparkles className="w-4 h-4 shrink-0 text-watchman-accent" />
+              <span className="text-watchman-muted shrink-0">Anchor:</span>
+              <span className="font-medium whitespace-nowrap">
                 {settings.cycle.anchor_date
                   ? (displayDateOnly(settings.cycle.anchor_date) ?? settings.cycle.anchor_date)
                   : 'Not set'}
               </span>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 glass rounded-xl">
-              <Target className="w-4 h-4 text-watchman-purple" />
+            <div className="flex items-center gap-2 px-4 py-2 glass rounded-xl w-fit max-w-full">
+              <Target className="w-4 h-4 shrink-0 text-watchman-purple" />
               <span className="text-watchman-muted">Day</span>
               <span className="font-bold text-watchman-accent">{settings.cycle.anchor_cycle_day}</span>
-              <span className="text-watchman-muted">of cycle</span>
+              <span className="text-watchman-muted whitespace-nowrap">of cycle</span>
             </div>
           </div>
         </div>

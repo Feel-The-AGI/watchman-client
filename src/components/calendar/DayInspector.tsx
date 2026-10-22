@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
+import { actualHoursText, hoursWereLogged } from '@/lib/logged-hours';
 import {
   Sun,
   Moon,
@@ -151,7 +152,9 @@ export function DayInspector({
   // Local state for logs and incidents
   const [logs, setLogs] = useState<DailyLog[]>(dayData?.logs || []);
   const [incidents, setIncidents] = useState<Incident[]>(dayData?.incidents || []);
-  const [actualHours, setActualHours] = useState<number>(dayData?.actual_hours_worked || 0);
+  const [actualHours, setActualHours] = useState<number | null>(
+    hoursWereLogged(dayData?.actual_hours_worked) ? dayData!.actual_hours_worked! : null
+  );
   const [overtimeHours, setOvertimeHours] = useState<number>(dayData?.overtime_hours || 0);
 
   // UI state
@@ -225,19 +228,25 @@ export function DayInspector({
           } else if (logsRes.value.logs) {
             setLogs(logsRes.value.logs);
           }
-          if (!editingHoursRef.current && logsRes.value.actual_hours !== undefined) {
+          if (!editingHoursRef.current && hoursWereLogged(logsRes.value.actual_hours)) {
             setActualHours(logsRes.value.actual_hours);
+          } else if (!editingHoursRef.current) {
+            setActualHours(hoursWereLogged(dayData?.actual_hours_worked) ? dayData!.actual_hours_worked! : null);
           }
           if (!editingHoursRef.current && logsRes.value.overtime_hours !== undefined) {
             setOvertimeHours(logsRes.value.overtime_hours);
           }
+        } else if (!editingHoursRef.current) {
+          setActualHours(hoursWereLogged(dayData?.actual_hours_worked) ? dayData!.actual_hours_worked! : null);
         }
 
         if (incidentsRes.status === 'fulfilled' && incidentsRes.value) {
           setIncidents(Array.isArray(incidentsRes.value) ? incidentsRes.value : []);
         }
-      } catch (err) {
-        console.log('Day data API not available yet');
+      } catch {
+        if (!editingHoursRef.current) {
+          setActualHours(hoursWereLogged(dayData?.actual_hours_worked) ? dayData!.actual_hours_worked! : null);
+        }
       }
     };
 
@@ -247,7 +256,7 @@ export function DayInspector({
       cancelled = true;
       stop();
     };
-  }, [dateStr]);
+  }, [dateStr, dayData]);
 
   // Save daily log
   const handleSaveLog = async () => {
@@ -304,7 +313,7 @@ export function DayInspector({
     setSaving(true);
     try {
       await api.dailyLogs.updateHours(dateStr, {
-        actual_hours: actualHours,
+        actual_hours: actualHours ?? 0,
         overtime_hours: overtimeHours,
       });
       setEditingHours(false);
@@ -419,10 +428,10 @@ export function DayInspector({
           </div>
           <motion.button
             onClick={onClose}
-            aria-label="Close day"
             whileHover={{ scale: 1.1, rotate: 90 }}
             whileTap={{ scale: 0.9 }}
             className="p-2 rounded-xl glass hover:bg-white/10 transition-colors"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </motion.button>
@@ -455,8 +464,9 @@ export function DayInspector({
                 <div className="text-left">
                   <p className="font-semibold">Hours Worked</p>
                   <p className="text-xs text-watchman-muted">
-                    Expected: {expectedHours}h | Actual: {actualHours || '-'}h
-                    {overtimeHours > 0 && <span className="text-amber-400 ml-2">+{overtimeHours}h OT</span>}
+                    <span className="whitespace-nowrap">Expected: {expectedHours}h</span>
+                    <span className="whitespace-nowrap"> · Actual: {actualHoursText(actualHours)}</span>
+                    {overtimeHours > 0 && <span className="text-amber-400 ml-2 whitespace-nowrap">+{overtimeHours}h OT</span>}
                   </p>
                 </div>
               </div>
@@ -478,8 +488,8 @@ export function DayInspector({
                           <label className="text-xs text-watchman-muted mb-1 block">Actual Hours Worked</label>
                           <input
                             type="number"
-                            value={actualHours}
-                            onChange={(e) => setActualHours(Number(e.target.value))}
+                            value={actualHours ?? ''}
+                            onChange={(e) => setActualHours(e.target.value === '' ? null : Number(e.target.value))}
                             className="w-full px-3 py-2 glass border border-white/10 rounded-lg text-sm focus:border-watchman-accent focus:outline-none"
                             min="0"
                             max="24"
@@ -499,7 +509,7 @@ export function DayInspector({
                           />
                         </div>
                         <div className="flex gap-2">
-                          <Button size="sm" variant="primary" onClick={handleSaveHours} disabled={saving} className="gap-2">
+                          <Button size="sm" variant="primary" onClick={handleSaveHours} disabled={saving || actualHours === null} className="gap-2">
                             <Save className="w-4 h-4" />
                             Save
                           </Button>
@@ -515,8 +525,10 @@ export function DayInspector({
                             <p className="text-2xl font-bold text-blue-400">{expectedHours}h</p>
                             <p className="text-xs text-watchman-muted">Expected</p>
                           </div>
-                          <div className="text-center p-3 glass rounded-xl">
-                            <p className="text-2xl font-bold text-emerald-400">{actualHours || '-'}h</p>
+                          <div className="text-center p-2 sm:p-3 glass rounded-xl min-w-0">
+                            <p className={actualHours === null ? 'text-xs font-semibold leading-tight text-zinc-200' : 'text-2xl font-bold text-emerald-400'}>
+                              {actualHoursText(actualHours)}
+                            </p>
                             <p className="text-xs text-watchman-muted">Actual</p>
                           </div>
                           <div className="text-center p-3 glass rounded-xl">

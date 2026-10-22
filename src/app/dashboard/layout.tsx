@@ -317,11 +317,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         'ml-0'
       )}>
         {/* Top Bar */}
-        <header className="sticky top-0 z-30 flex items-center justify-between px-6 py-4 glass-subtle border-b border-white/5 lg:px-8">
+        <header className="sticky top-0 z-30 flex items-center justify-between px-6 py-4 bg-watchman-bg border-b border-white/10 lg:px-8">
           <div className="flex items-center gap-4">
             <button
-              aria-label="Open menu"
               className="lg:hidden p-2.5 -ml-2 hover:bg-white/5 rounded-xl transition-colors"
+              aria-label="Open menu"
               onClick={() => setSidebarOpen(true)}
             >
               <Menu className="w-5 h-5" />

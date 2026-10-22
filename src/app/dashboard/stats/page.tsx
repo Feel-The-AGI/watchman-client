@@ -39,6 +39,7 @@ import {
   Weight,
   DollarSign,
   CalendarClock,
+  Crown,
   MessageSquareWarning,
   ShieldAlert,
   Building2,
@@ -65,7 +66,9 @@ import { toast } from '@/components/ui/Toast';
 import { IncidentModal, LogModal } from '@/components/ui/IncidentModal';
 import { api } from '@/lib/api';
 import { subscribeCalendarCache } from '@/lib/calendar-sync';
+import { localDateFromStored } from '@/lib/date-only';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 
 interface YearStats {
   year: number;
@@ -191,8 +194,8 @@ const calculateShiftHours = (start?: string, end?: string): number => {
 const safeFormatDate = (dateStr: string | undefined, formatStr: string, fallback = 'N/A'): string => {
   if (!dateStr) return fallback;
   try {
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return fallback;
+    const date = localDateFromStored(dateStr);
+    if (!date) return fallback;
     return format(date, formatStr);
   } catch {
     return fallback;
@@ -200,6 +203,8 @@ const safeFormatDate = (dateStr: string | undefined, formatStr: string, fallback
 };
 
 export default function StatsPage() {
+  const { profile } = useAuth();
+  const exportsOpen = profile?.tier === 'pro' || profile?.tier === 'admin';
   const [year, setYear] = useState(new Date().getFullYear());
   const [stats, setStats] = useState<YearStats | null>(null);
   const [workSettings, setWorkSettings] = useState<WorkSettings | null>(null);
@@ -208,6 +213,7 @@ export default function StatsPage() {
   const [exporting, setExporting] = useState(false);
   const [animateStats, setAnimateStats] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showExportUpgrade, setShowExportUpgrade] = useState(false);
   const [exportType, setExportType] = useState<'stats' | 'logs' | 'incidents' | 'all'>('all');
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
   const [exportProgress, setExportProgress] = useState('');
@@ -227,9 +233,8 @@ export default function StatsPage() {
     try {
       const stats = await api.incidents.getStats(year);
       setIncidentStats(stats);
-    } catch (err) {
-      // Incidents stats not critical - just log it
-      console.log('Incident stats not available yet');
+    } catch {
+      // Incident totals are optional on this page.
     }
   };
 
@@ -241,8 +246,8 @@ export default function StatsPage() {
       // Fetch recent incidents
       const incidents = await api.incidents.list(startDate, endDate);
       setRecentIncidents(Array.isArray(incidents) ? incidents.slice(0, 10) : []);
-    } catch (err) {
-      console.log('Could not fetch recent incidents');
+    } catch {
+      setRecentIncidents([]);
     }
 
     try {
@@ -250,8 +255,8 @@ export default function StatsPage() {
       const logs = await api.dailyLogs.getRange(startDate, endDate);
       const logsArray = Array.isArray(logs) ? logs : (logs?.logs || []);
       setRecentLogs(logsArray.slice(0, 10));
-    } catch (err) {
-      console.log('Could not fetch recent logs');
+    } catch {
+      setRecentLogs([]);
     }
   };
 
@@ -370,7 +375,7 @@ export default function StatsPage() {
           const statsBlob = await api.stats.export(year, exportFormat);
           downloads.push({ name: `watchman-stats-${year}.${exportFormat}`, blob: statsBlob });
         } catch (e) {
-          console.log('Stats export not available');
+          setExportProgress('Statistics export is part of Pro');
         }
       }
 
@@ -380,7 +385,7 @@ export default function StatsPage() {
           const logsBlob = await api.dailyLogs.export(startDate, endDate, exportFormat);
           downloads.push({ name: `watchman-daily-logs-${year}.${exportFormat}`, blob: logsBlob });
         } catch (e) {
-          console.log('Logs export not available');
+          setExportProgress('Daily log export is part of Pro');
         }
       }
 
@@ -390,7 +395,7 @@ export default function StatsPage() {
           const incidentsBlob = await api.incidents.export(startDate, endDate, exportFormat);
           downloads.push({ name: `watchman-incidents-${year}.${exportFormat}`, blob: incidentsBlob });
         } catch (e) {
-          console.log('Incidents export not available');
+          setExportProgress('Incident export is part of Pro');
         }
       }
 
@@ -483,36 +488,44 @@ export default function StatsPage() {
         <motion.div 
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="flex items-center gap-3"
+          className="flex flex-col gap-3 min-[420px]:flex-row min-[420px]:flex-wrap min-[420px]:items-center"
         >
           {/* Year Selector */}
-          <div className="flex items-center glass rounded-2xl border border-white/10 overflow-hidden">
+          <div className="flex w-fit shrink-0 items-center glass rounded-2xl border border-white/10">
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => setYear(y => y - 1)}
               className="p-3 hover:bg-white/5 transition-colors"
+              aria-label="Previous year"
             >
               <ChevronLeft className="w-5 h-5" />
             </motion.button>
-            <span className="px-6 font-bold text-lg">{year}</span>
+            <span className="px-4 font-bold text-lg tabular-nums" data-testid="stats-year">{year}</span>
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={() => setYear(y => y + 1)}
               className="p-3 hover:bg-white/5 transition-colors"
+              aria-label="Next year"
             >
               <ChevronRight className="w-5 h-5" />
             </motion.button>
           </div>
 
-          {/* Export Buttons */}
-          <div className="flex gap-2">
+          {/* Export Buttons. The server gates CSV, PDF, and incident/log exports to Pro. */}
+          <div className="flex flex-wrap items-center gap-2">
+            {!exportsOpen && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-watchman-mint/15 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-watchman-mint">
+                <Crown className="w-3 h-3" />
+                Pro
+              </span>
+            )}
             <Button
               variant="glass"
               size="sm"
-              onClick={() => handleExport('csv')}
-              disabled={exporting || !stats}
+              onClick={() => exportsOpen ? handleExport('csv') : setShowExportUpgrade(true)}
+              disabled={exportsOpen && (exporting || !stats)}
               className="gap-2"
             >
               <Table className="w-4 h-4" />
@@ -521,8 +534,8 @@ export default function StatsPage() {
             <Button
               variant="glass"
               size="sm"
-              onClick={() => handleExport('pdf')}
-              disabled={exporting || !stats}
+              onClick={() => exportsOpen ? handleExport('pdf') : setShowExportUpgrade(true)}
+              disabled={exportsOpen && (exporting || !stats)}
               className="gap-2"
             >
               <FileText className="w-4 h-4" />
@@ -531,7 +544,7 @@ export default function StatsPage() {
             <Button
               variant="primary"
               size="sm"
-              onClick={() => setShowExportModal(true)}
+              onClick={() => exportsOpen ? setShowExportModal(true) : setShowExportUpgrade(true)}
               className="gap-2"
             >
               <Download className="w-4 h-4" />
@@ -540,6 +553,21 @@ export default function StatsPage() {
           </div>
         </motion.div>
       </div>
+
+      {showExportUpgrade && (
+        <div className="rounded-2xl border border-watchman-mint/30 bg-watchman-mint/10 p-4 flex flex-col sm:flex-row sm:items-center gap-3" data-testid="export-upgrade" role="status">
+          <span className="inline-flex w-fit items-center gap-1 rounded-full bg-watchman-mint/20 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-watchman-mint">
+            <Crown className="w-3 h-3" />
+            Pro
+          </span>
+          <p className="text-sm text-watchman-text flex-1">
+            CSV, PDF, and Export All are Pro features. Statistics, daily logs, and incident exports all use the same gate.
+          </p>
+          <a href="/pricing" className="inline-flex items-center justify-center rounded-xl bg-watchman-accent px-4 py-2 text-sm font-medium text-white">
+            Upgrade to Pro
+          </a>
+        </div>
+      )}
 
       {/* Export Modal */}
       <AnimatePresence>

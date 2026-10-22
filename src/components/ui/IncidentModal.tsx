@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { format } from 'date-fns';
+import { formatDate } from '@/lib/utils';
 import {
   X,
   Calendar,
@@ -146,7 +146,7 @@ export function IncidentModal({ incident, isOpen, onClose }: IncidentModalProps)
                 <div className="flex items-center gap-3 text-sm">
                   <Calendar className="w-4 h-4 text-watchman-muted" />
                   <span className="text-watchman-muted">Date:</span>
-                  <span className="font-medium">{format(new Date(incident.date), 'EEEE, MMMM d, yyyy')}</span>
+                  <span className="font-medium">{formatDate(incident.date, 'EEEE, MMMM d, yyyy')}</span>
                 </div>
 
                 {/* Description */}
@@ -196,7 +196,7 @@ export function IncidentModal({ incident, isOpen, onClose }: IncidentModalProps)
                 {/* Logged Time */}
                 <div className="flex items-center gap-3 text-xs text-watchman-muted pt-2 border-t border-white/5">
                   <Clock className="w-3.5 h-3.5" />
-                  <span>Logged {format(new Date(incident.created_at), 'MMM d, yyyy \'at\' h:mm a')}</span>
+                  <span>Logged {formatDate(incident.created_at, "MMM d, yyyy 'at' h:mm a")}</span>
                 </div>
               </div>
             </div>
@@ -248,7 +248,7 @@ export function LogModal({ log, isOpen, onClose }: LogModalProps) {
                     <div>
                       <h2 className="text-xl font-bold">Daily Note</h2>
                       <p className="text-sm text-watchman-muted mt-1">
-                        {format(new Date(log.date), 'EEEE, MMMM d, yyyy')}
+                        {formatDate(log.date, 'EEEE, MMMM d, yyyy')}
                       </p>
                     </div>
                   </div>
@@ -295,7 +295,7 @@ export function LogModal({ log, isOpen, onClose }: LogModalProps) {
                 {/* Logged Time */}
                 <div className="flex items-center gap-3 text-xs text-watchman-muted pt-2 border-t border-white/5">
                   <Clock className="w-3.5 h-3.5" />
-                  <span>Logged {format(new Date(log.created_at), 'MMM d, yyyy \'at\' h:mm a')}</span>
+                  <span>Logged {formatDate(log.created_at, "MMM d, yyyy 'at' h:mm a")}</span>
                 </div>
               </div>
             </div>

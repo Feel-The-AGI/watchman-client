@@ -5,8 +5,10 @@ import {
   freeHorizonNotice,
   isDayPastFreeHorizon,
   isMonthEntirelyPastHorizon,
+  lockedMonthSpanLabel,
   PRO_UPGRADE_FALLBACK,
   readCalendarYearPayload,
+  statsPeriodLabel,
   shiftCountsThroughHorizon,
   yearMonthShiftCounts,
 } from './free-horizon.ts'
@@ -79,6 +81,20 @@ describe('free horizon lock', () => {
       approvalUpgradeMessage({ status: 500, detail: 'The change could not be saved. It is still waiting for review.' }),
       null,
     )
+  })
+
+  it('names the visible stats window instead of a bare through-date', () => {
+    assert.deepEqual(statsPeriodLabel(2026, '2027-01-22'), { kind: 'year', label: '2026 totals' })
+    assert.deepEqual(statsPeriodLabel(2027, '2027-01-22'), {
+      kind: 'window',
+      label: 'Showing Jan 1, 2027 – Jan 22, 2027',
+    })
+    assert.deepEqual(statsPeriodLabel(2028, '2027-01-22'), {
+      kind: 'past',
+      label: '2028 is past the free plan',
+    })
+    assert.equal(lockedMonthSpanLabel(2027, [1, 2, 11]), 'February–December 2027')
+    assert.equal(lockedMonthSpanLabel(2027, []), null)
   })
 
   it('leaves days after the horizon out of the year stats', () => {

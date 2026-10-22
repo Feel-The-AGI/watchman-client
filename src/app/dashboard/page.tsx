@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { gridMonthAfterViewToggle, headerYear, monthToShow, selectedDateAfterMonthChange, shiftViewedMonth, yearToLoad } from '@/lib/calendar-view';
@@ -22,11 +22,12 @@ import {
   Zap,
   BarChart2,
   Plane,
+  X,
 } from 'lucide-react';
 import { CalendarGrid, YearOverview, DayInspector, type CalendarDay } from '@/components/calendar';
 import { ChatPanel } from '@/components/chat';
 import { Button } from '@/components/ui/Button';
-import { BlockSkeleton, LoadingState } from '@/components/ui/LoadingState';
+import { LoadingState } from '@/components/ui/LoadingState';
 import { Card, CardContent, CardHeader, CardTitle, BentoCard } from '@/components/ui/Card';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -44,14 +45,28 @@ import { parseDateOnly } from '@/lib/date-only';
 import {
   freeHorizonNotice,
   FREE_HORIZON_MESSAGE,
-  horizonThroughLabel,
+  isDayPastFreeHorizon,
   readCalendarYearPayload,
+  SEE_FURTHER_AHEAD,
   shiftCountsThroughHorizon,
+  statsPeriodLabel,
 } from '@/lib/free-horizon';
 import { FreeHorizonNotice } from '@/components/upgrade/FreeHorizonNotice';
 import Link from 'next/link';
 
 type ViewMode = 'month' | 'year';
+
+function useDesktopLayout(): boolean {
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      const query = window.matchMedia('(min-width: 1024px)');
+      query.addEventListener('change', onStoreChange);
+      return () => query.removeEventListener('change', onStoreChange);
+    },
+    () => window.matchMedia('(min-width: 1024px)').matches,
+    () => true,
+  );
+}
 
 interface CalendarStats {
   total_days: number;
@@ -65,6 +80,7 @@ interface CalendarStats {
 
 export default function DashboardPage() {
   const { profile } = useAuth();
+  const desktopLayout = useDesktopLayout();
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -76,7 +92,10 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<CalendarStats | null>(null);
   const [freeHorizonEnd, setFreeHorizonEnd] = useState<string | null>(null);
   const horizonCounts = freeHorizonEnd ? shiftCountsThroughHorizon(calendarDays, freeHorizonEnd) : null;
-  const horizonLabel = parseDateOnly(freeHorizonEnd)?.year === headerYear(viewedMonth) ? horizonThroughLabel(freeHorizonEnd) : null;
+  const statsPeriod = statsPeriodLabel(headerYear(viewedMonth), freeHorizonEnd);
+  const selectedIsLocked = selectedDate
+    ? isDayPastFreeHorizon(format(selectedDate, 'yyyy-MM-dd'), freeHorizonEnd)
+    : false;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -102,16 +121,16 @@ export default function DashboardPage() {
     setError(null);
   }, []);
 
-  const fetchCalendarData = useCallback(async (yearOverride?: number) => {
+  const fetchCalendarData = useCallback(async (yearOverride?: number, monthAfter?: Date) => {
     let yearToFetch = yearOverride ?? currentYearRef.current;
     const sameYear = yearToFetch === viewedYearRef.current;
     const cached = cachedCalendarYear(yearToFetch);
     if (!sameYear && cached?.calendar) {
       applyCachedYear(yearToFetch);
+      if (monthAfter) setViewedMonth(monthAfter);
     } else if (calendarDays.length === 0 || !sameYear) {
       setLoading(true);
       setError(null);
-      if (!sameYear && !cached?.calendar) setCalendarDays([]);
     }
 
     let fetchYear = yearToFetch;
@@ -155,6 +174,7 @@ export default function DashboardPage() {
 
       if (fetchYear !== viewedYearRef.current) return;
       applyCachedYear(fetchYear);
+      if (monthAfter && fetchYear === viewedYearRef.current) setViewedMonth(monthAfter);
     } catch (err: any) {
       if (fetchYear !== viewedYearRef.current) return;
       console.error('Failed to fetch calendar:', err);
@@ -190,19 +210,29 @@ export default function DashboardPage() {
     fetchCalendarData();
   }, []);
 
+  useEffect(() => {
+    if (!selectedDate) return;
+    if (window.matchMedia('(min-width: 1024px)').matches) return;
+    const iso = format(selectedDate, 'yyyy-MM-dd');
+    document.querySelector(`[data-date="${iso}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    document.querySelector('[data-testid="mobile-day-panel"]')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [selectedDate]);
+
   const showMonth = (month: Date) => {
     const tier = profile?.tier === 'pro' || profile?.tier === 'admin' ? profile.tier : 'free';
     const next = monthToShow(month, new Date(), tier);
     if (!next) return;
     setSelectedDate((current) => selectedDateAfterMonthChange(current, next));
+    const year = yearToLoad(currentYearRef.current, next);
     viewedYearRef.current = headerYear(next);
     setViewedCalendarYear(headerYear(next));
-    setViewedMonth(next);
-    const year = yearToLoad(currentYearRef.current, next);
-    if (year !== null) {
-      setCurrentYear(year);
-      fetchCalendarData(year);
+    if (year !== null) setCurrentYear(year);
+    if (year === null || cachedCalendarYear(year)?.calendar) {
+      setViewedMonth(next);
+      if (year !== null) void fetchCalendarData(year);
+      return;
     }
+    void fetchCalendarData(year, next);
   };
 
   const selectedDayData = selectedDate 
@@ -342,7 +372,7 @@ export default function DashboardPage() {
               className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 ${
                 viewMode === 'month'
                   ? 'bg-watchman-accent text-white shadow-lg shadow-watchman-accent/30'
-                  : 'text-watchman-muted hover:text-white'
+                  : 'text-zinc-200 hover:text-white'
               }`}
             >
               <CalendarIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -353,7 +383,7 @@ export default function DashboardPage() {
               className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 ${
                 viewMode === 'year'
                   ? 'bg-watchman-accent text-white shadow-lg shadow-watchman-accent/30'
-                  : 'text-watchman-muted hover:text-white'
+                  : 'text-zinc-200 hover:text-white'
               }`}
             >
               <Grid3X3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -389,18 +419,19 @@ export default function DashboardPage() {
         )}
       </AnimatePresence>
 
-      {/* Loading State */}
-      {loading && (
+      {/* Loading State. Later month changes keep the previous grid mounted. */}
+      {loading && calendarDays.length === 0 && (
         <LoadingState title="Loading your calendar…" detail="Fetching this year's rotation. This can take a few seconds.">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            <BlockSkeleton className="lg:col-span-8 h-80" />
-            <BlockSkeleton className="lg:col-span-4 h-80" />
+          <div className="grid grid-cols-7 gap-1 max-w-3xl" data-testid="calendar-skeleton">
+            {Array.from({ length: 42 }, (_, index) => (
+              <div key={index} className="aspect-square rounded-md bg-white/5" />
+            ))}
           </div>
         </LoadingState>
       )}
 
       {/* Main Bento Layout */}
-      {!loading && !error && (
+      {(calendarDays.length > 0 || !loading) && !error && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Calendar - Main Focus */}
           <motion.div 
@@ -438,6 +469,20 @@ export default function DashboardPage() {
             </Card>
           </motion.div>
 
+          {selectedDate && !desktopLayout && (
+            <div data-testid="mobile-day-panel">
+              {selectedIsLocked ? (
+                <LockedDayPanel date={selectedDate} onClose={() => setSelectedDate(null)} />
+              ) : (
+                <DayInspector
+                  date={selectedDate}
+                  dayData={selectedDayData}
+                  onClose={() => setSelectedDate(null)}
+                />
+              )}
+            </div>
+          )}
+
           {/* Right Sidebar - Chat + Stats */}
           <div className="lg:col-span-4 space-y-4">
             {/* Chat Panel */}
@@ -447,29 +492,27 @@ export default function DashboardPage() {
               transition={{ duration: 0.5, delay: 0.1 }}
             >
               <ChatPanel
-                className="h-[420px]"
+                className="h-[400px] min-h-[320px]"
                 autoExecute={false}
                 userTier={profile?.tier as 'free' | 'pro' || 'free'}
               />
             </motion.div>
 
-            {/* Day Inspector or Stats */}
-            <AnimatePresence mode="wait">
-              {selectedDate ? (
-                <motion.div
-                  key="inspector"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <DayInspector
-                    date={selectedDate}
-                    dayData={selectedDayData}
-                    onClose={() => setSelectedDate(null)}
-                  />
-                </motion.div>
+            {/* On a phone the day panel sits under the calendar, above chat.
+                On a desktop it stays in this column. */}
+            <div>
+            {(selectedDate && desktopLayout) ? (
+              selectedIsLocked ? (
+                <LockedDayPanel date={selectedDate} onClose={() => setSelectedDate(null)} />
               ) : (
+                <DayInspector
+                  date={selectedDate}
+                  dayData={selectedDayData}
+                  onClose={() => setSelectedDate(null)}
+                />
+              )
+            ) : (
+              <AnimatePresence mode="wait">
                 <motion.div
                   key="stats"
                   initial={{ opacity: 0 }}
@@ -477,9 +520,10 @@ export default function DashboardPage() {
                   exit={{ opacity: 0 }}
                   className="space-y-4"
                 >
-                  {/* Quick Stats Grid */}
-                  {stats && horizonLabel && (
-                    <p className="text-xs text-watchman-muted">{horizonLabel}</p>
+                  {stats && (
+                    <p className="text-sm font-medium text-zinc-200" data-testid="stats-period">
+                      {statsPeriod.label}
+                    </p>
                   )}
                   {stats && (
                     <div className="grid grid-cols-2 gap-3">
@@ -557,8 +601,9 @@ export default function DashboardPage() {
                     </div>
                   </Card>
                 </motion.div>
-              )}
-            </AnimatePresence>
+              </AnimatePresence>
+            )}
+            </div>
           </div>
         </div>
       )}
@@ -573,6 +618,38 @@ interface StatCardProps {
   value: number;
   color: string;
   glow: string;
+}
+
+function LockedDayPanel({ date, onClose }: { date: Date; onClose: () => void }) {
+  return (
+    <div className="glass rounded-3xl border border-white/10 p-6" data-testid="locked-day-panel">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-zinc-300">Locked day</p>
+          <h3 className="text-xl font-bold">{format(date, 'EEEE')}</h3>
+          <p className="text-sm text-watchman-muted flex items-center gap-2 mt-1">
+            <CalendarIcon className="w-3.5 h-3.5" />
+            {format(date, 'MMMM d, yyyy')}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-2 rounded-xl glass hover:bg-white/10"
+          aria-label="Close"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+      <div className="mt-6 text-center">
+        <p className="text-base font-semibold">{SEE_FURTHER_AHEAD}</p>
+        <p className="mt-2 text-sm text-zinc-300">The free plan covers three months from today.</p>
+        <Link href="/pricing" className="inline-flex mt-4 items-center justify-center rounded-xl bg-watchman-accent px-4 py-2 text-sm font-medium text-white">
+          Upgrade
+        </Link>
+      </div>
+    </div>
+  );
 }
 
 function StatCard({ icon, label, value, color, glow }: StatCardProps) {

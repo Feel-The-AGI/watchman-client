@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useMemo, useState, useCallback, useEffect, useSyncExternalStore } from 'react';
+import { motion } from 'framer-motion';
 import {
   format,
   startOfMonth,
@@ -15,17 +15,30 @@ import {
   addMonths,
   subMonths,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Sun, Moon, Coffee, Plane, Sparkles, Lock, Crown, HelpCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Sun, Moon, Coffee, Plane, Sparkles, Lock, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { cycleDayBadge, type BadgeBlock } from '@/lib/cycle-day-badge';
 import { calendarCellKind, calendarHoverLabel, dayCommitments } from '@/lib/calendar-day';
 import { isFreeMonthLocked, isYearMonthVisible } from '@/lib/free-calendar-access';
-import { horizonThroughLabel, isDayPastFreeHorizon, isMonthEntirelyPastHorizon, yearMonthShiftCounts } from '@/lib/free-horizon';
+import { FREE_HORIZON_MESSAGE, horizonThroughLabel, isDayPastFreeHorizon, isMonthEntirelyPastHorizon, lockedMonthSpanLabel, SEE_FURTHER_AHEAD, yearMonthShiftCounts } from '@/lib/free-horizon';
+import { monthMiniCells, WEEKDAY_INITIALS } from '@/lib/year-mini';
 import { FreeHorizonNotice } from '@/components/upgrade/FreeHorizonNotice';
 import { monthArrowLabel, UPGRADE_AHEAD_LABEL } from '@/lib/calendar-view';
 import { LOCKED_MONTH_PAY_LINE, lockedMonthPriceLine } from '@/lib/upgrade-offer';
 import { api } from '@/lib/api';
 import Link from 'next/link';
+
+function useFinePointer(): boolean {
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      const query = window.matchMedia('(hover: hover) and (pointer: fine)');
+      query.addEventListener('change', onStoreChange);
+      return () => query.removeEventListener('change', onStoreChange);
+    },
+    () => window.matchMedia('(hover: hover) and (pointer: fine)').matches,
+    () => false,
+  );
+}
 
 function useLockedMonthPrice(userTier: 'free' | 'pro' | 'admin'): string | null {
   const [priceLine, setPriceLine] = useState<string | null>(null);
@@ -170,20 +183,12 @@ export function CalendarGrid({
   freeHorizonEnd = null,
 }: CalendarGridProps) {
   const lockedPriceLine = useLockedMonthPrice(userTier);
-  const [currentMonth, setCurrentMonth] = useState(initialMonth || new Date());
-  const [direction, setDirection] = useState(0);
+  const finePointer = useFinePointer();
+  const currentMonth = useMemo(() => {
+    const source = initialMonth || new Date();
+    return new Date(source.getFullYear(), source.getMonth(), 1);
+  }, [initialMonth]);
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
-
-  // Follow the month the dashboard is showing. Ignore a new Date for the same month
-  // so picking a day, or switching Month/Year, does not jump back to the selection.
-  useEffect(() => {
-    if (!initialMonth) return
-    setCurrentMonth((current) => (
-      current.getFullYear() === initialMonth.getFullYear() && current.getMonth() === initialMonth.getMonth()
-        ? current
-        : initialMonth
-    ))
-  }, [initialMonth])
 
   const today = new Date();
 
@@ -211,6 +216,10 @@ export function CalendarGrid({
       day = addDays(day, 1);
     }
 
+    while (days.length < 42) {
+      days.push(addDays(days[days.length - 1], 1));
+    }
+
     return days;
   }, [currentMonth]);
 
@@ -219,13 +228,10 @@ export function CalendarGrid({
       ? subMonths(currentMonth, 1)
       : addMonths(currentMonth, 1);
 
-    // Check if next month is locked for free users
     if (dir === 'next' && isMonthLocked(newMonth)) {
-      return; // Don't navigate to locked month
+      return;
     }
 
-    setDirection(dir === 'prev' ? -1 : 1);
-    setCurrentMonth(newMonth);
     onMonthChange?.(newMonth);
   }, [currentMonth, onMonthChange, isMonthLocked]);
 
@@ -239,21 +245,6 @@ export function CalendarGrid({
   );
 
   const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-  const slideVariants = {
-    enter: (direction: number) => ({
-      x: direction > 0 ? 50 : -50,
-      opacity: 0,
-    }),
-    center: {
-      x: 0,
-      opacity: 1,
-    },
-    exit: (direction: number) => ({
-      x: direction < 0 ? 50 : -50,
-      opacity: 0,
-    }),
-  };
 
   return (
     <div className="glass rounded-3xl overflow-hidden border border-white/10">
@@ -270,20 +261,9 @@ export function CalendarGrid({
           <ChevronLeft className="w-5 h-5 group-hover:text-watchman-accent transition-colors" />
         </motion.button>
         
-        <AnimatePresence mode="wait" custom={direction}>
-          <motion.h2
-            key={format(currentMonth, 'yyyy-MM')}
-            custom={direction}
-            variants={slideVariants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={{ duration: 0.2 }}
-            className="text-xl font-semibold tracking-tight"
-          >
-            {format(currentMonth, 'MMMM yyyy')}
-          </motion.h2>
-        </AnimatePresence>
+        <h2 className="text-xl font-semibold tracking-tight">
+          {format(currentMonth, 'MMMM yyyy')}
+        </h2>
         
         <motion.button
           type="button"
@@ -338,18 +318,7 @@ export function CalendarGrid({
         ))}
       </div>
 
-      {/* Calendar Grid with Animation */}
-      <AnimatePresence mode="wait" custom={direction}>
-        <motion.div
-          key={format(currentMonth, 'yyyy-MM')}
-          custom={direction}
-          variants={slideVariants}
-          initial="enter"
-          animate="center"
-          exit="exit"
-          transition={{ duration: 0.25, ease: 'easeOut' }}
-          className="grid grid-cols-7"
-        >
+      <div className="grid grid-cols-7">
           {calendarDays.map((day, index) => {
             const dateStr = format(day, 'yyyy-MM-dd');
             const calendarDay = daysMap.get(dateStr);
@@ -376,29 +345,30 @@ export function CalendarGrid({
                     blockDay: calendarDay?.block_day,
                   });
 
+            const column = index % 7;
+            const tipAlign = column <= 1 ? 'left-1' : column >= 5 ? 'right-1' : 'left-1/2 -translate-x-1/2';
+            const showTip = finePointer && isHovered && inCurrentMonth && !pastHorizon;
+
             return (
-              <motion.button
+              <button
                 key={dateStr}
-                title={calendarHoverLabel(calendarDay)}
+                type="button"
                 data-date={dateStr}
-                data-work-type={calendarDay?.work_type ?? ''}
+                data-work-type={pastHorizon ? '' : (calendarDay?.work_type ?? '')}
                 data-selected={isSelected ? 'true' : 'false'}
-                onClick={() => { if (!pastHorizon) onSelectDate(day) }}
-                disabled={pastHorizon}
-                aria-label={pastHorizon ? `${format(day, 'MMMM d')} locked` : `${format(day, 'MMMM d')}`}
+                data-locked={pastHorizon ? 'true' : 'false'}
+                onClick={() => onSelectDate(day)}
+                aria-label={pastHorizon
+                  ? `${format(day, 'MMMM d, yyyy')}, locked. ${SEE_FURTHER_AHEAD}`
+                  : `${format(day, 'MMMM d, yyyy')}${calendarDay ? `, ${calendarHoverLabel(calendarDay)}` : ''}`}
                 onMouseEnter={() => setHoveredDate(dateStr)}
                 onMouseLeave={() => setHoveredDate(null)}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.01, duration: 0.2 }}
-                whileHover={{ scale: 1.02, zIndex: 10 }}
-                whileTap={{ scale: 0.98 }}
                 className={cn(
-                  'relative aspect-square p-1.5 border-r border-b border-white/5 transition-all duration-200',
+                  'relative aspect-square p-1.5 border-r border-b border-white/5 transition-colors duration-200',
                   'focus:outline-none focus:ring-2 focus:ring-watchman-accent/50 focus:ring-inset',
                   !inCurrentMonth && 'opacity-25',
-                  pastHorizon && 'opacity-40 cursor-not-allowed',
-                  isSelected && 'ring-2 ring-watchman-accent ring-inset bg-watchman-accent/10',
+                  pastHorizon && !isSelected && 'opacity-60',
+                  isSelected && 'ring-2 ring-watchman-accent ring-inset bg-watchman-accent/15',
                   isPreview && 'bg-watchman-accent/5 border-dashed border-watchman-accent/30',
                   isHovered && inCurrentMonth && !isSelected && 'bg-white/5',
                   isLeave && inCurrentMonth && !pastHorizon && 'bg-gradient-to-br from-teal-500/25 via-teal-500/10 to-transparent',
@@ -490,15 +460,8 @@ export function CalendarGrid({
                   )}
 
                   {/* Hover Preview Tooltip */}
-                  <AnimatePresence>
-                    {isHovered && calendarDay && inCurrentMonth && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 5, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 5, scale: 0.95 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50 pointer-events-none"
-                      >
+                  {showTip && calendarDay && (
+                      <div className={cn('absolute bottom-full mb-2 z-20 pointer-events-none', tipAlign)}>
                         <div className="glass-strong px-3 py-2 rounded-xl shadow-xl border border-white/10 whitespace-nowrap">
                           <p className="text-xs font-medium">
                             {calendarHoverLabel(calendarDay)}
@@ -509,16 +472,13 @@ export function CalendarGrid({
                             </p>
                           )}
                         </div>
-                        <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 bg-watchman-surface rotate-45 border-r border-b border-white/10" />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                      </div>
+                  )}
                 </div>
-              </motion.button>
+              </button>
             );
           })}
-        </motion.div>
-      </AnimatePresence>
+      </div>
       {isCurrentMonthLocked && (
         <div className="absolute inset-0 z-20 bg-watchman-bg/80 backdrop-blur-sm flex flex-col items-center justify-center">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-watchman-accent/20 to-watchman-purple/20 flex items-center justify-center mb-2 border border-white/10">
@@ -572,6 +532,87 @@ export function CalendarGrid({
   );
 }
 
+function MiniMonth({
+  year,
+  monthIndex,
+  daysMap,
+  todayIso,
+  horizonEnd,
+  muted,
+}: {
+  year: number;
+  monthIndex: number;
+  daysMap: Map<string, CalendarDay>;
+  todayIso: string;
+  horizonEnd: string | null;
+  muted?: boolean;
+}) {
+  const cells = monthMiniCells(year, monthIndex);
+  return (
+    <div>
+      <div className="grid grid-cols-7 gap-0.5 mb-1">
+        {WEEKDAY_INITIALS.map((label, index) => (
+          <span key={`${monthIndex}-${label}-${index}`} className="text-center text-[8px] font-medium text-zinc-400">
+            {label}
+          </span>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-0.5">
+        {cells.map((cell) => {
+          if (!cell.date) return <span key={cell.key} className="aspect-square" />;
+          const past = !muted && isDayPastFreeHorizon(cell.date, horizonEnd);
+          const kind = muted || past ? 'muted' : calendarCellKind(daysMap.get(cell.date));
+          const isTodayCell = cell.date === todayIso;
+          return (
+            <span
+              key={cell.key}
+              data-date={cell.date}
+              data-kind={calendarCellKind(daysMap.get(cell.date))}
+              data-today={isTodayCell ? 'true' : undefined}
+              className={cn(
+                'aspect-square rounded-[2px]',
+                isTodayCell && 'ring-2 ring-white',
+                kind === 'work_day' && 'bg-amber-500',
+                kind === 'work_night' && 'bg-indigo-500',
+                kind === 'off' && 'bg-emerald-500',
+                kind === 'leave' && 'bg-teal-500',
+                (kind === 'empty' || kind === 'blank' || kind === 'muted') && 'bg-white/10',
+              )}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MonthStatLines({
+  stats,
+}: {
+  stats: { dayShifts: number; nightShifts: number; offDays: number; leaveDays: number };
+}) {
+  return (
+    <div className="mt-auto grid grid-cols-2 gap-x-3 gap-y-1 pt-3 text-[10px] min-h-[2.75rem]">
+      <span className="flex items-center gap-1 text-amber-400">
+        <Sun className="w-3 h-3 shrink-0" />
+        {stats.dayShifts} days
+      </span>
+      <span className="flex items-center gap-1 text-indigo-400">
+        <Moon className="w-3 h-3 shrink-0" />
+        {stats.nightShifts} nights
+      </span>
+      <span className="flex items-center gap-1 text-emerald-400">
+        <Coffee className="w-3 h-3 shrink-0" />
+        {stats.offDays} off
+      </span>
+      <span className="flex items-center gap-1 text-teal-400">
+        <Plane className="w-3 h-3 shrink-0" />
+        {stats.leaveDays} leave
+      </span>
+    </div>
+  );
+}
+
 // Year Overview Component
 interface YearOverviewProps {
   days: CalendarDay[];
@@ -607,7 +648,7 @@ export function YearOverview({ days, year, onSelectMonth, userTier = 'free', fre
       // Calculate stats for this month
       const crossesHorizon = daysInMonth.some(({ date }) => isDayPastFreeHorizon(format(date, 'yyyy-MM-dd'), freeHorizonEnd));
       const stats = yearMonthShiftCounts(
-        daysInMonth.flatMap(({ date, day }) => day ? [{
+        daysInMonth.flatMap(({ day }) => day ? [{
           date: day.date,
           work_type: day.work_type,
           is_leave: day.is_leave,
@@ -620,150 +661,74 @@ export function YearOverview({ days, year, onSelectMonth, userTier = 'free', fre
   }, [year, daysMap, freeHorizonEnd]);
 
   const today = new Date();
+  const todayIso = format(today, 'yyyy-MM-dd');
+  const lockedIndexes = months.flatMap((_, index) => {
+    const pastHorizon = isMonthEntirelyPastHorizon(year, index, freeHorizonEnd);
+    const monthLocked = !isYearMonthVisible(index, year, today, userTier);
+    return pastHorizon || monthLocked ? [index] : [];
+  });
+  const lockedLabel = lockedMonthSpanLabel(year, lockedIndexes);
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      {months.map(({ month, days, stats, crossesHorizon }, index) => {
-        const isLocked = !isYearMonthVisible(index, year, today, userTier);
-        const pastHorizon = isMonthEntirelyPastHorizon(year, index, freeHorizonEnd);
-
-        if (pastHorizon) {
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 items-stretch">
+      {lockedLabel && (
+        <div className="col-span-full rounded-2xl border border-white/10 bg-watchman-bg p-4 flex flex-col sm:flex-row sm:items-center gap-3" data-testid="year-lock-banner">
+          <div className="flex-1">
+            <p className="text-sm font-medium text-white">{SEE_FURTHER_AHEAD}</p>
+            <p className="text-xs text-zinc-300 mt-1">{FREE_HORIZON_MESSAGE}</p>
+            <p className="text-xs text-zinc-300 mt-1">{lockedLabel} is outside the free plan.</p>
+            <LockedAheadDetails priceLine={lockedPriceLine} />
+          </div>
+          <Link href="/pricing" className="inline-flex items-center justify-center rounded-xl bg-watchman-accent px-4 py-2 text-sm font-medium text-white shrink-0">
+            Upgrade
+          </Link>
+        </div>
+      )}
+      {months.map(({ month, stats, crossesHorizon }, index) => {
+        const locked = lockedIndexes.includes(index);
+        const monthName = format(month, 'MMMM');
+        if (locked) {
           return (
-            <motion.div
+            <div
               key={format(month, 'yyyy-MM')}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              className="p-4 glass rounded-2xl border border-white/5 flex flex-col items-center justify-center min-h-[148px]"
+              className="p-4 h-full flex flex-col glass rounded-2xl border border-white/5 text-left opacity-60"
+              data-locked-month="true"
             >
-              <h3 className="text-sm font-semibold mb-3 text-watchman-muted self-start">
-                {format(month, 'MMMM')}
-              </h3>
-              <FreeHorizonNotice compact />
-            </motion.div>
-          );
-        }
-
-        if (isLocked) {
-          return (
-            <motion.div
-              key={format(month, 'yyyy-MM')}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              className="relative p-4 glass rounded-2xl border border-white/5 overflow-hidden"
-            >
-              {/* Blurred content */}
-              <div className="blur-sm pointer-events-none select-none">
-                <h3 className="text-sm font-semibold mb-3 text-watchman-muted">
-                  {format(month, 'MMMM')}
-                </h3>
-                <div className="grid grid-cols-7 gap-0.5">
-                  {days.slice(0, 28).map(({ date }) => (
-                    <div
-                      key={format(date, 'yyyy-MM-dd')}
-                      className="w-2.5 h-2.5 rounded-sm bg-white/10"
-                    />
-                  ))}
-                </div>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-3 text-[10px] opacity-50">
-                  <span className="flex items-center gap-1 text-watchman-muted">
-                    <Sun className="w-3 h-3" />
-                    -- days
-                  </span>
-                  <span className="flex items-center gap-1 text-watchman-muted">
-                    <Moon className="w-3 h-3" />
-                    -- nights
-                  </span>
-                </div>
-              </div>
-
-              {/* Lock overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-watchman-bg/95 via-watchman-bg/70 to-transparent flex flex-col items-center justify-center">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-watchman-accent/20 to-watchman-purple/20 flex items-center justify-center mb-2 border border-white/10">
-                  <Sparkles className="w-5 h-5 text-watchman-accent" />
-                </div>
-                <p className="text-xs font-medium text-white mb-1">Upgrade to Pro</p>
-                <Link href="/pricing" className="text-[10px] text-watchman-accent hover:underline" title={UPGRADE_AHEAD_LABEL}>
-                  {UPGRADE_AHEAD_LABEL}
-                </Link>
-                <LockedAheadDetails priceLine={lockedPriceLine} />
-              </div>
-            </motion.div>
+              <h3 className="text-sm font-semibold mb-3 text-watchman-muted min-h-[1.25rem]">{monthName}</h3>
+              <MiniMonth
+                year={year}
+                monthIndex={index}
+                daysMap={daysMap}
+                todayIso={todayIso}
+                horizonEnd={freeHorizonEnd}
+                muted
+              />
+            </div>
           );
         }
 
         return (
-          <motion.button
+          <button
             key={format(month, 'yyyy-MM')}
+            type="button"
             onClick={() => onSelectMonth(month)}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05 }}
-            whileHover={{ scale: 1.02, y: -4 }}
-            whileTap={{ scale: 0.98 }}
-            className="p-4 glass rounded-2xl border border-white/5 hover:border-watchman-accent/30 transition-all duration-300 text-left group"
+            className="p-4 h-full flex flex-col glass rounded-2xl border border-white/5 hover:border-watchman-accent/30 transition-colors text-left group"
           >
-            <h3 className="text-sm font-semibold mb-3 group-hover:text-watchman-accent transition-colors">
-              {format(month, 'MMMM')}
+            <h3 className="text-sm font-semibold mb-3 min-h-[1.25rem] group-hover:text-watchman-accent transition-colors">
+              {monthName}
             </h3>
-            <div className="grid grid-cols-7 gap-0.5">
-              {days.map(({ date, day }) => {
-                const dateStr = format(date, 'yyyy-MM-dd');
-                const past = isDayPastFreeHorizon(dateStr, freeHorizonEnd);
-                const kind = past ? 'locked' : calendarCellKind(day);
-                if (past) {
-                  return (
-                    <Lock
-                      key={dateStr}
-                      className="w-2.5 h-2.5 text-watchman-muted/70"
-                      aria-label="Locked"
-                    />
-                  );
-                }
-                return (
-                  <div
-                    key={dateStr}
-                    data-date={dateStr}
-                    data-kind={kind}
-                    className={cn(
-                      'w-2.5 h-2.5 rounded-sm transition-transform group-hover:scale-110',
-                      kind === 'work_day' && 'bg-amber-500 shadow-sm shadow-amber-500/30',
-                      kind === 'work_night' && 'bg-indigo-500 shadow-sm shadow-indigo-500/30',
-                      kind === 'off' && 'bg-emerald-500 shadow-sm shadow-emerald-500/30',
-                      kind === 'leave' && 'bg-teal-500 shadow-sm shadow-teal-500/30',
-                      kind === 'empty' && 'bg-white/10'
-                    )}
-                  />
-                );
-              })}
-            </div>
-
-            {/* Enhanced Mini Stats */}
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-3 text-[10px]">
-              <span className="flex items-center gap-1 text-amber-400">
-                <Sun className="w-3 h-3" />
-                {stats.dayShifts} days
-              </span>
-              <span className="flex items-center gap-1 text-indigo-400">
-                <Moon className="w-3 h-3" />
-                {stats.nightShifts} nights
-              </span>
-              <span className="flex items-center gap-1 text-emerald-400">
-                <Coffee className="w-3 h-3" />
-                {stats.offDays} off
-              </span>
-              {stats.leaveDays > 0 && (
-                <span className="flex items-center gap-1 text-teal-400">
-                  <Plane className="w-3 h-3" />
-                  {stats.leaveDays} leave
-                </span>
-              )}
-            </div>
+            <MiniMonth
+              year={year}
+              monthIndex={index}
+              daysMap={daysMap}
+              todayIso={todayIso}
+              horizonEnd={freeHorizonEnd}
+            />
+            <MonthStatLines stats={stats} />
             {crossesHorizon && horizonThroughLabel(freeHorizonEnd) && (
-              <p className="mt-2 text-[10px] text-watchman-muted">{horizonThroughLabel(freeHorizonEnd)}</p>
+              <p className="mt-2 text-[10px] text-zinc-300">Free plan {horizonThroughLabel(freeHorizonEnd)}</p>
             )}
-          </motion.button>
+          </button>
         );
       })}
     </div>
