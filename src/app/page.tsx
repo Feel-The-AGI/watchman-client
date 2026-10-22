@@ -33,18 +33,19 @@ import { Button } from '@/components/ui/Button';
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { authNavChoice } from '@/lib/signup-flow';
+import { BOUNDARY_STEP, CLOSING_LINE, ROTATION_FEATURE, RULES_FEATURE } from '@/lib/marketing-copy';
 
 // Features with emotional copy
 const features = [
   {
     title: 'Speak Your Pattern',
-    description: '"5 days, 5 nights, 5 off. January 1st is Day 4." That\'s it. Your entire year materializes.',
+    description: ROTATION_FEATURE,
     icon: MessageSquare,
     gradient: 'from-cyan-500 to-emerald-500',
   },
   {
     title: 'Rules You Can Set',
-    description: 'No study on night shifts. A cap on commitments. A chat change that breaks a hard rule is shown to you before it can be applied.',
+    description: RULES_FEATURE,
     icon: Shield,
     gradient: 'from-rose-500 to-orange-500',
   },
@@ -65,7 +66,7 @@ const features = [
 // How it works - simplified
 const steps = [
   { num: '01', title: 'Define Your Cycle', desc: 'Tell us your rotation. It becomes the foundation of your calendar.', icon: Clock },
-  { num: '02', title: 'Set Your Boundaries', desc: 'Rules that never bend. Constraints that protect you.', icon: Shield },
+  { num: '02', title: 'Set Your Boundaries', desc: BOUNDARY_STEP, icon: Shield },
   { num: '03', title: 'Propose Changes', desc: 'Need leave? New commitment? Just ask.', icon: MessageSquare },
   { num: '04', title: 'Review Chat Changes', desc: 'Apply or decline a proposal before it updates the calendar.', icon: CheckCircle },
 ];
@@ -1376,7 +1377,7 @@ export default function LandingPage() {
             </h2>
 
             <p className="text-lg sm:text-xl text-white/50 mb-10 max-w-xl mx-auto">
-              Define your rules. Generate your year. See the truth.
+              {CLOSING_LINE}
               <br />
               <span className="text-white/70">No credit card required.</span>
             </p>

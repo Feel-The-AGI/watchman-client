@@ -14,6 +14,7 @@ import { api } from '@/lib/api';
 import { cedisChargeLine, OPENING_CHECKOUT_LABEL, plainCheckoutError, type PricingAmounts } from '@/lib/billing';
 import { pricingRowMotion } from '@/lib/pricing-display';
 import { rememberCheckoutReference } from '@/lib/checkout';
+import { AGENT_FAQ, BINARY_CONSTRAINT_FAQ, RENEWAL_FAQ } from '@/lib/marketing-copy';
 
 const tiers = [
   {
@@ -71,15 +72,15 @@ const tiers = [
 const faqs = [
   {
     question: 'What is the Watchman Agent?',
-    answer: 'Watchman is your AI scheduling assistant. Chat naturally to add commitments, plan study sessions, or modify your calendar. Free users get 100 messages/month, Pro users get unlimited access.',
+    answer: AGENT_FAQ,
   },
   {
     question: 'Does Pro renew automatically?',
-    answer: 'Checkout does not start an automatic card subscription. $12 through Paystack covers 30 days. Another checkout adds 30 more days. If you cancel, Pro stays until the end of the days you already paid for.',
+    answer: RENEWAL_FAQ,
   },
   {
     question: 'What does "binary constraints" mean?',
-    answer: 'Binary constraints are hard rules: allowed or not allowed. No exceptions. "No study on night shifts" is a binary constraint that the system will never break.',
+    answer: BINARY_CONSTRAINT_FAQ,
   },
   {
     question: 'Is my data secure?',
