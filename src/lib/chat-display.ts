@@ -272,7 +272,8 @@ export function chatTextParts(content: unknown): ChatTextPart[] {
 /** User text is shown as typed. Markdown and tool-name cleanup apply to assistant text only. */
 export function displayedChatParts(role: string, content: unknown): ChatTextPart[] {
   if (role === 'user') {
-    return typeof content === 'string' && content.length > 0 ? [{ kind: 'text', text: content }] : []
+    const text = chatMessageText(content)
+    return text ? [{ kind: 'text', text }] : []
   }
   return chatTextParts(content)
 }
@@ -315,7 +316,7 @@ export function userAskedToClearDays(text: string): boolean {
   return CLEAR_DAYS_WORD.test(text)
 }
 
-type ChatTurn = { id?: string; role?: string; content?: string }
+type ChatTurn = { id?: string; role?: string; content?: unknown }
 
 function isBlankDaysOverride(proposal: unknown): boolean {
   const record = proposalRecord(proposal)
@@ -341,7 +342,7 @@ export function blankDaysProposalFate(
   const source = rawHistory.find((message) => message.id && message.id === record?.message_id)
   if (!source) return 'hide'
   if (isInternalChatMessage(source)) return 'decline'
-  const text = typeof source.content === 'string' ? source.content : ''
+  const text = chatMessageText(source.content) ?? ''
   if (source.role === 'user' && !userAskedToClearDays(text)) return 'decline'
   if (source.role === 'user' && userAskedToClearDays(text)) return 'show'
   return 'hide'

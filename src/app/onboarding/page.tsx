@@ -418,7 +418,7 @@ export default function OnboardingPage() {
                       ? 'glass border border-white/10' 
                       : 'bg-watchman-accent text-white'
                   )}>
-                    <p className="text-sm leading-relaxed">{message.content}</p>
+                    <p className="text-sm leading-relaxed">{chatMessageText(message.content) ?? ''}</p>
                   </div>
                 </motion.div>
               ))}
