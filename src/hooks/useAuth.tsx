@@ -5,6 +5,12 @@ import { User, Session } from '@supabase/supabase-js'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import api from '@/lib/api'
+import {
+  SIGN_OUT_ENDPOINT,
+  clearSupabaseBrowserSession,
+  isSignOutNavigationPending,
+  markSignOutNavigationPending,
+} from '@/lib/auth-session'
 
 interface UserProfile {
   id: string
@@ -98,48 +104,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        
+        if (isSignOutNavigationPending()) return
+
         if (session) {
           setSession(session)
           setUser(session.user)
           const userProfile = await fetchProfile(session.access_token)
+          if (isSignOutNavigationPending()) return
           // Redirect if we have session and on public page
           handleAuthRedirect(session, userProfile)
         }
       } catch (error) {
         console.error('Auth init error:', error)
       } finally {
-        setLoading(false)
+        if (!isSignOutNavigationPending()) setLoading(false)
       }
     }
 
     initAuth()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email)
-        
-        setSession(session)
-        setUser(session?.user ?? null)
-        
-        if (session?.access_token) {
-          const userProfile = await fetchProfile(session.access_token)
-          
-          // On SIGNED_IN event, redirect to dashboard
+    // The callback must return before it touches the network. Supabase runs it
+    // inside the auth lock, and an awaited profile fetch there blocks signOut.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event, session?.user?.email)
+
+      setSession(session)
+      setUser(session?.user ?? null)
+
+      if (!session?.access_token) {
+        setProfile(null)
+        api.setToken(null)
+        if (event === 'SIGNED_OUT' && !isSignOutNavigationPending()) {
+          router.push('/login')
+        }
+        return
+      }
+
+      const accessToken = session.access_token
+      setTimeout(() => {
+        if (isSignOutNavigationPending()) return
+        void fetchProfile(accessToken).then((userProfile) => {
+          if (isSignOutNavigationPending()) return
           if (event === 'SIGNED_IN') {
             handleAuthRedirect(session, userProfile)
           }
-        } else {
-          setProfile(null)
-          api.setToken(null)
-        }
-
-        if (event === 'SIGNED_OUT') {
-          setProfile(null)
-          router.push('/login')
-        }
-      }
-    )
+        })
+      }, 0)
+    })
 
     return () => subscription.unsubscribe()
   }, [fetchProfile, handleAuthRedirect, router])
@@ -166,9 +177,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    // auth-js leaves the cookie in place when the revoke request returns anything
+    // other than success, 401, 403, or 404. The promise still resolves, so the
+    // caller cannot tell the session survived. Always drop local state, then
+    // load a document that expires whatever cookies the browser still sends.
+    markSignOutNavigationPending()
+    try {
+      await supabase.auth.stopAutoRefresh()
+      const { error } = await supabase.auth.signOut()
+      if (error) console.error('Sign out failed:', error)
+    } catch (error) {
+      console.error('Sign out failed:', error)
+    }
+    clearSupabaseBrowserSession()
+    setSession(null)
+    setUser(null)
     setProfile(null)
     api.setToken(null)
+    if (typeof document === 'undefined') return
+    const form = document.createElement('form')
+    form.method = 'POST'
+    form.action = SIGN_OUT_ENDPOINT
+    form.hidden = true
+    try {
+      document.body.appendChild(form)
+      form.submit()
+    } catch (error) {
+      console.error('Sign out navigation failed:', error)
+      window.location.assign('/login')
+    }
   }
 
   const signInWithGoogle = async () => {

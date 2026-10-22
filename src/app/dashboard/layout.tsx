@@ -20,6 +20,7 @@ import {
   Crown,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { isSignOutNavigationPending } from '@/lib/auth-session';
 import { Button } from '@/components/ui/Button';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { cn } from '@/lib/utils';
@@ -52,14 +53,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [collapsed]);
 
   useEffect(() => {
+    if (isSignOutNavigationPending()) return
     if (!loading && !user) {
       router.push('/login');
     }
   }, [user, loading, router]);
 
-  const handleSignOut = async () => {
-    await signOut();
-    router.push('/');
+  const handleSignOut = () => {
+    void signOut();
   };
 
   if (loading) {
