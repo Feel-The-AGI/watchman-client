@@ -12,7 +12,8 @@ function isLeapYear(year: number): boolean {
 }
 
 /** Read a date-only `YYYY-MM-DD` by splitting on `-`. No `Date` and no timezone conversion. */
-export function parseDateOnly(value: string): DateOnly | null {
+export function parseDateOnly(value: unknown): DateOnly | null {
+  if (typeof value !== 'string') return null
   const parts = value.split('-')
   if (parts.length !== 3) return null
   const [yearText, monthText, dayText] = parts
@@ -27,13 +28,13 @@ export function parseDateOnly(value: string): DateOnly | null {
   return { year, month, day }
 }
 
-export function formatDateOnly(value: string): string | null {
+export function formatDateOnly(value: unknown): string | null {
   const parsed = parseDateOnly(value)
   if (!parsed) return null
   return `${parsed.year}-${String(parsed.month).padStart(2, '0')}-${String(parsed.day).padStart(2, '0')}`
 }
 
-export function displayDateOnly(value: string, style: 'full' | 'month-day' = 'full'): string | null {
+export function displayDateOnly(value: unknown, style: 'full' | 'month-day' = 'full'): string | null {
   const parsed = parseDateOnly(value)
   if (!parsed) return null
   const month = MONTHS[parsed.month - 1]
