@@ -33,6 +33,7 @@ import { dashboardHandoffButton } from '@/lib/onboarding-handoff';
 import {
   buildMonthPreview,
   parseLocalDate,
+  anchorFromChatResponse,
   parseRotation,
   ROTATION_PRESETS,
   rotationFromChatResponse,
@@ -127,16 +128,21 @@ export default function OnboardingPage() {
     }, 600);
   };
 
-  const handleSetAnchor = () => {
-    const anchor = parseLocalDate(anchorDate) || new Date();
-    addMessage('user', `${format(anchor, 'MMM d, yyyy')} is day ${anchorCycleDay} of my cycle`);
+  const advanceToRules = (date: string, cycleDay: number) => {
+    setAnchorDate(date);
+    setAnchorCycleDay(cycleDay);
     setShowQuickActions(false);
-    
     setTimeout(() => {
       addMessage('assistant', "Great! Finally, what rules should I always respect? These are hard constraints that will never be broken.");
       setStep(3);
       setTimeout(() => setShowQuickActions(true), 500);
     }, 600);
+  };
+
+  const handleSetAnchor = () => {
+    const anchor = parseLocalDate(anchorDate) || new Date();
+    addMessage('user', `${format(anchor, 'MMM d, yyyy')} is day ${anchorCycleDay} of my cycle`);
+    advanceToRules(anchorDate, anchorCycleDay);
   };
 
   const toggleConstraint = (rule: string) => {
@@ -233,8 +239,15 @@ export default function OnboardingPage() {
 
       try {
         setLoading(true);
-        const response = await api.chat.sendMessage(rotationParsePrompt(userMessage));
+        const response = await api.chat.sendMessage(rotationParsePrompt(userMessage), false, pattern);
         const fromChat = rotationFromChatResponse(response);
+        const chosen = fromChat?.understood ? fromChat.pattern : pattern;
+        if (fromChat?.understood) setPattern(fromChat.pattern);
+        const anchor = anchorFromChatResponse(response, chosen);
+        if (anchor) {
+          advanceToRules(anchor.date, anchor.cycle_day);
+          return;
+        }
         if (fromChat?.understood) {
           acceptRotation(fromChat);
         } else if (fromChat) {
@@ -262,7 +275,12 @@ export default function OnboardingPage() {
     // Later steps stay in the same chat. The server does not apply changes from here.
     try {
       setLoading(true);
-      const response = await api.chat.sendMessage(userMessage);
+      const response = await api.chat.sendMessage(userMessage, false, step < 4 ? pattern : undefined);
+      const anchor = anchorFromChatResponse(response, pattern);
+      if (anchor) {
+        advanceToRules(anchor.date, anchor.cycle_day);
+        return;
+      }
       const reply = chatMessageText(response?.response ?? response?.message);
       addMessage('assistant', reply || "I couldn't use that reply. Try the options below.");
       setTimeout(() => setShowQuickActions(true), 500);

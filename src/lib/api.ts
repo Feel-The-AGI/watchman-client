@@ -3,6 +3,8 @@
  * Centralized API communication layer
  */
 
+import { onboardingChatRequest, type CycleBlock } from '@/lib/rotation'
+
 export const BACKEND_NOT_CONFIGURED_MESSAGE =
   'Watchman is not connected to a server. Set NEXT_PUBLIC_API_URL and reload.'
 
@@ -248,11 +250,12 @@ class APIService {
 
   // New overhaul endpoints
   chat = {
-    sendMessage: (content: string, _autoExecute: boolean = false) =>
+    sendMessage: (content: string, _autoExecute: boolean = false, pattern?: CycleBlock[]) =>
       this.request<any>('/api/chat/message', {
         method: 'POST',
         // The server accepts only auto_execute: false. Commands are saved as proposals.
-        body: JSON.stringify({ content, auto_execute: false }),
+        // pattern is sent only by onboarding, before the cycle row exists.
+        body: JSON.stringify(pattern ? onboardingChatRequest(content, pattern) : { content, auto_execute: false }),
       }),
     getHistory: (limit: number = 50) =>
       this.request<any>(`/api/chat/history?limit=${limit}`),
