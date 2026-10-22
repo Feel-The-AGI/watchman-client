@@ -94,7 +94,7 @@ export const PROPOSAL_CARD_FALLBACK = 'Review this proposed change.'
 
 export const REVIEW_FAILURE_MESSAGE = "That didn't go through. You can try again or send another message."
 
-/** Card copy prefers the server's human explanation and never a raw tool name. */
+/** Card copy is the server summary in command.explanation, never a raw tool name. */
 export function proposalCardText(
   proposal: { command?: { explanation?: unknown } } | null | undefined,
   messageContent?: unknown,
@@ -104,6 +104,17 @@ export function proposalCardText(
   const content = chatMessageText(messageContent)
   if (content && !isRawToolText(content)) return content
   return PROPOSAL_CARD_FALLBACK
+}
+
+/** The model's own sentence, shown under the summary when the server sent one. */
+export function proposalModelNote(
+  proposal: { command?: { explanation?: unknown; model_text?: unknown } } | null | undefined,
+): string | null {
+  const note = proposal?.command?.model_text
+  if (typeof note !== 'string' || !note.trim() || isRawToolText(note)) return null
+  const main = explanationFromCommand(proposal?.command)
+  if (main && note.trim() === main.trim()) return null
+  return note.trim()
 }
 
 /** Post-apply line. Same explanation, never "Executing add_commitment". */
@@ -285,15 +296,10 @@ export function chatInputLocked(_pendingProposal: unknown, isReviewing: boolean)
 type ProposalRecord = {
   id?: string
   message_id?: string
+  created_at?: string
   command?: {
     action?: string
-    explanation?: unknown
-    description?: unknown
-    summary?: unknown
-    card?: unknown
-    before?: unknown
-    after?: unknown
-    payload?: Record<string, unknown>
+    payload?: { work_type?: unknown }
   }
 }
 
@@ -302,95 +308,53 @@ function proposalRecord(proposal: unknown): ProposalRecord | null {
   return proposal as ProposalRecord
 }
 
+const CLEAR_DAYS_WORD = /\b(blank|clear|untrack(?:ed)?)\b/i
+
+/** Whole words in the user's message. "unclear" and "clearly" do not count. */
+export function userAskedToClearDays(text: string): boolean {
+  return CLEAR_DAYS_WORD.test(text)
+}
+
+type ChatTurn = { id?: string; role?: string; content?: string }
+
 /**
- * The dashboard loads pending proposals from the server. An override that blanks
- * days is only shown when the user message asked to clear or blank them.
+ * A blank-days override the user did not ask for. The explanation is ignored;
+ * the server rewrites that sentence.
  */
-export function shouldShowPendingProposal(
-  proposal: unknown,
-  messages: { id?: string; role?: string; content?: string }[],
-): boolean {
+export function isHiddenBlankDaysProposal(proposal: unknown, messages: ChatTurn[]): boolean {
   const record = proposalRecord(proposal)
   if (!record?.id) return false
-  const action = record.command?.action || ''
-  const explanation = typeof record.command?.explanation === 'string' ? record.command.explanation : ''
-  const workType = record.command?.payload?.work_type
-  const clearsDays = action === 'override_days' && (workType === 'blank' || /clear the days before/i.test(explanation))
-  if (!clearsDays) return true
+  if (record.command?.action !== 'override_days') return false
+  if (record.command?.payload?.work_type !== 'blank') return false
   const trigger = messages.find((message) => message.role === 'user' && message.id && message.id === record.message_id)
-  return /blank|clear|untrack/i.test(trigger?.content || '')
+  return !userAskedToClearDays(trigger?.content || '')
+}
+
+export function hiddenBlankDayProposalIds(proposals: unknown[] | null | undefined, messages: ChatTurn[]): string[] {
+  const ids: string[] = []
+  for (const proposal of proposals || []) {
+    const record = proposalRecord(proposal)
+    if (record?.id && isHiddenBlankDaysProposal(record, messages)) ids.push(record.id)
+  }
+  return ids
+}
+
+/** Newest by created_at. The pending list itself is oldest first. */
+export function newestVisibleProposal<T>(proposals: T[] | null | undefined, messages: ChatTurn[]): T | null {
+  const visible = (proposals || []).filter((proposal) => {
+    const record = proposalRecord(proposal)
+    return Boolean(record?.id) && !isHiddenBlankDaysProposal(proposal, messages)
+  })
+  if (visible.length === 0) return null
+  return [...visible].sort((left, right) => {
+    const leftAt = proposalRecord(left)?.created_at || ''
+    const rightAt = proposalRecord(right)?.created_at || ''
+    return rightAt.localeCompare(leftAt)
+  })[0]
 }
 
 export function stalePendingCards<T extends { isProposal?: boolean; proposal?: unknown }>(messages: T[]): T[] {
   return messages.map((message) => (message.proposal ? { ...message, isProposal: false } : message))
-}
-
-export interface ProposalChangeLine {
-  label: string
-  value: string
-}
-
-function plainField(value: unknown): string | null {
-  if (typeof value === 'string' && value.trim()) return value.trim()
-  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
-  return null
-}
-
-function serverCardText(source: Record<string, unknown> | null | undefined): string | null {
-  if (!source) return null
-  for (const key of ['description', 'summary', 'card']) {
-    const text = plainField(source[key])
-    if (text) return text
-  }
-  return null
-}
-
-function changeKind(action: string, payload: Record<string, unknown>): string | null {
-  if (action === 'add_leave' || payload.type === 'leave') return 'leave'
-  if (action === 'add_commitment') return 'commitment'
-  if (action === 'override_days' || action === 'update_cycle') return 'shift change'
-  return null
-}
-
-function dayField(value: unknown): string | null {
-  const text = plainField(value)
-  if (!text) return null
-  const match = text.match(/^(\d{4}-\d{2}-\d{2})/)
-  return match ? match[1] : text
-}
-
-/** Structured lines already present on the proposal. Missing fields are omitted. */
-export function proposalChangeLines(proposal: unknown): ProposalChangeLine[] {
-  const record = proposalRecord(proposal)
-  const command = record?.command
-  const payload = command?.payload && typeof command.payload === 'object' ? command.payload : {}
-  const lines: ProposalChangeLine[] = []
-  const described = serverCardText(command as Record<string, unknown> | undefined) || serverCardText(payload)
-  if (described) lines.push({ label: 'Change', value: described })
-  const action = typeof command?.action === 'string' ? command.action : ''
-  const kind = changeKind(action, payload)
-  if (kind) lines.push({ label: 'Type', value: kind })
-  const name = plainField(payload.name)
-  if (name) lines.push({ label: 'Name', value: name })
-  const start = dayField(payload.start_date ?? payload.date)
-  const end = dayField(payload.end_date)
-  if (start) lines.push({ label: 'From', value: start })
-  if (end && end !== start) lines.push({ label: 'To', value: end })
-  const shift = plainField(payload.work_type)
-  if (shift) lines.push({ label: 'Shift', value: shift })
-  const timeStart = plainField(payload.time_start)
-  const timeEnd = plainField(payload.time_end)
-  if (timeStart) lines.push({ label: 'Time', value: timeEnd ? `${timeStart.slice(0, 5)}-${timeEnd.slice(0, 5)}` : timeStart.slice(0, 5) })
-  for (const key of ['before', 'after'] as const) {
-    const raw = payload[key] ?? command?.[key]
-    const direct = plainField(raw)
-    const nested = raw && typeof raw === 'object'
-      ? plainField((raw as Record<string, unknown>).work_type) || plainField((raw as Record<string, unknown>).name)
-      : null
-    const text = direct || nested
-    if (text) lines.push({ label: key === 'before' ? 'Before' : 'After', value: text })
-  }
-  return lines
 }
 
 export interface ChatListMessage {

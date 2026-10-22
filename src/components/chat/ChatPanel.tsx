@@ -18,10 +18,11 @@ import {
   isInternalChatMessage,
   mergeChatHistory,
   messagesAfterSend,
+  hiddenBlankDayProposalIds,
+  newestVisibleProposal,
   proposalAppliedText,
   proposalCardText,
-  proposalChangeLines,
-  shouldShowPendingProposal,
+  proposalModelNote,
   stalePendingCards,
   REVIEW_FAILURE_MESSAGE,
   type ChatTextPart,
@@ -160,6 +161,19 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
     })
   }, [messages, initialLoadComplete])
 
+  const choosePendingProposal = async (turns: { id?: string; role?: string; content?: string }[]) => {
+    const pending = await api.commands.pendingProposals()
+    const list = Array.isArray(pending?.proposals) ? pending.proposals : []
+    await Promise.all(hiddenBlankDayProposalIds(list, turns).map(async (id) => {
+      try {
+        await api.commands.reviewProposal(id, 'reject')
+      } catch (error) {
+        console.error('Failed to decline an unrequested proposal:', error)
+      }
+    }))
+    return newestVisibleProposal(list, turns)
+  }
+
   const loadHistory = async () => {
     let history: Message[] = []
     let historyLoaded = false
@@ -201,9 +215,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
     }
 
     try {
-      const pending = await api.commands.pendingProposals()
-      const loaded = pending?.proposals?.[0] || null
-      const proposal = shouldShowPendingProposal(loaded, history) ? loaded : null
+      const proposal = await choosePendingProposal(history)
       setPendingProposal(proposal)
       history = withProposalCard(history, proposal)
       if (historyLoaded) setHistoryError(null)
@@ -239,10 +251,18 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       content: userMessage,
       created_at: new Date().toISOString()
     }
+    const replacedId = pendingProposal?.id
     setPendingProposal(null)
     setMessages(prev => [...stalePendingCards(prev), tempUserMessage])
 
     try {
+      if (replacedId) {
+        try {
+          await api.commands.reviewProposal(replacedId, 'reject')
+        } catch (error) {
+          console.error('Failed to decline the replaced proposal:', error)
+        }
+      }
       const response = await api.chat.sendMessage(userMessage, autoExecute)
       
       const assistantText = response.assistant_message
@@ -294,14 +314,9 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
 
   const loadNextProposal = async () => {
     try {
-      const pending = await api.commands.pendingProposals()
-      const loaded = pending?.proposals?.[0] || null
-      let visible: typeof loaded = null
-      setMessages(prev => {
-        visible = shouldShowPendingProposal(loaded, prev) ? loaded : null
-        return withProposalCard(prev, visible)
-      })
+      const visible = await choosePendingProposal(messages)
       setPendingProposal(visible)
+      setMessages(prev => withProposalCard(prev, visible))
     } catch (error) {
       console.error('Failed to reload pending proposals:', error)
     }
@@ -535,15 +550,10 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
                         : message.content}
                   />
                 </p>
-                {message.proposal && proposalChangeLines(message.proposal).length > 0 && (
-                  <ul className="mt-3 space-y-1 text-xs text-watchman-muted">
-                    {proposalChangeLines(message.proposal).map((line) => (
-                      <li key={`${line.label}-${line.value}`}>
-                        <span className="text-white/80">{line.label}: </span>
-                        {line.value}
-                      </li>
-                    ))}
-                  </ul>
+                {message.proposal && proposalModelNote(message.proposal) && (
+                  <p className="mt-2 text-xs text-watchman-muted whitespace-pre-wrap">
+                    {proposalModelNote(message.proposal)}
+                  </p>
                 )}
                 
                 {/* Proposal approval buttons */}

@@ -11,11 +11,13 @@ import {
   isInternalChatMessage,
   mergeChatHistory,
   messagesAfterSend,
+  hiddenBlankDayProposalIds,
+  newestVisibleProposal,
   proposalAppliedText,
   proposalCardText,
-  proposalChangeLines,
-  shouldShowPendingProposal,
+  proposalModelNote,
   stalePendingCards,
+  userAskedToClearDays,
   REVIEW_FAILURE_MESSAGE,
   sanitizeChatDisplay,
 } from './chat-display.ts'
@@ -178,47 +180,66 @@ describe('chat display', () => {
     assert.equal(chatScrollBehavior(true), 'smooth')
   })
 
-  it('does not show an unrequested onboarding proposal', () => {
-    const proposal = {
-      id: 'p-blank',
+  it('does not treat unclear or clearly as a request to clear days', () => {
+    assert.equal(userAskedToClearDays('the schedule is unclear'), false)
+    assert.equal(userAskedToClearDays('clearly a day shift'), false)
+    assert.equal(userAskedToClearDays('please clear the days before Oct 22'), true)
+    assert.equal(userAskedToClearDays('mark them blank'), true)
+    assert.equal(userAskedToClearDays('leave those days untracked'), true)
+  })
+
+  it('shows the newer card when the oldest blank-days proposal is hidden', () => {
+    const hidden = {
+      id: 'old',
+      created_at: '2026-10-22T01:00:00Z',
       message_id: 'u-setup',
       command: {
         action: 'override_days',
-        explanation: 'I will clear the days before Oct 22',
-        payload: { work_type: 'blank', start_date: '2026-01-01', end_date: '2026-10-21' },
+        explanation: 'Clear every day before the anchor',
+        payload: { work_type: 'blank', start_date: '2026-01-01', end_date: '2026-10-21', description: 'incident body' },
       },
     }
-    const setup = [{ id: 'u-setup', role: 'user', content: 'I work 5 days, 5 nights, 5 off' }]
-    assert.equal(shouldShowPendingProposal(proposal, setup), false)
-    assert.equal(shouldShowPendingProposal(proposal, []), false)
-    assert.equal(shouldShowPendingProposal({
-      id: 'p-hair',
+    const newer = {
+      id: 'new',
+      created_at: '2026-10-22T02:00:00Z',
       message_id: 'u-hair',
-      command: { action: 'add_commitment', payload: { name: 'Haircut', start_date: '2026-11-05' } },
-    }, [{ id: 'u-hair', role: 'user', content: 'Book a haircut on Thursday' }]), true)
+      command: {
+        action: 'add_commitment',
+        explanation: 'Add Haircut on Thu 5 Nov, 16:00-17:00',
+        model_text: "I'll add the haircut.",
+        payload: { name: 'Haircut', start_date: '2026-11-05', description: 'not a change label' },
+      },
+    }
+    const turns = [
+      { id: 'u-setup', role: 'user', content: 'I work 5 days, 5 nights, 5 off' },
+      { id: 'u-hair', role: 'user', content: 'Book a haircut on Thursday' },
+    ]
+    assert.deepEqual(hiddenBlankDayProposalIds([hidden, newer], turns), ['old'])
+    assert.equal(newestVisibleProposal([hidden, newer], turns)?.id, 'new')
+    assert.equal(proposalCardText(newer), 'Add Haircut on Thu 5 Nov, 16:00-17:00')
+    assert.equal(proposalModelNote(newer), "I'll add the haircut.")
+    assert.equal(proposalCardText(newer).includes('not a change label'), false)
   })
 
-  it('lists the payload changes on a proposal card', () => {
-    const lines = proposalChangeLines({
-      command: {
-        action: 'add_leave',
-        explanation: "I'll mark those days off.",
-        description: 'Mark Sun 20 Dec to Sun 27 Dec as leave',
-        payload: {
-          name: 'Leave',
-          start_date: '2026-12-20',
-          end_date: '2026-12-27',
-          before: { work_type: 'work_day' },
-          after: 'leave',
-        },
-      },
-    })
-    assert.equal(lines.some((line) => line.value === 'Mark Sun 20 Dec to Sun 27 Dec as leave'), true)
-    assert.equal(lines.find((line) => line.label === 'Type')?.value, 'leave')
-    assert.equal(lines.find((line) => line.label === 'From')?.value, '2026-12-20')
-    assert.equal(lines.find((line) => line.label === 'To')?.value, '2026-12-27')
-    assert.equal(lines.find((line) => line.label === 'Before')?.value, 'work_day')
-    assert.equal(lines.find((line) => line.label === 'After')?.value, 'leave')
+  it('shows the newest pending proposal after a reload', () => {
+    const older = {
+      id: 'older',
+      created_at: '2026-10-22T01:00:00Z',
+      message_id: 'u1',
+      command: { action: 'add_leave', explanation: 'Mark Tue 27 Oct as leave', payload: { start_date: '2026-10-27' } },
+    }
+    const newest = {
+      id: 'newest',
+      created_at: '2026-10-22T03:00:00Z',
+      message_id: 'u2',
+      command: { action: 'add_commitment', explanation: 'Add Haircut on Thu 5 Nov', payload: { name: 'Haircut' } },
+    }
+    const turns = [
+      { id: 'u1', role: 'user', content: 'I need leave on 27 Oct' },
+      { id: 'u2', role: 'user', content: 'Book a haircut' },
+    ]
+    assert.equal(newestVisibleProposal([older, newest], turns)?.id, 'newest')
+    assert.equal(newestVisibleProposal([newest, older], turns)?.id, 'newest')
   })
 
   it('shows one copy of a message sent while a proposal card is pending', () => {
