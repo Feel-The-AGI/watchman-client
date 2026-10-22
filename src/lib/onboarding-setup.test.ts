@@ -8,6 +8,7 @@ import {
   reusableSetupCycleId,
   rulesStillNeeded,
   saveOnboardingCycle,
+  visibleOnboardingRules,
   type SetupCycleChoice,
   type SetupRule,
 } from './onboarding-setup.ts'
@@ -171,6 +172,20 @@ describe('save onboarding cycle', () => {
 })
 
 describe('onboarding rules', () => {
+  it('offers only the night-study rule during setup', () => {
+    const presets = [
+      { name: 'No study on night shifts', rule: 'no_study_on:work_night' },
+      { name: 'Max 2 commitments per day', rule: 'max_concurrent_commitments:2' },
+      { name: 'Study only on off days', rule: 'study_only_on:off' },
+      { name: 'No study on work days', rule: 'no_study_on:work_day' },
+    ]
+    assert.deepEqual(
+      visibleOnboardingRules(presets).map((preset) => preset.rule),
+      ['no_study_on:work_night'],
+    )
+    assert.equal(visibleOnboardingRules(presets).length, 1)
+  })
+
   const night: SetupRule = { name: 'No study on night shifts', rule: { type: 'no_study_on', value: 'work_night' } }
   const cap: SetupRule = { name: 'Max 2 commitments per day', rule: { type: 'max_concurrent_commitments', value: 2 } }
 
