@@ -17,7 +17,7 @@ import {
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, Sun, Moon, Coffee, Plane, Sparkles, Lock, Crown, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { cycleDayBadge } from '@/lib/cycle-day-badge';
+import { cycleDayBadge, type BadgeBlock } from '@/lib/cycle-day-badge';
 import { calendarCellKind, calendarHoverLabel, dayCommitments } from '@/lib/calendar-day';
 import { isFreeMonthLocked, isYearMonthVisible } from '@/lib/free-calendar-access';
 import { monthArrowLabel, UPGRADE_AHEAD_LABEL } from '@/lib/calendar-view';
@@ -94,6 +94,7 @@ export interface CalendarDay {
   incidents?: Incident[];
   actual_hours_worked?: number;
   overtime_hours?: number;
+  block_day?: number;
 }
 
 interface CalendarGridProps {
@@ -104,6 +105,7 @@ interface CalendarGridProps {
   view?: 'month' | 'year';
   initialMonth?: Date;
   userTier?: 'free' | 'pro' | 'admin';
+  pattern?: BadgeBlock[] | null;
 }
 
 const workTypeConfig: Record<string, {
@@ -160,7 +162,8 @@ export function CalendarGrid({
   onMonthChange,
   view: _view = 'month',
   initialMonth,
-  userTier = 'free'
+  userTier = 'free',
+  pattern = null,
 }: CalendarGridProps) {
   const lockedPriceLine = useLockedMonthPrice(userTier);
   const [currentMonth, setCurrentMonth] = useState(initialMonth || new Date());
@@ -353,7 +356,10 @@ export function CalendarGrid({
               ? null
               : isLeave
                 ? 'Leave'
-                : cycleDayBadge(calendarDay?.work_type, calendarDay?.cycle_day);
+                : cycleDayBadge(calendarDay?.work_type, calendarDay?.cycle_day, {
+                    pattern,
+                    blockDay: calendarDay?.block_day,
+                  });
 
             return (
               <motion.button

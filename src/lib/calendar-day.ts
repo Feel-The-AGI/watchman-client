@@ -19,6 +19,8 @@ export interface NormalizedCalendarDay {
   actual_hours_worked?: number
   overtime_hours?: number
   state_json?: Record<string, unknown>
+  /** 1-based index inside the current pattern block. The cell badge uses this, not cycle_day. */
+  block_day?: number
 }
 
 export type CalendarCellKind = 'leave' | 'work_day' | 'work_night' | 'off' | 'blank' | 'empty'
@@ -157,7 +159,14 @@ export function normalizeCalendarDay(raw: unknown): NormalizedCalendarDay | null
         ? state.overtime_hours
         : undefined,
     state_json: state,
+    block_day: blockDayFrom(record, state),
   }
+}
+
+function blockDayFrom(record: Record<string, unknown>, state: Record<string, unknown>): number | undefined {
+  const value = typeof record.block_day === 'number' ? record.block_day : state.block_day
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 1) return undefined
+  return Math.trunc(value)
 }
 
 export function normalizeCalendarDays(raw: unknown): NormalizedCalendarDay[] {
