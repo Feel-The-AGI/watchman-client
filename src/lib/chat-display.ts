@@ -272,6 +272,9 @@ export function chatTextParts(content: unknown): ChatTextPart[] {
 /** User text is shown as typed. Markdown and tool-name cleanup apply to assistant text only. */
 export function displayedChatParts(role: string, content: unknown): ChatTextPart[] {
   if (role === 'user') {
+    if (typeof content === 'string') {
+      return content.length > 0 ? [{ kind: 'text', text: content }] : []
+    }
     const text = chatMessageText(content)
     return text ? [{ kind: 'text', text }] : []
   }

@@ -196,6 +196,8 @@ describe('chat display', () => {
     const typed = 'Meeting with <John> at 2*3*4'
     assert.deepEqual(displayedChatParts('user', typed), [{ kind: 'text', text: typed }])
     assert.deepEqual(displayedChatParts('user', 'add_commitment'), [{ kind: 'text', text: 'add_commitment' }])
+    const json = '{"message":"hi"}'
+    assert.deepEqual(displayedChatParts('user', json), [{ kind: 'text', text: json }])
   })
 
   it('jumps to the newest message before later messages animate', () => {
