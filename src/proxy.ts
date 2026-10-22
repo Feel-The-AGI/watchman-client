@@ -34,7 +34,13 @@ export async function proxy(request: NextRequest) {
   if (hasAuthCookie) {
     const env = supabaseEnv()
     if (!env) {
-      decision = 'redirect-and-clear'
+      console.error('Supabase environment variables are missing. The dashboard session was not checked.')
+      decision = dashboardAuthDecision({
+        hasAuthCookie: true,
+        user: null,
+        error: null,
+        envMissing: true,
+      })
     } else {
       const supabase = createServerClient(env.url, env.key, {
         cookies: {

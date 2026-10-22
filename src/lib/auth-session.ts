@@ -90,43 +90,45 @@ export interface DashboardAuthError {
 export type DashboardAuthDecision = 'allow' | 'redirect-and-clear' | 'pass-through' | 'redirect'
 
 /**
- * A valid user stays on the dashboard. An invalid or expired session redirects
- * to /login and the auth cookies are deleted. A network failure, timeout, or
- * 5xx leaves the request and cookies alone. No auth cookie still redirects.
+ * A valid user stays on the dashboard. Status 400, 401, or 403, or an explicit
+ * dead-session code, redirects to /login and deletes the auth cookies. A 429,
+ * 5xx, network failure, or missing Supabase env leaves the request alone.
+ * No auth cookie still redirects.
  */
 export function dashboardAuthDecision(check: {
   hasAuthCookie: boolean
   user: unknown
   error?: DashboardAuthError | null
+  envMissing?: boolean
 }): DashboardAuthDecision {
+  if (check.envMissing) return 'pass-through'
   if (!check.hasAuthCookie) return 'redirect'
   if (check.user) return 'allow'
   if (isRejectedSession(check.error)) return 'redirect-and-clear'
   return 'pass-through'
 }
 
+const REJECTED_SESSION_CODES = new Set([
+  'session_not_found',
+  'session_expired',
+  'bad_jwt',
+  'invalid_jwt',
+  'refresh_token_not_found',
+  'refresh_token_already_used',
+])
+
 function isRejectedSession(error: DashboardAuthError | null | undefined): boolean {
   if (!error) return false
   const status = typeof error.status === 'number' ? error.status : undefined
-  if (status !== undefined && status >= 500) return false
-  if (status === 401 || status === 403) return true
-  const name = error.name || ''
-  if (name === 'AuthSessionMissingError') return true
-  if (name === 'AuthApiError') return true
+  if (status === 429 || (status !== undefined && status >= 500)) return false
+  if (status === 400 || status === 401 || status === 403) return true
+  if (error.name === 'AuthSessionMissingError') return true
   const code = (error.code || '').toLowerCase()
-  if (
-    code === 'session_not_found'
-    || code === 'session_expired'
-    || code === 'bad_jwt'
-    || code.includes('invalid_jwt')
-    || code === 'refresh_token_not_found'
-  ) {
-    return true
-  }
+  if (REJECTED_SESSION_CODES.has(code)) return true
   const message = (error.message || '').toLowerCase()
-  return message.includes('session missing')
-    || message.includes('invalid jwt')
+  return message.includes('invalid jwt')
     || message.includes('jwt expired')
+    || message.includes('invalid refresh token')
 }
 
 function clearWebStorage(storage: Storage | undefined): void {

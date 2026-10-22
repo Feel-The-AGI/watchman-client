@@ -142,6 +142,23 @@ describe('dashboard auth check', () => {
       error: null,
     }), 'redirect')
   })
+
+  it('passes through a 429 from AuthApiError', () => {
+    assert.equal(dashboardAuthDecision({
+      hasAuthCookie: true,
+      user: null,
+      error: { name: 'AuthApiError', status: 429, message: 'too many requests' },
+    }), 'pass-through')
+  })
+
+  it('passes through when the Supabase environment is missing', () => {
+    assert.equal(dashboardAuthDecision({
+      hasAuthCookie: true,
+      user: null,
+      error: null,
+      envMissing: true,
+    }), 'pass-through')
+  })
 })
 
 describe('dashboard without a session', () => {
