@@ -211,12 +211,31 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (!selectedDate) return;
-    if (window.matchMedia('(min-width: 1024px)').matches) return;
+    if (!selectedDate || desktopLayout) return;
     const iso = format(selectedDate, 'yyyy-MM-dd');
-    document.querySelector(`[data-date="${iso}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    document.querySelector('[data-testid="mobile-day-panel"]')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [selectedDate]);
+    let cancelled = false;
+    const alignSelectedDay = () => {
+      if (cancelled) return;
+      const day = document.querySelector(`[data-date="${iso}"]`);
+      if (!(day instanceof HTMLElement)) return;
+      const header = document.querySelector('header');
+      const headerHeight = header instanceof HTMLElement ? header.getBoundingClientRect().height : 72;
+      // Keep the tapped day under the sticky header so the panel below the
+      // calendar is on screen. `instant` ignores the page's smooth scroll.
+      // Framer Motion then scrolls to 0 while measuring keyframes, so repeat
+      // the alignment once that measurement has finished.
+      const top = day.getBoundingClientRect().top + window.scrollY - headerHeight - 8;
+      window.scrollTo({ top: Math.max(0, top), behavior: 'instant' });
+    };
+    alignSelectedDay();
+    const frame = requestAnimationFrame(alignSelectedDay);
+    const timer = window.setTimeout(alignSelectedDay, 60);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, [selectedDate, desktopLayout]);
 
   const showMonth = (month: Date) => {
     const tier = profile?.tier === 'pro' || profile?.tier === 'admin' ? profile.tier : 'free';

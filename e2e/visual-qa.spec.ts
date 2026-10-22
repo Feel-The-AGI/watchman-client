@@ -92,6 +92,9 @@ test.describe('local visual qa', () => {
           const notLogged = page.locator('text=Not logged >> visible=true').first()
           await expect(notLogged).toBeVisible()
           const hours = page.locator('text=Hours Worked >> visible=true')
+          if (viewport.width < 800) {
+            await expect.poll(async () => (await hours.boundingBox())?.y ?? 9999).toBeLessThan(viewport.height * 0.7)
+          }
           const hoursBox = await hours.boundingBox()
           expect(hoursBox).not.toBeNull()
           expect(hoursBox!.y + hoursBox!.height).toBeGreaterThan(0)
