@@ -11,6 +11,7 @@ import {
   isInternalChatMessage,
   mergeChatHistory,
   messagesAfterSend,
+  blankDaysProposalFate,
   blankDaysProposalIdsToDecline,
   newestVisibleProposal,
   proposalAppliedText,
@@ -42,6 +43,30 @@ describe('chat display', () => {
     assert.equal(chatMessageText({ message: 'Try a shorter request.' }), 'Try a shorter request.')
     assert.equal(chatMessageText('[object Object]'), 'Something went wrong. Please try again.')
     assert.equal(chatMessageText('Your rotation is saved.'), 'Your rotation is saved.')
+  })
+
+  it('reads string, structured, and missing chat content as text', () => {
+    assert.equal(chatMessageText('Book a haircut'), 'Book a haircut')
+    assert.equal(chatMessageText({ message: 'Added the night shift.' }), 'Added the night shift.')
+    assert.equal(chatMessageText(undefined), null)
+    assert.equal(chatMessageText(null), null)
+    assert.deepEqual(displayedChatParts('user', { message: 'Added the night shift.' }), [
+      { kind: 'text', text: 'Added the night shift.' },
+    ])
+    assert.deepEqual(displayedChatParts('user', null), [])
+    const proposal = {
+      id: 'p-blank',
+      message_id: 'u-clear',
+      command: { action: 'override_days', payload: { work_type: 'blank' } },
+    }
+    assert.equal(
+      blankDaysProposalFate(
+        proposal,
+        [{ id: 'u-clear', role: 'user', content: { message: 'please clear those days' } }],
+        true,
+      ),
+      'show',
+    )
   })
 
   it('uses command.explanation and hides raw tool names', () => {
@@ -171,6 +196,8 @@ describe('chat display', () => {
     const typed = 'Meeting with <John> at 2*3*4'
     assert.deepEqual(displayedChatParts('user', typed), [{ kind: 'text', text: typed }])
     assert.deepEqual(displayedChatParts('user', 'add_commitment'), [{ kind: 'text', text: 'add_commitment' }])
+    const json = '{"message":"hi"}'
+    assert.deepEqual(displayedChatParts('user', json), [{ kind: 'text', text: json }])
   })
 
   it('jumps to the newest message before later messages animate', () => {
@@ -242,6 +269,22 @@ describe('chat display', () => {
     ]
     assert.equal(newestVisibleProposal([older, newest], turns)?.id, 'newest')
     assert.equal(newestVisibleProposal([newest, older], turns)?.id, 'newest')
+  })
+
+  it('shows a blank-days card when the user string asks to clear days', () => {
+    const proposal = {
+      id: 'p-blank',
+      message_id: 'u-clear',
+      command: { action: 'override_days', payload: { work_type: 'blank' } },
+    }
+    assert.equal(
+      blankDaysProposalFate(
+        proposal,
+        [{ id: 'u-clear', role: 'user', content: '{clear days}' }],
+        true,
+      ),
+      'show',
+    )
   })
 
   it('hides a blank-days card without declining when history did not load', () => {
