@@ -30,6 +30,13 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { api } from '@/lib/api';
+import {
+  canSaveMasterSettings,
+  loadMasterSettings,
+  MASTER_SETTINGS_LOAD_ERROR,
+  saveMasterSettings,
+  type LoadedMasterSettings,
+} from '@/lib/master-settings-save';
 import { cn } from '@/lib/utils';
 
 interface MasterSettings {
@@ -104,12 +111,44 @@ const defaultSettings: MasterSettings = {
   leave_blocks: [],
 };
 
+function settingsFromDocument(raw: unknown): MasterSettings {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? raw as Partial<MasterSettings>
+    : {};
+  const work = source.work || ({} as MasterSettings['work']);
+  return {
+    cycle: {
+      ...defaultSettings.cycle,
+      ...(source.cycle || {}),
+      pattern: source.cycle?.pattern || defaultSettings.cycle.pattern,
+    },
+    work: {
+      day_hours: {
+        start: work.day_hours?.start || defaultSettings.work.day_hours.start,
+        end: work.day_hours?.end || defaultSettings.work.day_hours.end,
+      },
+      night_hours: {
+        start: work.night_hours?.start || defaultSettings.work.night_hours.start,
+        end: work.night_hours?.end || defaultSettings.work.night_hours.end,
+      },
+      available_hours_on_off: work.available_hours_on_off ?? defaultSettings.work.available_hours_on_off,
+      available_hours_on_work: work.available_hours_on_work ?? defaultSettings.work.available_hours_on_work,
+    },
+    constraints: source.constraints || defaultSettings.constraints,
+    commitments: source.commitments || defaultSettings.commitments,
+    leave_blocks: source.leave_blocks || defaultSettings.leave_blocks,
+  };
+}
+
 export default function MasterSettingsPage() {
   const [settings, setSettings] = useState<MasterSettings>(defaultSettings);
+  const [loadedDocument, setLoadedDocument] = useState<LoadedMasterSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const savesDisabled = saving || !canSaveMasterSettings(loadedDocument);
   
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [editPattern, setEditPattern] = useState(settings.cycle.pattern);
@@ -132,70 +171,61 @@ export default function MasterSettingsPage() {
   }, []);
 
   const fetchSettings = async () => {
+    setLoading(true);
+    setError(null);
+    setEditingSection(null);
+    setRegenerateModal(false);
     try {
-      setLoading(true);
-      setError(null);
-      const response = await api.masterSettings.get();
-      if (response?.settings) {
-        // Deep merge to handle null/undefined nested objects
-        const work = response.settings.work || {};
-        const merged: MasterSettings = {
-          cycle: {
-            ...defaultSettings.cycle,
-            ...(response.settings.cycle || {}),
-            pattern: response.settings.cycle?.pattern || defaultSettings.cycle.pattern,
-          },
-          work: {
-            day_hours: {
-              start: work.day_hours?.start || defaultSettings.work.day_hours.start,
-              end: work.day_hours?.end || defaultSettings.work.day_hours.end,
-            },
-            night_hours: {
-              start: work.night_hours?.start || defaultSettings.work.night_hours.start,
-              end: work.night_hours?.end || defaultSettings.work.night_hours.end,
-            },
-            available_hours_on_off: work.available_hours_on_off ?? defaultSettings.work.available_hours_on_off,
-            available_hours_on_work: work.available_hours_on_work ?? defaultSettings.work.available_hours_on_work,
-          },
-          constraints: response.settings.constraints || defaultSettings.constraints,
-          commitments: response.settings.commitments || defaultSettings.commitments,
-          leave_blocks: response.settings.leave_blocks || defaultSettings.leave_blocks,
-        };
-        setSettings(merged);
-      } else {
-        // No settings yet - use defaults
-        setSettings(defaultSettings);
+      const result = await loadMasterSettings(api.masterSettings);
+      if (!result.ok) {
+        setLoadedDocument(null);
+        setLoadError(result.message);
+        return;
       }
-    } catch (err: any) {
-      console.error('Settings fetch error:', err);
-      // 404 means no settings yet - use defaults
-      if (err.status === 404 || err.message?.includes('404') || err.message?.includes('not found')) {
-        setSettings(defaultSettings);
-      } else {
-        setError(err.message || 'Failed to load settings');
-      }
+      setLoadedDocument(result.document);
+      setSettings(settingsFromDocument(result.document.settings));
+      setLoadError(null);
     } finally {
       setLoading(false);
     }
   };
 
   const saveSettings = async (newSettings: MasterSettings) => {
+    if (saving || !canSaveMasterSettings(loadedDocument)) return;
+    setSaving(true);
+    setError(null);
     try {
-      setSaving(true);
-      setError(null);
-      await api.masterSettings.update(newSettings);
-      setSettings(newSettings);
-      setSuccess('Settings saved successfully');
-      setTimeout(() => setSuccess(null), 3000);
-      setEditingSection(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to save settings');
+      const result = await saveMasterSettings(loadedDocument, newSettings, api.masterSettings);
+      if (result.ok) {
+        setLoadedDocument(result.document);
+        setSettings(newSettings);
+        setSuccess('Settings saved successfully');
+        setTimeout(() => setSuccess(null), 3000);
+        setEditingSection(null);
+        return;
+      }
+      if (result.conflict) {
+        setEditingSection(null);
+        if (result.document) {
+          setLoadedDocument(result.document);
+          setSettings(settingsFromDocument(result.document.settings));
+          setLoadError(null);
+        } else {
+          setLoadedDocument(null);
+          setLoadError(MASTER_SETTINGS_LOAD_ERROR);
+        }
+      }
+      setError(result.message);
     } finally {
       setSaving(false);
     }
   };
 
   const saveRotation = async (cycle: MasterSettings['cycle']) => {
+    if (!canSaveMasterSettings(loadedDocument)) {
+      setLoadError(MASTER_SETTINGS_LOAD_ERROR);
+      return;
+    }
     if (!cycle.anchor_date) {
       setError('Set an anchor date before updating the rotation.');
       return;
@@ -250,6 +280,7 @@ export default function MasterSettingsPage() {
   };
 
   const openWorkHoursEditor = () => {
+    if (!canSaveMasterSettings(loadedDocument)) return;
     setEditDayStart(settings.work?.day_hours?.start || '06:00');
     setEditDayEnd(settings.work?.day_hours?.end || '18:00');
     setEditNightStart(settings.work?.night_hours?.start || '18:00');
@@ -274,6 +305,7 @@ export default function MasterSettingsPage() {
   };
 
   const handleRegenerateCalendar = () => {
+    if (!canSaveMasterSettings(loadedDocument)) return;
     setRegenerateModal(true);
   };
 
@@ -328,7 +360,7 @@ export default function MasterSettingsPage() {
         <Button
           variant="glass"
           onClick={handleRegenerateCalendar}
-          disabled={saving}
+          disabled={savesDisabled}
           className="gap-2"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -338,6 +370,21 @@ export default function MasterSettingsPage() {
 
       {/* Status Messages */}
       <AnimatePresence>
+        {loadError && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            className="p-4 rounded-2xl glass border border-red-500/30 flex items-center gap-3"
+          >
+            <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+            <p className="text-sm text-red-400 flex-1">{loadError}</p>
+            <Button variant="secondary" size="sm" onClick={() => void fetchSettings()}>
+              Retry
+            </Button>
+          </motion.div>
+        )}
+
         {error && (
           <motion.div
             initial={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -391,7 +438,7 @@ export default function MasterSettingsPage() {
                 variant="secondary"
                 size="sm"
                 onClick={handleRegenerateCalendar}
-                disabled={saving}
+                disabled={savesDisabled}
                 className="gap-2"
               >
                 <RefreshCw className={cn("w-4 h-4", saving && "animate-spin")} />
@@ -400,6 +447,7 @@ export default function MasterSettingsPage() {
               <Button
                 variant="ghost"
                 size="sm"
+                disabled={savesDisabled}
                 onClick={() => {
                   setEditPattern([...settings.cycle.pattern]);
                   setEditAnchorDate(settings.cycle.anchor_date || '');
@@ -508,6 +556,7 @@ export default function MasterSettingsPage() {
                 variant="ghost"
                 size="sm"
                 onClick={openWorkHoursEditor}
+                disabled={savesDisabled}
                 className="gap-2"
               >
                 <Edit2 className="w-4 h-4" />
@@ -520,12 +569,14 @@ export default function MasterSettingsPage() {
             <div className="grid sm:grid-cols-2 gap-6">
               {/* Day Shift Hours */}
               <motion.button
+                type="button"
                 onClick={openWorkHoursEditor}
+                disabled={savesDisabled}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
-                className="p-5 glass rounded-2xl border border-white/5 cursor-pointer group hover:border-amber-500/30 transition-colors text-left"
+                className="p-5 glass rounded-2xl border border-white/5 cursor-pointer group hover:border-amber-500/30 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -550,13 +601,15 @@ export default function MasterSettingsPage() {
 
               {/* Night Shift Hours */}
               <motion.button
+                type="button"
                 onClick={openWorkHoursEditor}
+                disabled={savesDisabled}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.05 }}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
-                className="p-5 glass rounded-2xl border border-white/5 cursor-pointer group hover:border-indigo-500/30 transition-colors text-left"
+                className="p-5 glass rounded-2xl border border-white/5 cursor-pointer group hover:border-indigo-500/30 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -583,10 +636,12 @@ export default function MasterSettingsPage() {
             {/* Available Study Hours */}
             <div className="mt-6 grid sm:grid-cols-2 gap-4">
               <motion.button
+                type="button"
                 onClick={openWorkHoursEditor}
+                disabled={savesDisabled}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
-                className="p-4 glass rounded-xl border border-white/5 flex items-center justify-between cursor-pointer hover:border-emerald-500/30 transition-colors group text-left"
+                className="p-4 glass rounded-xl border border-white/5 flex items-center justify-between cursor-pointer hover:border-emerald-500/30 transition-colors group text-left disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center gap-3">
                   <Coffee className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
@@ -598,10 +653,12 @@ export default function MasterSettingsPage() {
                 </div>
               </motion.button>
               <motion.button
+                type="button"
                 onClick={openWorkHoursEditor}
+                disabled={savesDisabled}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
-                className="p-4 glass rounded-xl border border-white/5 flex items-center justify-between cursor-pointer hover:border-blue-500/30 transition-colors group text-left"
+                className="p-4 glass rounded-xl border border-white/5 flex items-center justify-between cursor-pointer hover:border-blue-500/30 transition-colors group text-left disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="flex items-center gap-3">
                   <BookOpen className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
@@ -868,7 +925,7 @@ export default function MasterSettingsPage() {
               {/* Actions */}
               <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
                 <Button variant="ghost" onClick={() => setEditingSection(null)}>Cancel</Button>
-                <Button variant="gradient" onClick={handleSaveCycle} disabled={saving} className="gap-2">
+                <Button variant="gradient" onClick={handleSaveCycle} disabled={savesDisabled} className="gap-2">
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Save Changes
                 </Button>
@@ -977,7 +1034,7 @@ export default function MasterSettingsPage() {
               {/* Actions */}
               <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
                 <Button variant="ghost" onClick={() => setEditingSection(null)}>Cancel</Button>
-                <Button variant="gradient" onClick={handleSaveWorkHours} disabled={saving} className="gap-2">
+                <Button variant="gradient" onClick={handleSaveWorkHours} disabled={savesDisabled} className="gap-2">
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Save Changes
                 </Button>
