@@ -271,6 +271,22 @@ describe('chat display', () => {
     assert.equal(newestVisibleProposal([newest, older], turns)?.id, 'newest')
   })
 
+  it('shows a blank-days card when the user string asks to clear days', () => {
+    const proposal = {
+      id: 'p-blank',
+      message_id: 'u-clear',
+      command: { action: 'override_days', payload: { work_type: 'blank' } },
+    }
+    assert.equal(
+      blankDaysProposalFate(
+        proposal,
+        [{ id: 'u-clear', role: 'user', content: '{clear days}' }],
+        true,
+      ),
+      'show',
+    )
+  })
+
   it('hides a blank-days card without declining when history did not load', () => {
     const proposal = {
       id: 'p-blank',

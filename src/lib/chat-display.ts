@@ -345,7 +345,7 @@ export function blankDaysProposalFate(
   const source = rawHistory.find((message) => message.id && message.id === record?.message_id)
   if (!source) return 'hide'
   if (isInternalChatMessage(source)) return 'decline'
-  const text = chatMessageText(source.content) ?? ''
+  const text = typeof source.content === 'string' ? source.content : (chatMessageText(source.content) ?? '')
   if (source.role === 'user' && !userAskedToClearDays(text)) return 'decline'
   if (source.role === 'user' && userAskedToClearDays(text)) return 'show'
   return 'hide'
