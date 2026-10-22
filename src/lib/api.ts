@@ -3,6 +3,7 @@
  * Centralized API communication layer
  */
 
+import { formatDateOnly } from '@/lib/date-only'
 import { onboardingChatRequest, type CycleBlock } from '@/lib/rotation'
 
 export const BACKEND_NOT_CONFIGURED_MESSAGE =
@@ -97,9 +98,16 @@ class APIService {
 
     const json = await response.json()
     
-    // Unwrap { success: true, data: ... } responses from backend
+    // Unwrap { success: true, data: ... } responses from backend.
+    // A free calendar read also sends free_horizon_end beside data. Keep it,
+    // and leave every other response as the unwrapped data.
     if (json && typeof json === 'object' && 'success' in json && 'data' in json) {
-      return json.data as T
+      const envelope = json as { data: unknown; free_horizon_end?: unknown }
+      const horizonEnd = formatDateOnly(envelope.free_horizon_end)
+      if (horizonEnd && Array.isArray(envelope.data)) {
+        return { days: envelope.data, free_horizon_end: horizonEnd } as T
+      }
+      return envelope.data as T
     }
     
     return json as T

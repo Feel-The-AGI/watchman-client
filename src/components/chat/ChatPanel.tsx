@@ -6,6 +6,8 @@ import { Send, Loader2, Bot, User, Undo2, Redo2, CheckCircle, XCircle, AlertTria
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
+import { FREE_HORIZON_MESSAGE, freeHorizonNotice } from '@/lib/free-horizon'
+import { FreeHorizonNotice } from '@/components/upgrade/FreeHorizonNotice'
 import {
   appliedConfirmation,
   chatInputLocked,
@@ -116,6 +118,7 @@ interface Message {
   created_at: string
   isProposal?: boolean
   proposal?: any
+  freeHorizon?: boolean
 }
 
 interface ChatPanelProps {
@@ -270,6 +273,25 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
         }
       }
       const response = await api.chat.sendMessage(userMessage, autoExecute)
+      const savedUser = response.user_message
+        ? {
+          ...response.user_message,
+          role: 'user' as const,
+          content: chatMessageText(response.user_message.content) || userMessage,
+        }
+        : null
+      if (freeHorizonNotice(response)) {
+        setMessages(prev => messagesAfterSend(prev, tempUserMessage.id, savedUser, {
+          id: `horizon-${Date.now()}`,
+          role: 'assistant',
+          content: FREE_HORIZON_MESSAGE,
+          created_at: new Date().toISOString(),
+          freeHorizon: true,
+        }))
+        setHistoryError(null)
+        setPendingProposal(null)
+        return
+      }
       
       const assistantText = response.assistant_message
         ? chatMessageText(response.assistant_message.content)
@@ -282,13 +304,6 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
           content: response.proposal ? proposalCardText(response.proposal, assistantText) : assistantText,
           isProposal: response.is_command,
           proposal: response.proposal,
-        }
-        : null
-      const savedUser = response.user_message
-        ? {
-          ...response.user_message,
-          role: 'user' as const,
-          content: chatMessageText(response.user_message.content) || userMessage,
         }
         : null
       setMessages(prev => messagesAfterSend(prev, tempUserMessage.id, savedUser, assistantMessage))
@@ -307,7 +322,13 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       
     } catch (error) {
       console.error('Failed to send message:', error)
-      setMessages(prev => [...prev, {
+      setMessages(prev => [...prev, freeHorizonNotice(error) ? {
+        id: `horizon-${Date.now()}`,
+        role: 'assistant',
+        content: FREE_HORIZON_MESSAGE,
+        created_at: new Date().toISOString(),
+        freeHorizon: true,
+      } : {
         id: `error-${Date.now()}`,
         role: 'assistant',
         content: errorText(error, 'Sorry, I had trouble processing that. Please try again.'),
@@ -361,6 +382,16 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       await loadNextProposal()
     } catch (error) {
       console.error('Failed to approve proposal:', error)
+      if (freeHorizonNotice(error)) {
+        setMessages(prev => [...prev, {
+          id: `horizon-${Date.now()}`,
+          role: 'assistant',
+          content: FREE_HORIZON_MESSAGE,
+          created_at: new Date().toISOString(),
+          freeHorizon: true,
+        }])
+        return
+      }
       if (apiStatus(error) === 409) {
         setPendingProposal(null)
         setMessages(prev => [...prev, {
@@ -546,6 +577,9 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
                   ? 'bg-watchman-accent text-white rounded-br-lg shadow-lg shadow-watchman-accent/20' 
                   : 'glass border border-white/5 text-watchman-text rounded-bl-lg'
               )}>
+                {message.freeHorizon ? (
+                  <FreeHorizonNotice compact />
+                ) : (
                 <p className="text-sm whitespace-pre-wrap leading-relaxed">
                   <ChatBubbleText
                     role={message.role}
@@ -556,6 +590,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
                         : message.content}
                   />
                 </p>
+                )}
                 {message.proposal && proposalModelNote(message.proposal) && (
                   <p className="mt-2 text-xs text-watchman-muted whitespace-pre-wrap">
                     {proposalModelNote(message.proposal)}

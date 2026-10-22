@@ -20,6 +20,8 @@ import { cn } from '@/lib/utils';
 import { cycleDayBadge, type BadgeBlock } from '@/lib/cycle-day-badge';
 import { calendarCellKind, calendarHoverLabel, dayCommitments } from '@/lib/calendar-day';
 import { isFreeMonthLocked, isYearMonthVisible } from '@/lib/free-calendar-access';
+import { horizonThroughLabel, isDayPastFreeHorizon, isMonthEntirelyPastHorizon } from '@/lib/free-horizon';
+import { FreeHorizonNotice } from '@/components/upgrade/FreeHorizonNotice';
 import { monthArrowLabel, UPGRADE_AHEAD_LABEL } from '@/lib/calendar-view';
 import { LOCKED_MONTH_PAY_LINE, lockedMonthPriceLine } from '@/lib/upgrade-offer';
 import { api } from '@/lib/api';
@@ -106,6 +108,7 @@ interface CalendarGridProps {
   initialMonth?: Date;
   userTier?: 'free' | 'pro' | 'admin';
   pattern?: BadgeBlock[] | null;
+  freeHorizonEnd?: string | null;
 }
 
 const workTypeConfig: Record<string, {
@@ -164,6 +167,7 @@ export function CalendarGrid({
   initialMonth,
   userTier = 'free',
   pattern = null,
+  freeHorizonEnd = null,
 }: CalendarGridProps) {
   const lockedPriceLine = useLockedMonthPrice(userTier);
   const [currentMonth, setCurrentMonth] = useState(initialMonth || new Date());
@@ -228,6 +232,11 @@ export function CalendarGrid({
   // Check if next month navigation should be disabled
   const isNextMonthLocked = isMonthLocked(addMonths(currentMonth, 1));
   const isCurrentMonthLocked = isMonthLocked(currentMonth);
+  const monthPastHorizon = isMonthEntirelyPastHorizon(
+    currentMonth.getFullYear(),
+    currentMonth.getMonth(),
+    freeHorizonEnd,
+  );
 
   const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -307,6 +316,11 @@ export function CalendarGrid({
         </div>
       )}
 
+      {monthPastHorizon ? (
+        <div className="px-6 py-16 flex justify-center">
+          <FreeHorizonNotice />
+        </div>
+      ) : (
       <div className="relative">
       {/* Week Days Header */}
       <div className="grid grid-cols-7 border-b border-white/5 bg-white/[0.02]">
@@ -344,7 +358,8 @@ export function CalendarGrid({
             const today = isToday(day);
             const isHovered = hoveredDate === dateStr;
 
-            const workConfig = calendarDay?.work_type 
+            const pastHorizon = inCurrentMonth && isDayPastFreeHorizon(dateStr, freeHorizonEnd);
+            const workConfig = !pastHorizon && calendarDay?.work_type 
               ? workTypeConfig[calendarDay.work_type] 
               : null;
 
@@ -352,7 +367,7 @@ export function CalendarGrid({
             const hasCommitments = commitments.length > 0;
             const isLeave = calendarCellKind(calendarDay) === 'leave';
             const isPreview = calendarDay?.is_preview;
-            const dayBadge = !inCurrentMonth
+            const dayBadge = !inCurrentMonth || pastHorizon
               ? null
               : isLeave
                 ? 'Leave'
@@ -365,7 +380,9 @@ export function CalendarGrid({
               <motion.button
                 key={dateStr}
                 title={calendarHoverLabel(calendarDay)}
-                onClick={() => onSelectDate(day)}
+                onClick={() => { if (!pastHorizon) onSelectDate(day) }}
+                disabled={pastHorizon}
+                aria-label={pastHorizon ? `${format(day, 'MMMM d')} locked` : undefined}
                 onMouseEnter={() => setHoveredDate(dateStr)}
                 onMouseLeave={() => setHoveredDate(null)}
                 initial={{ opacity: 0, scale: 0.8 }}
@@ -377,10 +394,11 @@ export function CalendarGrid({
                   'relative aspect-square p-1.5 border-r border-b border-white/5 transition-all duration-200',
                   'focus:outline-none focus:ring-2 focus:ring-watchman-accent/50 focus:ring-inset',
                   !inCurrentMonth && 'opacity-25',
+                  pastHorizon && 'opacity-40 cursor-not-allowed',
                   isSelected && 'ring-2 ring-watchman-accent ring-inset bg-watchman-accent/10',
                   isPreview && 'bg-watchman-accent/5 border-dashed border-watchman-accent/30',
                   isHovered && inCurrentMonth && !isSelected && 'bg-white/5',
-                  isLeave && inCurrentMonth && 'bg-gradient-to-br from-teal-500/25 via-teal-500/10 to-transparent',
+                  isLeave && inCurrentMonth && !pastHorizon && 'bg-gradient-to-br from-teal-500/25 via-teal-500/10 to-transparent',
                   workConfig && inCurrentMonth && !isLeave && `bg-gradient-to-br ${workConfig.gradient}`
                 )}
               >
@@ -403,10 +421,15 @@ export function CalendarGrid({
                       </span>
                     )}
                   </div>
+                  {pastHorizon && (
+                    <div className="flex-1 flex items-center justify-center">
+                      <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-watchman-muted" />
+                    </div>
+                  )}
 
                   {/* Work Type Indicator */}
                   <div className="flex-1 flex flex-col justify-center items-center gap-0.5 sm:gap-1.5 py-0.5 sm:py-1">
-                    {isLeave && inCurrentMonth && (
+                    {isLeave && inCurrentMonth && !pastHorizon && (
                       <motion.div
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
@@ -506,6 +529,7 @@ export function CalendarGrid({
         </div>
       )}
       </div>
+      )}
 
       {/* Legend */}
       <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 sm:gap-x-6 gap-y-2 px-3 sm:px-6 py-3 sm:py-4 border-t border-white/5 text-[10px] sm:text-xs bg-white/[0.02]">
@@ -551,9 +575,10 @@ interface YearOverviewProps {
   year: number;
   onSelectMonth: (month: Date) => void;
   userTier?: 'free' | 'pro' | 'admin';
+  freeHorizonEnd?: string | null;
 }
 
-export function YearOverview({ days, year, onSelectMonth, userTier = 'free' }: YearOverviewProps) {
+export function YearOverview({ days, year, onSelectMonth, userTier = 'free', freeHorizonEnd = null }: YearOverviewProps) {
   const lockedPriceLine = useLockedMonthPrice(userTier);
   const daysMap = useMemo(() => {
     const map = new Map<string, CalendarDay>();
@@ -577,21 +602,41 @@ export function YearOverview({ days, year, onSelectMonth, userTier = 'free' }: Y
       }
 
       // Calculate stats for this month
-      const dayShifts = daysInMonth.filter(d => d.day?.work_type === 'work_day').length;
-      const nightShifts = daysInMonth.filter(d => d.day?.work_type === 'work_night').length;
-      const offDays = daysInMonth.filter(d => d.day?.work_type === 'off').length;
-      const leaveDays = daysInMonth.filter(d => d.day?.is_leave).length;
+      const counted = daysInMonth.filter(({ date }) => !isDayPastFreeHorizon(format(date, 'yyyy-MM-dd'), freeHorizonEnd));
+      const dayShifts = counted.filter(d => d.day?.work_type === 'work_day').length;
+      const nightShifts = counted.filter(d => d.day?.work_type === 'work_night').length;
+      const offDays = counted.filter(d => d.day?.work_type === 'off' && !d.day?.is_leave).length;
+      const leaveDays = counted.filter(d => d.day?.is_leave).length;
+      const crossesHorizon = daysInMonth.some(({ date }) => isDayPastFreeHorizon(format(date, 'yyyy-MM-dd'), freeHorizonEnd));
 
-      return { month: monthStart, days: daysInMonth, stats: { dayShifts, nightShifts, offDays, leaveDays } };
+      return { month: monthStart, days: daysInMonth, stats: { dayShifts, nightShifts, offDays, leaveDays }, crossesHorizon };
     });
-  }, [year, daysMap]);
+  }, [year, daysMap, freeHorizonEnd]);
 
   const today = new Date();
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      {months.map(({ month, days, stats }, index) => {
+      {months.map(({ month, days, stats, crossesHorizon }, index) => {
         const isLocked = !isYearMonthVisible(index, year, today, userTier);
+        const pastHorizon = isMonthEntirelyPastHorizon(year, index, freeHorizonEnd);
+
+        if (pastHorizon) {
+          return (
+            <motion.div
+              key={format(month, 'yyyy-MM')}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+              className="p-4 glass rounded-2xl border border-white/5 flex flex-col items-center justify-center min-h-[148px]"
+            >
+              <h3 className="text-sm font-semibold mb-3 text-watchman-muted self-start">
+                {format(month, 'MMMM')}
+              </h3>
+              <FreeHorizonNotice compact />
+            </motion.div>
+          );
+        }
 
         if (isLocked) {
           return (
@@ -658,10 +703,21 @@ export function YearOverview({ days, year, onSelectMonth, userTier = 'free' }: Y
             </h3>
             <div className="grid grid-cols-7 gap-0.5">
               {days.map(({ date, day }) => {
-                const kind = calendarCellKind(day);
+                const dateStr = format(date, 'yyyy-MM-dd');
+                const past = isDayPastFreeHorizon(dateStr, freeHorizonEnd);
+                const kind = past ? 'locked' : calendarCellKind(day);
+                if (past) {
+                  return (
+                    <Lock
+                      key={dateStr}
+                      className="w-2.5 h-2.5 text-watchman-muted/70"
+                      aria-label="Locked"
+                    />
+                  );
+                }
                 return (
                   <div
-                    key={format(date, 'yyyy-MM-dd')}
+                    key={dateStr}
                     className={cn(
                       'w-2.5 h-2.5 rounded-sm transition-transform group-hover:scale-110',
                       kind === 'work_day' && 'bg-amber-500 shadow-sm shadow-amber-500/30',
@@ -696,6 +752,9 @@ export function YearOverview({ days, year, onSelectMonth, userTier = 'free' }: Y
                 </span>
               )}
             </div>
+            {crossesHorizon && horizonThroughLabel(freeHorizonEnd) && (
+              <p className="mt-2 text-[10px] text-watchman-muted">{horizonThroughLabel(freeHorizonEnd)}</p>
+            )}
           </motion.button>
         );
       })}
