@@ -27,6 +27,7 @@ import { Logo } from '@/components/ui/Logo';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { api } from '@/lib/api';
 import { chatMessageText } from '@/lib/chat-display';
+import { copyRulesIntoSettings, rulesStillNeeded, saveOnboardingCycle } from '@/lib/onboarding-setup';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { dashboardHandoffButton } from '@/lib/onboarding-handoff';
@@ -85,6 +86,8 @@ export default function OnboardingPage() {
   const [anchorDate, setAnchorDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [anchorCycleDay, setAnchorCycleDay] = useState(1);
   const [selectedConstraints, setSelectedConstraints] = useState<string[]>([]);
+  const createdCycleIdRef = useRef<string | null>(null);
+  const finishingRef = useRef(false);
 
   const totalDays = pattern.reduce((sum, block) => sum + block.duration, 0);
 
@@ -154,6 +157,8 @@ export default function OnboardingPage() {
   };
 
   const handleComplete = async () => {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
     if (selectedConstraints.length > 0) {
       addMessage('user', `Apply these rules: ${selectedConstraints.map(r => PRESET_CONSTRAINTS.find(c => c.rule === r)?.name).join(', ')}`);
     } else {
@@ -171,36 +176,53 @@ export default function OnboardingPage() {
 
       // Rules first. Cycle creation is the one calendar write, and it reads
       // constraints that already exist. Night-shift rules use { type, value }.
-      for (const rule of selectedConstraints) {
+      const existingRules = await api.settings.getConstraints();
+      const wanted = selectedConstraints.flatMap((rule) => {
         const preset = PRESET_CONSTRAINTS.find(p => p.rule === rule);
-        if (preset) {
-          await api.settings.createConstraint({
-            name: preset.name,
-            rule: constraintRule(preset.rule),
-            is_active: true,
-          });
-        }
-      }
-
-      await api.auth.completeOnboarding();
-
-      const saved = await api.settings.getConstraints().catch(() => []);
-      const master = await api.masterSettings.get().catch(() => null);
-      const documentRules = Array.isArray(master?.settings?.constraints) ? master.settings.constraints : [];
-      const known = new Set(documentRules.map((item: { id?: string }) => item?.id).filter(Boolean));
-      const missing = (Array.isArray(saved) ? saved : []).filter(
-        (row: { id?: string }) => row?.id && !known.has(row.id)
-      );
-      if (missing.length > 0) {
-        await api.masterSettings.updateSection('constraints', [...documentRules, ...missing]);
-      }
-
-      await api.cycles.create({
-        name: cycleName,
-        pattern,
-        anchor_date: anchorDate,
-        anchor_cycle_day: anchorCycleDay,
+        if (!preset) return [];
+        return [{ name: preset.name, rule: constraintRule(preset.rule) }];
       });
+      for (const preset of rulesStillNeeded(wanted, existingRules)) {
+        await api.settings.createConstraint({
+          name: preset.name,
+          rule: preset.rule,
+          is_active: true,
+        });
+      }
+
+      await saveOnboardingCycle({
+        listCycles: () => api.cycles.list(),
+        createCycle: () => api.cycles.create({
+          name: cycleName,
+          pattern,
+          anchor_date: anchorDate,
+          anchor_cycle_day: anchorCycleDay,
+        }),
+        completeOnboarding: () => api.auth.completeOnboarding(),
+        choice: {
+          pattern,
+          anchor_date: anchorDate,
+          anchor_cycle_day: anchorCycleDay,
+        },
+        createdCycleId: createdCycleIdRef.current,
+        onCycleSaved: (cycleId) => {
+          if (cycleId) createdCycleIdRef.current = cycleId;
+        },
+      });
+
+      await copyRulesIntoSettings(async () => {
+        const saved = await api.settings.getConstraints();
+        const master = await api.masterSettings.get();
+        const documentRules = Array.isArray(master?.settings?.constraints) ? master.settings.constraints : [];
+        const known = new Set(documentRules.map((item: { id?: string }) => item?.id).filter(Boolean));
+        const missing = (Array.isArray(saved) ? saved : []).filter(
+          (row: { id?: string }) => row?.id && !known.has(row.id)
+        );
+        if (missing.length > 0) {
+          await api.masterSettings.updateSection('constraints', [...documentRules, ...missing]);
+        }
+      });
+
       await refreshProfile();
 
       setTimeout(() => {
@@ -208,10 +230,12 @@ export default function OnboardingPage() {
         setStep(4);
       }, 1000);
     } catch (err: any) {
+      setShowQuickActions(true);
       const friendly = chatMessageText(err?.message) || 'Failed to complete setup';
       setError(friendly);
-      addMessage('assistant', `Oops, something went wrong: ${friendly}. Let's try again.`);
+      addMessage('assistant', friendly);
     } finally {
+      finishingRef.current = false;
       setLoading(false);
     }
   };
