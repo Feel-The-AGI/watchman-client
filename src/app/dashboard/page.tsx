@@ -33,6 +33,7 @@ import { api } from '@/lib/api';
 import { loadDashboardSnapshot } from '@/lib/dashboard-refresh';
 import { normalizeCalendarDays } from '@/lib/calendar-day';
 import { activeCyclePattern, type BadgeBlock } from '@/lib/cycle-day-badge';
+import { parseDateOnly } from '@/lib/date-only';
 import Link from 'next/link';
 
 type ViewMode = 'month' | 'year';
@@ -126,8 +127,8 @@ export default function DashboardPage() {
 
       // Only set anchor year on FIRST load, not every navigation
       if (!initialYearSet && activeCycle?.anchor_date) {
-        const anchorYear = new Date(activeCycle.anchor_date).getFullYear();
-        if (anchorYear >= new Date().getFullYear() && anchorYear !== yearToFetch) {
+        const anchorYear = parseDateOnly(activeCycle.anchor_date)?.year;
+        if (anchorYear != null && anchorYear >= new Date().getFullYear() && anchorYear !== yearToFetch) {
           setCurrentYear(anchorYear);
           setViewedMonth((current) => new Date(anchorYear, current.getMonth(), 1));
           viewedYearRef.current = anchorYear;

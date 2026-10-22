@@ -824,9 +824,11 @@ export default function MasterSettingsPage() {
                 className="p-4 rounded-2xl bg-gradient-to-br from-teal-500/10 to-transparent border border-teal-500/20 cursor-default"
               >
                 <p className="font-medium text-teal-400">{l.name}</p>
-                <p className="text-sm text-watchman-muted mt-1">
-                  {(displayDateOnly(l.start_date, 'month-day') ?? l.start_date)} - {(displayDateOnly(l.end_date) ?? l.end_date)}
-                </p>
+                {l.start_date && l.end_date && (
+                  <p className="text-sm text-watchman-muted mt-1">
+                    {(displayDateOnly(l.start_date, 'month-day') ?? l.start_date)} - {(displayDateOnly(l.end_date) ?? l.end_date)}
+                  </p>
+                )}
               </motion.div>
             ))}
           </div>
