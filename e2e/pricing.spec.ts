@@ -18,7 +18,7 @@ test.describe('pricing plans @desktop-only', () => {
     await expect(page.getByTestId('founding-badge')).toHaveText('First 100 only · 17 left')
     await expect(page.getByText("That's about $4 a month.")).toBeVisible()
     await expect(page.getByTestId('billing-small-print')).toContainText('Billed in USD by card via Stripe')
-    await expect(page.getByText('Leave planning')).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'Leave planning' })).toBeVisible()
     await expect(page.locator('[data-feature="Leave planning"] [data-column="free"]')).toHaveAttribute('data-included', 'false')
     await expect(page.locator('[data-feature="Leave planning"] [data-column="pro"]')).toHaveAttribute('data-included', 'true')
     await expect(page.getByText(/Paystack|GHS|\$12|for 30 days/i)).toHaveCount(0)

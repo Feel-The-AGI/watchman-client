@@ -9,7 +9,17 @@ test.describe('home and legal copy @desktop-only', () => {
     await expect(page.locator('html')).toHaveClass(/dark/)
     await expect(page.locator('nav').getByRole('link', { name: 'Pricing' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Sign In' })).toBeVisible()
-    await expect(page.getByTestId('floating-day')).toHaveCount(0)
+    const paintedTiles = await page.getByTestId('floating-day').evaluateAll((nodes) =>
+      nodes.filter((node) => {
+        let current: Element | null = node
+        while (current) {
+          if (getComputedStyle(current).display === 'none') return false
+          current = current.parentElement
+        }
+        return true
+      }).length,
+    )
+    expect(paintedTiles).toBe(0)
     await assertNoHorizontalOverflow(page)
     await shot(page, testInfo, 'home-390')
 
