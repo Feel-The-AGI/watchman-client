@@ -20,6 +20,9 @@ import {
   messagesAfterSend,
   proposalAppliedText,
   proposalCardText,
+  proposalChangeLines,
+  shouldShowPendingProposal,
+  stalePendingCards,
   REVIEW_FAILURE_MESSAGE,
   type ChatTextPart,
 } from '@/lib/chat-display'
@@ -199,7 +202,8 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
 
     try {
       const pending = await api.commands.pendingProposals()
-      const proposal = pending?.proposals?.[0] || null
+      const loaded = pending?.proposals?.[0] || null
+      const proposal = shouldShowPendingProposal(loaded, history) ? loaded : null
       setPendingProposal(proposal)
       history = withProposalCard(history, proposal)
       if (historyLoaded) setHistoryError(null)
@@ -223,7 +227,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
   const sendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault()
     
-    if (!input.trim() || isLoading || pendingProposal || isReviewing) return
+    if (!input.trim() || isLoading || isReviewing) return
     
     const userMessage = input.trim()
     setInput('')
@@ -235,7 +239,8 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       content: userMessage,
       created_at: new Date().toISOString()
     }
-    setMessages(prev => [...prev, tempUserMessage])
+    setPendingProposal(null)
+    setMessages(prev => [...stalePendingCards(prev), tempUserMessage])
 
     try {
       const response = await api.chat.sendMessage(userMessage, autoExecute)
@@ -290,9 +295,13 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
   const loadNextProposal = async () => {
     try {
       const pending = await api.commands.pendingProposals()
-      const proposal = pending?.proposals?.[0] || null
-      setPendingProposal(proposal)
-      setMessages(prev => withProposalCard(prev, proposal))
+      const loaded = pending?.proposals?.[0] || null
+      let visible: typeof loaded = null
+      setMessages(prev => {
+        visible = shouldShowPendingProposal(loaded, prev) ? loaded : null
+        return withProposalCard(prev, visible)
+      })
+      setPendingProposal(visible)
     } catch (error) {
       console.error('Failed to reload pending proposals:', error)
     }
@@ -526,6 +535,16 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
                         : message.content}
                   />
                 </p>
+                {message.proposal && proposalChangeLines(message.proposal).length > 0 && (
+                  <ul className="mt-3 space-y-1 text-xs text-watchman-muted">
+                    {proposalChangeLines(message.proposal).map((line) => (
+                      <li key={`${line.label}-${line.value}`}>
+                        <span className="text-white/80">{line.label}: </span>
+                        {line.value}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 
                 {/* Proposal approval buttons */}
                 {message.isProposal && message.proposal && pendingProposal?.id === message.proposal.id && (
@@ -650,7 +669,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={pendingProposal ? 'Apply or decline the proposed change first' : 'Tell me about your schedule...'}
+              placeholder="Tell me about your schedule..."
               disabled={chatInputLocked(pendingProposal, isReviewing)}
               rows={1}
               className="w-full px-3 sm:px-4 py-2.5 sm:py-3 glass border border-white/10 rounded-xl text-xs sm:text-sm text-watchman-text placeholder-watchman-muted focus:outline-none focus:ring-2 focus:ring-watchman-accent focus:border-transparent resize-none transition-all disabled:cursor-not-allowed disabled:opacity-60"

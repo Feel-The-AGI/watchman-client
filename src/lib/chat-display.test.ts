@@ -13,6 +13,9 @@ import {
   messagesAfterSend,
   proposalAppliedText,
   proposalCardText,
+  proposalChangeLines,
+  shouldShowPendingProposal,
+  stalePendingCards,
   REVIEW_FAILURE_MESSAGE,
   sanitizeChatDisplay,
 } from './chat-display.ts'
@@ -60,7 +63,8 @@ describe('chat display', () => {
   it('unlocks the chat input after a failed review', () => {
     const afterFailure = { pendingProposal: null, isReviewing: false }
     assert.equal(chatInputLocked(afterFailure.pendingProposal, afterFailure.isReviewing), false)
-    assert.equal(chatInputLocked({ id: 'proposal-1' }, false), true)
+    assert.equal(chatInputLocked({ id: 'proposal-1' }, false), false)
+    assert.equal(chatInputLocked(null, true), true)
     assert.equal(
       REVIEW_FAILURE_MESSAGE,
       "That didn't go through. You can try again or send another message.",
@@ -172,6 +176,59 @@ describe('chat display', () => {
     assert.equal(chatScrollTop(100, 420), 0)
     assert.equal(chatScrollBehavior(false), 'auto')
     assert.equal(chatScrollBehavior(true), 'smooth')
+  })
+
+  it('does not show an unrequested onboarding proposal', () => {
+    const proposal = {
+      id: 'p-blank',
+      message_id: 'u-setup',
+      command: {
+        action: 'override_days',
+        explanation: 'I will clear the days before Oct 22',
+        payload: { work_type: 'blank', start_date: '2026-01-01', end_date: '2026-10-21' },
+      },
+    }
+    const setup = [{ id: 'u-setup', role: 'user', content: 'I work 5 days, 5 nights, 5 off' }]
+    assert.equal(shouldShowPendingProposal(proposal, setup), false)
+    assert.equal(shouldShowPendingProposal(proposal, []), false)
+    assert.equal(shouldShowPendingProposal({
+      id: 'p-hair',
+      message_id: 'u-hair',
+      command: { action: 'add_commitment', payload: { name: 'Haircut', start_date: '2026-11-05' } },
+    }, [{ id: 'u-hair', role: 'user', content: 'Book a haircut on Thursday' }]), true)
+  })
+
+  it('lists the payload changes on a proposal card', () => {
+    const lines = proposalChangeLines({
+      command: {
+        action: 'add_leave',
+        explanation: "I'll mark those days off.",
+        description: 'Mark Sun 20 Dec to Sun 27 Dec as leave',
+        payload: {
+          name: 'Leave',
+          start_date: '2026-12-20',
+          end_date: '2026-12-27',
+          before: { work_type: 'work_day' },
+          after: 'leave',
+        },
+      },
+    })
+    assert.equal(lines.some((line) => line.value === 'Mark Sun 20 Dec to Sun 27 Dec as leave'), true)
+    assert.equal(lines.find((line) => line.label === 'Type')?.value, 'leave')
+    assert.equal(lines.find((line) => line.label === 'From')?.value, '2026-12-20')
+    assert.equal(lines.find((line) => line.label === 'To')?.value, '2026-12-27')
+    assert.equal(lines.find((line) => line.label === 'Before')?.value, 'work_day')
+    assert.equal(lines.find((line) => line.label === 'After')?.value, 'leave')
+  })
+
+  it('shows one copy of a message sent while a proposal card is pending', () => {
+    const saved = { id: 'srv-1', role: 'user', content: 'Book a haircut', created_at: '' }
+    const card = { id: 'asst-1', role: 'assistant', content: 'Clear the days before Oct 22', created_at: '', proposal: { id: 'p1' } }
+    const optimistic = { id: 'temp-1', role: 'user', content: 'Book a haircut', created_at: '' }
+    const shown = messagesAfterSend([saved, card, optimistic], 'temp-1', saved, null)
+    assert.equal(shown.filter((message) => message.role === 'user' && message.content === 'Book a haircut').length, 1)
+    const dismissed = stalePendingCards(shown)
+    assert.equal(dismissed.find((message) => message.id === 'asst-1')?.isProposal, false)
   })
 
   it('does not repeat a user message already stored when the proposal reply echoes it', () => {

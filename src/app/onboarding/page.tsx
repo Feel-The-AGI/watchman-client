@@ -29,6 +29,7 @@ import { api } from '@/lib/api';
 import { chatMessageText } from '@/lib/chat-display';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import { dashboardHandoffButton } from '@/lib/onboarding-handoff';
 import {
   buildMonthPreview,
   parseLocalDate,
@@ -556,21 +557,17 @@ export default function OnboardingPage() {
             )}
 
             {step === 4 && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="pb-4"
-              >
-                <Button 
-                  variant="gradient" 
-                  size="lg"
-                  className="w-full gap-2" 
+              <div className="pb-4">
+                <button
+                  type="button"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-base font-semibold text-white bg-gradient-to-r from-watchman-accent via-watchman-purple to-watchman-pink"
+                  style={{ pointerEvents: dashboardHandoffButton().pointerEvents }}
                   onClick={() => router.push('/dashboard')}
                 >
                   <Zap className="w-5 h-5" />
-                  Go to Dashboard
-                </Button>
-              </motion.div>
+                  {dashboardHandoffButton().label}
+                </button>
+              </div>
             )}
           </AnimatePresence>
           </div>
