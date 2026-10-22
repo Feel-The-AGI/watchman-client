@@ -34,6 +34,17 @@ export function capTouchString(value: string): string {
   return value.length > FIRST_TOUCH_MAX_LENGTH ? value.slice(0, FIRST_TOUCH_MAX_LENGTH) : value
 }
 
+/** Paths whose next segment is a secret. `/shared/<code>` is the only one in this app. */
+const TOKEN_PATH_PREFIXES = ['/shared']
+
+export function publicLandingPath(pathname: string): string {
+  const path = pathname && pathname.startsWith('/') ? pathname : `/${pathname || ''}`
+  for (const prefix of TOKEN_PATH_PREFIXES) {
+    if (path === prefix || path.startsWith(`${prefix}/`)) return prefix
+  }
+  return capTouchString(path || '/')
+}
+
 export function referrerHost(referrer: string): string | null {
   if (!referrer) return null
   try {
@@ -58,23 +69,49 @@ export function firstTouchFromLocation(input: {
     tracked[key] = capTouchString(raw)
   }
   if (Object.keys(tracked).length === 0) return null
-  const path = input.pathname || '/'
   return {
     ...tracked,
-    landing_path: capTouchString(path),
+    landing_path: publicLandingPath(input.pathname),
     referrer_host: referrerHost(input.referrer),
     captured_at: input.capturedAt,
   }
 }
 
-function storedRecord(raw: string): FirstTouch | null {
+function parsedObject(raw: string): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(raw) as unknown
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
-    return parsed as FirstTouch
+    return parsed as Record<string, unknown>
   } catch {
     return null
   }
+}
+
+function cappedKnownString(value: unknown): string | null {
+  if (typeof value !== 'string' || !value) return null
+  return capTouchString(value)
+}
+
+/** Known fields only. Extra JSON keys are dropped, and every string is capped. */
+export function rebuildFirstTouch(value: unknown): FirstTouch | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const record = value as Record<string, unknown>
+  const touch: FirstTouch = {
+    landing_path: publicLandingPath(typeof record.landing_path === 'string' ? record.landing_path : '/'),
+    referrer_host: cappedKnownString(record.referrer_host),
+    captured_at: typeof record.captured_at === 'string' ? capTouchString(record.captured_at) : '',
+  }
+  let hasTrackedParam = false
+  for (const key of TRACKED_PARAMS) {
+    const capped = cappedKnownString(record[key])
+    if (!capped) continue
+    touch[key] = capped
+    hasTrackedParam = true
+  }
+  if (!hasTrackedParam && typeof record.landing_path !== 'string' && typeof record.captured_at !== 'string') {
+    return null
+  }
+  return touch
 }
 
 /** Read a saved first touch. Storage failures return null and never throw. */
@@ -83,7 +120,7 @@ export function readFirstTouch(storage: FirstTouchStorage | null): FirstTouch | 
   try {
     const raw = storage.getItem(FIRST_TOUCH_STORAGE_KEY)
     if (!raw) return null
-    return storedRecord(raw)
+    return rebuildFirstTouch(parsedObject(raw))
   } catch {
     return null
   }
@@ -103,7 +140,8 @@ export function captureFirstTouch(input: {
   if (!input.storage) return null
   try {
     const existingRaw = input.storage.getItem(FIRST_TOUCH_STORAGE_KEY)
-    if (existingRaw && storedRecord(existingRaw)) return storedRecord(existingRaw)
+    const existing = existingRaw ? rebuildFirstTouch(parsedObject(existingRaw)) : null
+    if (existing) return existing
   } catch {
     return null
   }
@@ -133,4 +171,47 @@ export function emailSignupData(name: string, storage: FirstTouchStorage | null)
 export function magicLinkSignupData(storage: FirstTouchStorage | null): { first_touch: FirstTouch } | undefined {
   const touch = readFirstTouch(storage)
   return touch ? { first_touch: touch } : undefined
+}
+
+export const OAUTH_BACKFILL_WINDOW_MS = 10 * 60 * 1000
+export const OAUTH_BACKFILL_STORAGE_PREFIX = 'wm_first_touch_backfill:'
+
+export interface OAuthBackfillUser {
+  id: string
+  created_at?: string | null
+  app_metadata?: { provider?: string | null } | null
+  identities?: { provider?: string | null }[] | null
+  user_metadata?: Record<string, unknown> | null
+}
+
+export interface BackfillAttemptStore {
+  has: (key: string) => boolean
+  add: (key: string) => void
+}
+
+export function shouldBackfillOAuthFirstTouch(user: OAuthBackfillUser, now: number): boolean {
+  if (user.user_metadata?.first_touch != null) return false
+  const providers = [
+    user.app_metadata?.provider,
+    ...(user.identities ?? []).map((identity) => identity.provider),
+  ]
+  if (!providers.includes('google')) return false
+  if (!user.created_at) return false
+  const created = Date.parse(user.created_at)
+  if (!Number.isFinite(created)) return false
+  return created >= now - OAUTH_BACKFILL_WINDOW_MS
+}
+
+/** One update payload, or null when this session must not tag the account. */
+export function oauthFirstTouchBackfill(input: {
+  user: OAuthBackfillUser
+  now: number
+  touch: FirstTouch | null
+  attempted: BackfillAttemptStore
+}): { data: { first_touch: FirstTouch } } | null {
+  if (!input.touch || !shouldBackfillOAuthFirstTouch(input.user, input.now)) return null
+  const key = `${OAUTH_BACKFILL_STORAGE_PREFIX}${input.user.id}`
+  if (input.attempted.has(key)) return null
+  input.attempted.add(key)
+  return { data: { first_touch: input.touch } }
 }

@@ -14,7 +14,57 @@ import {
   navChoiceAfterUserCheck,
   type DashboardAuthError,
 } from '@/lib/auth-session'
-import { browserFirstTouchStorage, emailSignupData, magicLinkSignupData } from '@/lib/first-touch'
+import {
+  browserFirstTouchStorage,
+  emailSignupData,
+  magicLinkSignupData,
+  oauthFirstTouchBackfill,
+  readFirstTouch,
+  type BackfillAttemptStore,
+} from '@/lib/first-touch'
+
+const oauthBackfillAttempted = new Set<string>()
+
+function oauthBackfillAttempts(): BackfillAttemptStore {
+  return {
+    has: (key) => {
+      if (oauthBackfillAttempted.has(key)) return true
+      try {
+        return window.sessionStorage.getItem(key) === '1'
+      } catch {
+        return false
+      }
+    },
+    add: (key) => {
+      oauthBackfillAttempted.add(key)
+      try {
+        window.sessionStorage.setItem(key, '1')
+      } catch {
+        // The in-memory set still stops a second call in this tab.
+      }
+    },
+  }
+}
+
+function maybeBackfillOAuthFirstTouch(user: User | null | undefined) {
+  if (!user) return
+  const plan = oauthFirstTouchBackfill({
+    user: {
+      id: user.id,
+      created_at: user.created_at,
+      app_metadata: user.app_metadata,
+      identities: user.identities,
+      user_metadata: user.user_metadata,
+    },
+    now: Date.now(),
+    touch: readFirstTouch(browserFirstTouchStorage()),
+    attempted: oauthBackfillAttempts(),
+  })
+  if (!plan) return
+  void supabase.auth.updateUser({ data: plan.data }).catch((error) => {
+    console.error('Could not save the signup source:', error)
+  })
+}
 
 interface UserProfile {
   id: string
@@ -149,6 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setSession(session)
         setUser(checkedUser ?? session.user)
+        maybeBackfillOAuthFirstTouch(checkedUser ?? session.user)
         const userProfile = await fetchProfile(session.access_token)
         if (isSignOutNavigationPending()) return
         handleAuthRedirect(session, userProfile)
@@ -186,6 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const accessToken = session.access_token
       setTimeout(() => {
         if (isSignOutNavigationPending() || sessionCheck.current) return
+        maybeBackfillOAuthFirstTouch(session.user)
         void fetchProfile(accessToken).then((userProfile) => {
           if (isSignOutNavigationPending() || sessionCheck.current) return
           if (event === 'SIGNED_IN') {
@@ -262,8 +314,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signInWithGoogle = async () => {
-    // auth-js 2.89 signInWithOAuth has no options.data, so first_touch cannot
-    // be stored as user metadata on the Google path.
+    // auth-js 2.89 signInWithOAuth has no options.data. A new Google account
+    // is tagged once, after the session starts, by maybeBackfillOAuthFirstTouch.
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
