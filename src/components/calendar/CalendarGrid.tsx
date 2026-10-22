@@ -21,7 +21,39 @@ import { cycleDayBadge } from '@/lib/cycle-day-badge';
 import { calendarCellKind, calendarHoverLabel, dayCommitments } from '@/lib/calendar-day';
 import { isFreeMonthLocked, isYearMonthVisible } from '@/lib/free-calendar-access';
 import { monthArrowLabel, UPGRADE_AHEAD_LABEL } from '@/lib/calendar-view';
+import { CARD_PAY_LABEL, lockedMonthPriceLine, MOBILE_MONEY_PAY_LABEL } from '@/lib/upgrade-offer';
+import { api } from '@/lib/api';
 import Link from 'next/link';
+
+function useLockedMonthPrice(userTier: 'free' | 'pro' | 'admin'): string | null {
+  const [priceLine, setPriceLine] = useState<string | null>(null);
+  useEffect(() => {
+    if (userTier !== 'free') return;
+    let cancelled = false;
+    api.payments.getPricing()
+      .then((pricing) => {
+        if (!cancelled) setPriceLine(lockedMonthPriceLine(pricing));
+      })
+      .catch(() => {
+        if (!cancelled) setPriceLine(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userTier]);
+  return userTier === 'free' ? priceLine : null;
+}
+
+function LockedAheadDetails({ priceLine }: { priceLine: string | null }) {
+  return (
+    <>
+      {priceLine && <p className="mt-1 text-[10px] text-white">{priceLine}</p>}
+      <p className="mt-1 text-[10px] text-watchman-muted">
+        {CARD_PAY_LABEL} · {MOBILE_MONEY_PAY_LABEL}
+      </p>
+    </>
+  );
+}
 
 export interface DailyLog {
   id: string;
@@ -130,6 +162,7 @@ export function CalendarGrid({
   initialMonth,
   userTier = 'free'
 }: CalendarGridProps) {
+  const lockedPriceLine = useLockedMonthPrice(userTier);
   const [currentMonth, setCurrentMonth] = useState(initialMonth || new Date());
   const [direction, setDirection] = useState(0);
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
@@ -263,11 +296,12 @@ export function CalendarGrid({
         </motion.button>
       </div>
       {isNextMonthLocked && (
-        <p className="px-6 pb-3 -mt-2 text-center text-xs text-watchman-muted">
+        <div className="px-6 pb-3 -mt-2 text-center text-xs text-watchman-muted">
           <Link href="/pricing" className="text-watchman-accent hover:underline">
             {UPGRADE_AHEAD_LABEL}
           </Link>
-        </p>
+          <LockedAheadDetails priceLine={lockedPriceLine} />
+        </div>
       )}
 
       <div className="relative">
@@ -462,6 +496,7 @@ export function CalendarGrid({
           <Link href="/pricing" className="text-[10px] text-watchman-accent hover:underline">
             {UPGRADE_AHEAD_LABEL}
           </Link>
+          <LockedAheadDetails priceLine={lockedPriceLine} />
         </div>
       )}
       </div>
@@ -513,6 +548,7 @@ interface YearOverviewProps {
 }
 
 export function YearOverview({ days, year, onSelectMonth, userTier = 'free' }: YearOverviewProps) {
+  const lockedPriceLine = useLockedMonthPrice(userTier);
   const daysMap = useMemo(() => {
     const map = new Map<string, CalendarDay>();
     days.forEach((day) => {
@@ -594,6 +630,7 @@ export function YearOverview({ days, year, onSelectMonth, userTier = 'free' }: Y
                 <Link href="/pricing" className="text-[10px] text-watchman-accent hover:underline" title={UPGRADE_AHEAD_LABEL}>
                   {UPGRADE_AHEAD_LABEL}
                 </Link>
+                <LockedAheadDetails priceLine={lockedPriceLine} />
               </div>
             </motion.div>
           );
