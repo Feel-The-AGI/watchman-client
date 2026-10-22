@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
 import { cycleDayBadge, type BadgeBlock } from '@/lib/cycle-day-badge';
 import { calendarCellKind, calendarHoverLabel, dayCommitments } from '@/lib/calendar-day';
 import { isFreeMonthLocked, isYearMonthVisible } from '@/lib/free-calendar-access';
-import { horizonThroughLabel, isDayPastFreeHorizon, isMonthEntirelyPastHorizon } from '@/lib/free-horizon';
+import { horizonThroughLabel, isDayPastFreeHorizon, isMonthEntirelyPastHorizon, yearMonthShiftCounts } from '@/lib/free-horizon';
 import { FreeHorizonNotice } from '@/components/upgrade/FreeHorizonNotice';
 import { monthArrowLabel, UPGRADE_AHEAD_LABEL } from '@/lib/calendar-view';
 import { LOCKED_MONTH_PAY_LINE, lockedMonthPriceLine } from '@/lib/upgrade-offer';
@@ -602,14 +602,17 @@ export function YearOverview({ days, year, onSelectMonth, userTier = 'free', fre
       }
 
       // Calculate stats for this month
-      const counted = daysInMonth.filter(({ date }) => !isDayPastFreeHorizon(format(date, 'yyyy-MM-dd'), freeHorizonEnd));
-      const dayShifts = counted.filter(d => d.day?.work_type === 'work_day').length;
-      const nightShifts = counted.filter(d => d.day?.work_type === 'work_night').length;
-      const offDays = counted.filter(d => d.day?.work_type === 'off' && !d.day?.is_leave).length;
-      const leaveDays = counted.filter(d => d.day?.is_leave).length;
       const crossesHorizon = daysInMonth.some(({ date }) => isDayPastFreeHorizon(format(date, 'yyyy-MM-dd'), freeHorizonEnd));
+      const stats = yearMonthShiftCounts(
+        daysInMonth.flatMap(({ date, day }) => day ? [{
+          date: day.date,
+          work_type: day.work_type,
+          is_leave: day.is_leave,
+        }] : []),
+        freeHorizonEnd,
+      );
 
-      return { month: monthStart, days: daysInMonth, stats: { dayShifts, nightShifts, offDays, leaveDays }, crossesHorizon };
+      return { month: monthStart, days: daysInMonth, stats, crossesHorizon };
     });
   }, [year, daysMap, freeHorizonEnd]);
 

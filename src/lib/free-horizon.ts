@@ -2,6 +2,10 @@ import { displayDateOnly, formatDateOnly, parseDateOnly } from './date-only'
 
 export const FREE_HORIZON_MESSAGE = 'The free plan shows 3 months ahead. Upgrade to Pro to plan further.'
 
+export const PRO_UPGRADE_FALLBACK = 'This is part of the Pro plan. Upgrade to Pro to use it.'
+
+const GENERIC_API_MESSAGE = 'Something went wrong while talking to Watchman.'
+
 function compareDateOnly(left: string, right: string): number | null {
   const a = parseDateOnly(left)
   const b = parseDateOnly(right)
@@ -60,6 +64,44 @@ export function freeHorizonNotice(value: unknown): { horizonEnd: string | null }
 export function horizonThroughLabel(horizonEnd: unknown): string | null {
   const label = displayDateOnly(horizonEnd)
   return label ? `through ${label}` : null
+}
+
+function readableText(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const text = value.trim()
+  if (!text || text === GENERIC_API_MESSAGE) return null
+  return text
+}
+
+/**
+ * Copy for a proposal approval that came back 403: free horizon, leave, or the
+ * free commitment cap. Null when this is not that refusal.
+ */
+export function approvalUpgradeMessage(error: unknown): string | null {
+  const record = recordOf(error)
+  if (!record || record.status !== 403) return null
+  const detail = record.detail
+  const detailRecord = recordOf(detail)
+  const fromDetail = typeof detail === 'string'
+    ? readableText(detail)
+    : readableText(detailRecord?.message) ?? readableText(detailRecord?.detail)
+  return fromDetail ?? readableText(record.message) ?? PRO_UPGRADE_FALLBACK
+}
+
+/** Year-view counts. Days after the horizon are hidden and are not off days. */
+export function yearMonthShiftCounts<T extends { date: string; work_type?: string | null; is_leave?: boolean }>(
+  days: T[],
+  horizonEnd: unknown,
+): { dayShifts: number; nightShifts: number; offDays: number; leaveDays: number } {
+  const visible = formatDateOnly(horizonEnd)
+    ? days.filter((day) => !isDayPastFreeHorizon(day.date, horizonEnd))
+    : days
+  return {
+    dayShifts: visible.filter((day) => day.work_type === 'work_day').length,
+    nightShifts: visible.filter((day) => day.work_type === 'work_night').length,
+    offDays: visible.filter((day) => day.work_type === 'off' && !day.is_leave).length,
+    leaveDays: visible.filter((day) => Boolean(day.is_leave)).length,
+  }
 }
 
 export function shiftCountsThroughHorizon<T extends { date: string; work_type?: string | null; is_leave?: boolean }>(

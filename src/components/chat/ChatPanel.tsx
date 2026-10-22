@@ -6,7 +6,7 @@ import { Send, Loader2, Bot, User, Undo2, Redo2, CheckCircle, XCircle, AlertTria
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
-import { FREE_HORIZON_MESSAGE, freeHorizonNotice } from '@/lib/free-horizon'
+import { approvalUpgradeMessage, FREE_HORIZON_MESSAGE, freeHorizonNotice } from '@/lib/free-horizon'
 import { FreeHorizonNotice } from '@/components/upgrade/FreeHorizonNotice'
 import {
   appliedConfirmation,
@@ -382,11 +382,13 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       await loadNextProposal()
     } catch (error) {
       console.error('Failed to approve proposal:', error)
-      if (freeHorizonNotice(error)) {
+      const upgradeMessage = approvalUpgradeMessage(error)
+      if (upgradeMessage) {
+        setPendingProposal(null)
         setMessages(prev => [...prev, {
           id: `horizon-${Date.now()}`,
           role: 'assistant',
-          content: FREE_HORIZON_MESSAGE,
+          content: upgradeMessage,
           created_at: new Date().toISOString(),
           freeHorizon: true,
         }])
@@ -578,7 +580,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
                   : 'glass border border-white/5 text-watchman-text rounded-bl-lg'
               )}>
                 {message.freeHorizon ? (
-                  <FreeHorizonNotice compact />
+                  <FreeHorizonNotice message={message.content} compact />
                 ) : (
                 <p className="text-sm whitespace-pre-wrap leading-relaxed">
                   <ChatBubbleText
