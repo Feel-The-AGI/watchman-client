@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { realpathSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { describe, it } from 'node:test'
 import {
   SIGN_OUT_ENDPOINT,
@@ -19,6 +21,12 @@ import {
   signedOutStorageKeys,
   supabaseAuthStorageKeys,
 } from './auth-session.ts'
+
+const { serialize: cookieSerialize } = createRequire(
+  realpathSync(new URL('../../node_modules/@supabase/ssr/package.json', import.meta.url)),
+)('cookie') as {
+  serialize: (name: string, value: string, options?: Record<string, unknown>) => string
+}
 
 describe('sign-out destination', () => {
   it('leaves the signed-in app through the login form', () => {
@@ -96,6 +104,25 @@ describe('Supabase auth cookies', () => {
       formatAuthCookie('sb-a-auth-token', 'base64-abc', { path: '/', sameSite: 'lax', maxAge: 10 }),
       'sb-a-auth-token=base64-abc; Max-Age=10; Path=/; SameSite=Lax',
     )
+  })
+
+  it('matches the cookie serializer @supabase/ssr uses', () => {
+    const name = 'sb-ref-auth-token.0'
+    const sessionWrite = {
+      path: '/',
+      sameSite: 'lax' as const,
+      httpOnly: false,
+      maxAge: 400 * 24 * 60 * 60,
+    }
+    const deletion = {
+      path: '/',
+      sameSite: 'lax' as const,
+      httpOnly: false,
+      maxAge: 0,
+    }
+    const value = 'base64-abc def/xyz'
+    assert.equal(formatAuthCookie(name, value, sessionWrite), cookieSerialize(name, value, sessionWrite))
+    assert.equal(formatAuthCookie(name, '', deletion), cookieSerialize(name, '', deletion))
   })
 
   it('clears chunked cookies and storage from the browser', () => {
@@ -215,6 +242,16 @@ describe('dashboard auth check', () => {
       hasAuthCookie: true,
       user: null,
       error: { name: 'AuthSessionMissingError', status: 400, message: 'Auth session missing!' },
+    }), 'redirect-and-clear')
+    assert.equal(dashboardAuthDecision({
+      hasAuthCookie: true,
+      user: null,
+      error: {
+        name: 'AuthApiError',
+        status: 400,
+        code: 'refresh_token_not_found',
+        message: 'Invalid Refresh Token: Refresh Token Not Found',
+      },
     }), 'redirect-and-clear')
   })
 

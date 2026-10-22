@@ -131,6 +131,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         if (choice !== 'in') {
           // The cookie still answered getSession(), but the server rejected it.
+          // Drop the in-memory session first so auto-refresh cannot write it back.
+          try {
+            const { error } = await supabase.auth.signOut({ scope: 'local' })
+            if (error) console.error('Sign out failed:', error)
+          } catch (error) {
+            console.error('Sign out failed:', error)
+          }
           clearSupabaseBrowserSession()
           setSession(null)
           setUser(null)
