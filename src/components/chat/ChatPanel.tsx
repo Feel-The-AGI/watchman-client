@@ -6,6 +6,7 @@ import { Send, Loader2, Bot, User, Undo2, Redo2, CheckCircle, XCircle, AlertTria
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
+import { invalidateCalendar } from '@/lib/calendar-sync'
 import { approvalUpgradeMessage, FREE_HORIZON_MESSAGE, freeHorizonNotice } from '@/lib/free-horizon'
 import { FreeHorizonNotice } from '@/components/upgrade/FreeHorizonNotice'
 import {
@@ -18,14 +19,19 @@ import {
   displayedChatParts,
   friendlyChatError,
   isInternalChatMessage,
+  EXPIRED_SUGGESTION_MESSAGE,
+  isNoChangeReview,
   mergeChatHistory,
   messagesAfterSend,
   blankDaysProposalIdsToDecline,
   newestVisibleProposal,
+  noChangeMessage,
   proposalAppliedText,
   proposalCardText,
   proposalModelNote,
+  proposalsToResurface,
   stalePendingCards,
+  withoutLingeringCalendarStatus,
   REVIEW_FAILURE_MESSAGE,
   type ChatTextPart,
 } from '@/lib/chat-display'
@@ -128,7 +134,7 @@ interface ChatPanelProps {
   userTier?: 'free' | 'pro'
 }
 
-export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, userTier = 'free' }: ChatPanelProps) {
+export function ChatPanel({ className, autoExecute = false, userTier = 'free' }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -168,7 +174,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
 
   const choosePendingProposal = async () => {
     const pending = await api.commands.pendingProposals()
-    const list = Array.isArray(pending?.proposals) ? pending.proposals : []
+    const list = proposalsToResurface(Array.isArray(pending?.proposals) ? pending.proposals : [])
     const rawHistory = rawHistoryRef.current
     const historyLoaded = historyLoadedRef.current
     await Promise.all(blankDaysProposalIdsToDecline(list, rawHistory, historyLoaded).map(async (id) => {
@@ -309,11 +315,8 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       setMessages(prev => messagesAfterSend(prev, tempUserMessage.id, savedUser, assistantMessage))
       setHistoryError(null)
       
-      // Refresh calendar if a command was actually executed (not just proposed)
       if (response.execution?.success) {
-        // Small delay to ensure database write completes
-        await new Promise(resolve => setTimeout(resolve, 500))
-        onCalendarUpdate?.()
+        await invalidateCalendar(response)
       }
 
       if (response.proposal) {
@@ -366,6 +369,19 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       const proposal = pendingProposal?.id === proposalId ? pendingProposal : null
       const result = await api.commands.reviewProposal(proposalId, 'approve')
 
+      if (isNoChangeReview(result)) {
+        setPendingProposal(null)
+        setMessages(prev => [...prev, {
+          id: `no-change-${Date.now()}`,
+          role: 'assistant',
+          content: noChangeMessage(result),
+          created_at: new Date().toISOString(),
+        }])
+        await invalidateCalendar({ proposal, result })
+        await loadNextProposal()
+        return
+      }
+
       if (!result?.success) {
         noteReviewFailure()
         return
@@ -378,10 +394,20 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
         created_at: new Date().toISOString()
       }])
       setPendingProposal(null)
-      await onCalendarUpdate?.()
+      await invalidateCalendar({ proposal, result })
       await loadNextProposal()
     } catch (error) {
       console.error('Failed to approve proposal:', error)
+      if (apiStatus(error) === 410) {
+        setPendingProposal(null)
+        setMessages(prev => [...prev.filter((message) => message.proposal?.id !== proposalId), {
+          id: `expired-${Date.now()}`,
+          role: 'assistant',
+          content: EXPIRED_SUGGESTION_MESSAGE,
+          created_at: new Date().toISOString(),
+        }])
+        return
+      }
       const upgradeMessage = approvalUpgradeMessage(error)
       if (upgradeMessage) {
         setPendingProposal(null)
@@ -428,6 +454,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
         created_at: new Date().toISOString()
       }])
       setPendingProposal(null)
+      await invalidateCalendar()
       await loadNextProposal()
     } catch (error) {
       console.error('Failed to decline proposal:', error)
@@ -458,7 +485,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
           content: 'Undone! The last change has been reverted.',
           created_at: new Date().toISOString()
         }])
-        onCalendarUpdate?.()
+        await invalidateCalendar(result)
       }
     } catch (error) {
       console.error('Failed to undo:', error)
@@ -475,7 +502,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
           content: 'Redone! The change has been reapplied.',
           created_at: new Date().toISOString()
         }])
-        onCalendarUpdate?.()
+        await invalidateCalendar(result)
       }
     } catch (error) {
       console.error('Failed to redo:', error)
@@ -555,7 +582,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
         )}
         
         <AnimatePresence>
-          {messages.map((message, index) => (
+          {withoutLingeringCalendarStatus(messages).map((message) => (
             <motion.div
               key={message.id}
               initial={{ opacity: 0, y: 10, scale: 0.98 }}
@@ -731,6 +758,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
           </div>
           <motion.button
             type="submit"
+            aria-label="Send"
             disabled={!input.trim() || isLoading || chatInputLocked(pendingProposal, isReviewing)}
             className={cn(
               'px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all flex items-center justify-center',

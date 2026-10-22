@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import {
@@ -46,6 +46,7 @@ import { toast } from '@/components/ui/Toast';
 import { IncidentModal, LogModal } from '@/components/ui/IncidentModal';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { invalidateCalendar, subscribeCalendarCache } from '@/lib/calendar-sync';
 import { commitmentPanelLine, dayCommitments, dayPanelSummary } from '@/lib/calendar-day';
 import type { CalendarDay, DailyLog, Incident } from './CalendarGrid';
 
@@ -160,6 +161,8 @@ export function DayInspector({
   const [expandedSection, setExpandedSection] = useState<string | null>('hours');
   const [saving, setSaving] = useState(false);
   const [editingHours, setEditingHours] = useState(false);
+  const editingHoursRef = useRef(false);
+  editingHoursRef.current = editingHours;
 
   // Modal state
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
@@ -199,14 +202,22 @@ export function DayInspector({
 
   const expectedHours = calculateExpectedHours();
 
+  useEffect(() => {
+    if (editingHoursRef.current) return;
+    if (typeof dayData?.actual_hours_worked === 'number') setActualHours(dayData.actual_hours_worked);
+    if (typeof dayData?.overtime_hours === 'number') setOvertimeHours(dayData.overtime_hours);
+  }, [dayData]);
+
   // Load data from API (with error handling for missing endpoints)
   useEffect(() => {
+    let cancelled = false;
     const loadDayData = async () => {
       try {
         const [logsRes, incidentsRes] = await Promise.allSettled([
           api.dailyLogs.getByDate(dateStr).catch(() => null),
           api.incidents.getByDate(dateStr).catch(() => []),
         ]);
+        if (cancelled) return;
 
         if (logsRes.status === 'fulfilled' && logsRes.value) {
           if (Array.isArray(logsRes.value)) {
@@ -214,10 +225,10 @@ export function DayInspector({
           } else if (logsRes.value.logs) {
             setLogs(logsRes.value.logs);
           }
-          if (logsRes.value.actual_hours !== undefined) {
+          if (!editingHoursRef.current && logsRes.value.actual_hours !== undefined) {
             setActualHours(logsRes.value.actual_hours);
           }
-          if (logsRes.value.overtime_hours !== undefined) {
+          if (!editingHoursRef.current && logsRes.value.overtime_hours !== undefined) {
             setOvertimeHours(logsRes.value.overtime_hours);
           }
         }
@@ -226,12 +237,16 @@ export function DayInspector({
           setIncidents(Array.isArray(incidentsRes.value) ? incidentsRes.value : []);
         }
       } catch (err) {
-        // Silently fail - API endpoints might not exist yet
         console.log('Day data API not available yet');
       }
     };
 
-    loadDayData();
+    void loadDayData();
+    const stop = subscribeCalendarCache(() => { void loadDayData(); });
+    return () => {
+      cancelled = true;
+      stop();
+    };
   }, [dateStr]);
 
   // Save daily log
@@ -248,6 +263,7 @@ export function DayInspector({
       setLogs(prev => [...prev, result]);
       setNewLogNote('');
       setShowAddLog(false);
+      void invalidateCalendar({ dates: [dateStr] });
       onDataChange?.();
       toast.success('Note saved', 'Your daily note has been recorded');
     } catch (err) {
@@ -274,6 +290,7 @@ export function DayInspector({
         await api.dailyLogs.delete(logId);
       }
       setLogs(prev => prev.filter(l => l.id !== logId));
+      void invalidateCalendar({ dates: [dateStr] });
       onDataChange?.();
       toast.success('Note deleted');
     } catch (err) {
@@ -291,6 +308,7 @@ export function DayInspector({
         overtime_hours: overtimeHours,
       });
       setEditingHours(false);
+      void invalidateCalendar({ dates: [dateStr] });
       onDataChange?.();
       toast.success('Hours updated', `${actualHours}h worked${overtimeHours > 0 ? ` (+${overtimeHours}h OT)` : ''}`);
     } catch (err) {
@@ -316,6 +334,7 @@ export function DayInspector({
       setIncidents(prev => [...prev, result]);
       resetIncidentForm();
       setShowAddIncident(false);
+      void invalidateCalendar({ dates: [dateStr] });
       onDataChange?.();
       toast.success('Incident logged', `${incidentForm.severity.toUpperCase()} severity incident recorded`);
     } catch (err) {
@@ -353,6 +372,7 @@ export function DayInspector({
         await api.incidents.delete(incidentId);
       }
       setIncidents(prev => prev.filter(i => i.id !== incidentId));
+      void invalidateCalendar({ dates: [dateStr] });
       onDataChange?.();
       toast.success('Incident deleted');
     } catch (err) {
@@ -399,6 +419,7 @@ export function DayInspector({
           </div>
           <motion.button
             onClick={onClose}
+            aria-label="Close day"
             whileHover={{ scale: 1.1, rotate: 90 }}
             whileTap={{ scale: 0.9 }}
             className="p-2 rounded-xl glass hover:bg-white/10 transition-colors"
@@ -503,7 +524,7 @@ export function DayInspector({
                             <p className="text-xs text-watchman-muted">Overtime</p>
                           </div>
                         </div>
-                        <Button size="sm" variant="ghost" onClick={() => setEditingHours(true)} className="ml-4">
+                        <Button size="sm" variant="ghost" onClick={() => setEditingHours(true)} className="ml-4" aria-label="Edit hours">
                           <Edit2 className="w-4 h-4" />
                         </Button>
                       </div>

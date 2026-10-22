@@ -1,3 +1,6 @@
+import { datesFromChange } from '@/lib/calendar-sync'
+import { parseDateOnly } from '@/lib/date-only'
+
 const FRIENDLY_CHAT_ERROR = 'Something went wrong. Please try again.'
 
 export function looksLikeRawPayload(value: string): boolean {
@@ -94,16 +97,51 @@ export const PROPOSAL_CARD_FALLBACK = 'Review this proposed change.'
 
 export const REVIEW_FAILURE_MESSAGE = "That didn't go through. You can try again or send another message."
 
+const PLAIN_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+function plainOne(year: number, month: number, day: number): string {
+  return `${PLAIN_MONTHS[month - 1]} ${day}, ${year}`
+}
+
+/** Target dates in words, such as "October 15, 2026" or "October 15–17, 2026". */
+export function plainDatePhrase(dates: string[]): string | null {
+  const parsed = dates
+    .map((date) => parseDateOnly(date))
+    .filter((date): date is NonNullable<typeof date> => date !== null)
+    .sort((left, right) => left.year - right.year || left.month - right.month || left.day - right.day)
+  const unique = parsed.filter((date, index) => {
+    const previous = parsed[index - 1]
+    return !previous || previous.year !== date.year || previous.month !== date.month || previous.day !== date.day
+  })
+  if (unique.length === 0) return null
+  const first = unique[0]
+  const last = unique[unique.length - 1]
+  if (unique.length === 1) return plainOne(first.year, first.month, first.day)
+  const sameMonth = unique.every((date) => date.year === first.year && date.month === first.month)
+  if (sameMonth) return `${PLAIN_MONTHS[first.month - 1]} ${first.day}-${last.day}, ${first.year}`
+  return `${plainOne(first.year, first.month, first.day)} through ${plainOne(last.year, last.month, last.day)}`
+}
+
+function withTargetDates(base: string, proposal: unknown): string {
+  const phrase = plainDatePhrase(datesFromChange(proposal))
+  if (!phrase || base.toLowerCase().includes(phrase.toLowerCase())) return base
+  if (base === PROPOSAL_CARD_FALLBACK) return `Review this proposed change for ${phrase}.`
+  return `${base} (${phrase}).`
+}
+
 /** Card copy is the server summary in command.explanation, never a raw tool name. */
 export function proposalCardText(
   proposal: { command?: { explanation?: unknown } } | null | undefined,
   messageContent?: unknown,
 ): string {
   const explanation = explanationFromCommand(proposal?.command)
-  if (explanation) return explanation
-  const content = chatMessageText(messageContent)
-  if (content && !isRawToolText(content)) return content
-  return PROPOSAL_CARD_FALLBACK
+  const base = explanation
+    || (() => {
+      const content = chatMessageText(messageContent)
+      if (content && !isRawToolText(content)) return content
+      return PROPOSAL_CARD_FALLBACK
+    })()
+  return withTargetDates(base, proposal)
 }
 
 /** The model's own sentence, shown under the summary when the server sent one. */
@@ -124,6 +162,100 @@ export function proposalAppliedText(...sources: unknown[]): string {
     if (text) return `Done! ${text}`
   }
   return 'Done! Changes applied successfully.'
+}
+
+export const NO_CHANGE_MESSAGE = 'No days were changed.'
+export const EXPIRED_SUGGESTION_MESSAGE = 'This suggestion expired. Ask again.'
+export const PENDING_PROPOSAL_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+
+const UPDATED_DAY_KEYS = ['updated_days', 'days_updated', 'updated_count', 'days_changed', 'changed_days']
+
+function reviewRecords(result: unknown): Record<string, unknown>[] {
+  if (!result || typeof result !== 'object') return []
+  const top = result as Record<string, unknown>
+  const records = [top]
+  for (const key of ['data', 'result']) {
+    const nested = top[key]
+    if (nested && typeof nested === 'object' && !Array.isArray(nested)) records.push(nested as Record<string, unknown>)
+  }
+  return records
+}
+
+function updatedDayCount(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (Array.isArray(value)) return value.length
+  return null
+}
+
+/** The server said nothing changed: status no_change, or zero updated days. */
+export function isNoChangeReview(result: unknown): boolean {
+  for (const record of reviewRecords(result)) {
+    if (record.status === 'no_change') return true
+    for (const key of UPDATED_DAY_KEYS) {
+      if (updatedDayCount(record[key]) === 0) return true
+    }
+  }
+  return false
+}
+
+export function noChangeMessage(result: unknown): string {
+  for (const record of reviewRecords(result)) {
+    for (const key of ['message', 'detail']) {
+      const text = record[key]
+      if (typeof text === 'string' && text.trim() && text.trim() !== 'Something went wrong while talking to Watchman.') {
+        return text.trim()
+      }
+    }
+  }
+  return NO_CHANGE_MESSAGE
+}
+
+/** Pending cards older than 7 days stay in history and are not shown again. */
+export function proposalsToResurface<T>(proposals: T[] | null | undefined, now = Date.now()): T[] {
+  return (proposals || []).filter((proposal) => {
+    const createdAt = proposalRecord(proposal)?.created_at
+    if (typeof createdAt !== 'string' || !createdAt) return false
+    const created = Date.parse(createdAt)
+    if (!Number.isFinite(created)) return false
+    return now - created <= PENDING_PROPOSAL_MAX_AGE_MS
+  })
+}
+
+export function isPendingCalendarStatus(content: unknown): boolean {
+  const text = sanitizeChatDisplay(content)
+  if (!text) return false
+  return text.trim().replace(/\.+$/, '') === 'Updating your calendar'
+}
+
+function isSettledChatResult(message: { proposal?: unknown; isProposal?: boolean; content?: unknown }): boolean {
+  if (message.proposal || message.isProposal) return true
+  const text = typeof message.content === 'string' ? message.content.trim() : ''
+  if (!text) return false
+  return text.startsWith('Done!')
+    || text.startsWith('Undone!')
+    || text.startsWith('Redone!')
+    || text === NO_CHANGE_MESSAGE
+    || text === EXPIRED_SUGGESTION_MESSAGE
+    || text === REVIEW_FAILURE_MESSAGE
+    || text === 'The proposed change was declined.'
+    || text === 'That proposal was already reviewed.'
+}
+
+/**
+ * "Updating your calendar." is a pending tool line. Once a card or result is in
+ * the thread, that line is not its own bubble.
+ */
+export function withoutLingeringCalendarStatus<T extends { role?: string; content?: unknown; proposal?: unknown; isProposal?: boolean }>(messages: T[]): T[] {
+  let settledAt = -1
+  messages.forEach((message, index) => {
+    if (isSettledChatResult(message)) settledAt = index
+  })
+  if (settledAt < 0) return messages
+  return messages.filter((message, index) => {
+    if (index > settledAt) return true
+    if (message.role === 'user' || message.proposal || message.isProposal) return true
+    return !isPendingCalendarStatus(message.content)
+  })
 }
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']

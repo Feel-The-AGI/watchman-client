@@ -22,6 +22,7 @@ import {
   readFirstTouch,
   type BackfillAttemptStore,
 } from '@/lib/first-touch'
+import { localhostE2EAuth } from '@/lib/e2e-auth'
 
 const oauthBackfillAttempted = new Set<string>()
 
@@ -156,6 +157,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [pathname, router])
 
   useEffect(() => {
+    if (localhostE2EAuth()) {
+      const e2eUser = {
+        id: 'e2e-user',
+        email: 'e2e@trywatchman.app',
+        app_metadata: {},
+        user_metadata: {},
+        aud: 'authenticated',
+        created_at: '2026-10-22T08:00:00.000Z',
+      } as User
+      const e2eSession = {
+        access_token: 'e2e',
+        refresh_token: 'e2e',
+        expires_in: 3600,
+        token_type: 'bearer',
+        user: e2eUser,
+      } as Session
+      api.setToken('e2e')
+      document.cookie = 'wm_e2e=1; path=/'
+      setSession(e2eSession)
+      setUser(e2eUser)
+      setProfile({
+        id: 'e2e-user',
+        email: 'e2e@trywatchman.app',
+        name: 'Tim',
+        timezone: 'UTC',
+        tier: 'pro',
+        role: 'user',
+        onboarding_completed: true,
+        settings: {
+          constraint_mode: 'binary',
+          weighted_mode_enabled: false,
+          max_concurrent_commitments: 2,
+          notifications_email: false,
+          notifications_whatsapp: false,
+          theme: 'dark',
+        },
+      })
+      setLoading(false)
+      return
+    }
+
     const initAuth = async () => {
       sessionCheck.current = true
       try {

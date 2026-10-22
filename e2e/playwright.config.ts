@@ -7,6 +7,7 @@ const artifacts = path.resolve(process.cwd(), 'e2e/artifacts')
 export default defineConfig({
   testDir: '.',
   testMatch: /.*\.spec\.ts/,
+  testIgnore: ['**/local/**'],
   timeout: 60_000,
   expect: { timeout: 15_000 },
   fullyParallel: true,

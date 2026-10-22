@@ -64,6 +64,7 @@ import { Button } from '@/components/ui/Button';
 import { toast } from '@/components/ui/Toast';
 import { IncidentModal, LogModal } from '@/components/ui/IncidentModal';
 import { api } from '@/lib/api';
+import { subscribeCalendarCache } from '@/lib/calendar-sync';
 import { cn } from '@/lib/utils';
 
 interface YearStats {
@@ -260,11 +261,13 @@ export default function StatsPage() {
     }
   }, [stats]);
 
-  const fetchStats = async () => {
+  const fetchStats = async (silent = false) => {
     try {
-      setLoading(true);
-      setError(null);
-      setAnimateStats(false);
+      if (!silent) {
+        setLoading(true);
+        setError(null);
+        setAnimateStats(false);
+      }
 
       // Fetch stats and work settings in parallel
       const [statsResponse, settingsResponse] = await Promise.all([
@@ -317,15 +320,21 @@ export default function StatsPage() {
       }
     } catch (err: any) {
       console.error('Stats fetch error:', err);
-      // Don't crash - show empty state instead
+      if (silent) return;
       setStats(null);
       if (err.status !== 404) {
         setError(err.message || 'Failed to load statistics');
       }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
+
+  useEffect(() => {
+    return subscribeCalendarCache(() => {
+      void fetchStats(true);
+    });
+  }, [year]);
 
   const handleExport = async (format: 'csv' | 'pdf') => {
     try {
@@ -690,7 +699,7 @@ export default function StatsPage() {
           >
             <AlertTriangle className="w-5 h-5 text-red-400" />
             <p className="text-sm text-red-400">{error}</p>
-            <Button variant="ghost" size="sm" onClick={fetchStats} className="ml-auto gap-2">
+            <Button variant="ghost" size="sm" onClick={() => { void fetchStats(); }} className="ml-auto gap-2">
               <RefreshCw className="w-4 h-4" />
               Retry
             </Button>

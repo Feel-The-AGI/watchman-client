@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { displayDateOnly, formatDateOnly } from '@/lib/date-only';
+import { invalidateCalendar } from '@/lib/calendar-sync';
 import { FREE_HORIZON_MESSAGE, freeHorizonNotice } from '@/lib/free-horizon';
 import { FreeHorizonNotice } from '@/components/upgrade/FreeHorizonNotice';
 import {
@@ -205,6 +206,7 @@ export default function MasterSettingsPage() {
         setSuccess('Settings saved successfully');
         setTimeout(() => setSuccess(null), 3000);
         setEditingSection(null);
+        await invalidateCalendar();
         return;
       }
       if (result.conflict) {
@@ -252,6 +254,7 @@ export default function MasterSettingsPage() {
         await api.cycles.create({ name: 'My Rotation', ...body });
       }
       await fetchSettings();
+      await invalidateCalendar({ dates: [anchorDate] });
       setSuccess('Rotation saved');
       setTimeout(() => setSuccess(null), 3000);
       setEditingSection(null);
