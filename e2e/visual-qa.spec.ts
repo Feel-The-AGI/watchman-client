@@ -37,7 +37,22 @@ function sessionCookie() {
   }
 }
 
+async function settle(page: Page) {
+  await page.evaluate(async () => {
+    const styleId = 'qa-no-motion'
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style')
+      style.id = styleId
+      style.textContent = '*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;transition-duration:0s!important;transition-delay:0s!important;}html{scroll-behavior:auto!important;}'
+      document.head.appendChild(style)
+    }
+    for (const animation of document.getAnimations()) animation.finish()
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+  })
+}
+
 async function shot(page: Page, testInfo: TestInfo, name: string) {
+  await settle(page)
   const file = testInfo.outputPath(`${name}.png`)
   await page.screenshot({ path: file, fullPage: false })
   await testInfo.attach(name, { path: file, contentType: 'image/png' })
@@ -76,6 +91,11 @@ test.describe('local visual qa', () => {
         const tag = `${zone}-${viewport.name}`
         try {
           await expect(page.locator('[data-date]')).toHaveCount(42)
+          await expect(page.getByText(`${EMAIL.split('@')[0]}'s schedule`)).toHaveCount(0)
+          if (viewport.width >= 1024) {
+            await expect(page.getByText('Your schedule overview')).toBeVisible()
+            await shot(page, testInfo, `${tag}-header`)
+          }
           const leaked = logs.filter((line) => /Auth state changed|@gmail\.com|access_token|refresh_token/i.test(line))
           expect(leaked, leaked.join('\n')).toEqual([])
 
@@ -89,6 +109,13 @@ test.describe('local visual qa', () => {
           if (viewport.width >= 1024) expect(chatHeight).toBeGreaterThanOrEqual(320)
 
           await page.locator('[data-date="2026-10-22"]').click()
+          await settle(page)
+          const hoursSummary = page.locator('p', { hasText: 'Expected:' }).filter({ hasText: 'Actual:' }).first()
+          await expect(hoursSummary).toContainText('Actual: Not logged')
+          await expect.poll(async () => hoursSummary.evaluate((element) => element.scrollWidth <= element.clientWidth + 1 && element.scrollHeight <= element.clientHeight + 1)).toBe(true)
+          const actualTile = page.locator('p', { hasText: 'Not logged' }).nth(1)
+          await expect(actualTile).toBeVisible()
+          await expect.poll(async () => actualTile.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
           const notLogged = page.locator('text=Not logged >> visible=true').first()
           await expect(notLogged).toBeVisible()
           const hours = page.locator('text=Hours Worked >> visible=true')
@@ -99,6 +126,13 @@ test.describe('local visual qa', () => {
           expect(hoursBox).not.toBeNull()
           expect(hoursBox!.y + hoursBox!.height).toBeGreaterThan(0)
           expect(hoursBox!.y).toBeLessThan(viewport.height)
+          await page.evaluate(() => {
+            document.documentElement.style.scrollBehavior = 'auto'
+            const summary = [...document.querySelectorAll('p')].find((node) => node.textContent?.includes('Expected:') && node.textContent?.includes('Actual:'))
+            if (!summary) return
+            const top = summary.getBoundingClientRect().top + window.scrollY - 140
+            window.scrollTo(0, Math.max(0, top))
+          })
           await shot(page, testInfo, viewport.width < 800 ? `${tag}-day-sheet` : `${tag}-day-panel-hours`)
           await page.getByRole('button', { name: 'Close', exact: true }).click()
           await expect(page.getByText('Hours Worked')).toHaveCount(0)
@@ -167,6 +201,7 @@ test.describe('local visual qa', () => {
           await expect(page.locator('[data-testid="locked-day-panel"]:visible')).toHaveCount(0)
           await expect(page.getByTestId('year-lock-banner')).toHaveCount(1)
           await expect(page.locator('[data-locked-month]')).toHaveCount(11)
+          await expect(page.locator('[data-locked-month="true"] [data-date="2027-02-01"]')).toHaveAttribute('data-kind', 'muted')
           await expect(page.getByTestId('year-lock-banner')).toContainText('February–December 2027')
           const upgradeInBanner = page.getByTestId('year-lock-banner').getByRole('link', { name: 'Upgrade' })
           await expect(upgradeInBanner).toHaveCount(1)
@@ -196,9 +231,11 @@ test.describe('local visual qa', () => {
           await shot(page, testInfo, `${tag}-stats-header`)
 
           await page.getByRole('button', { name: 'CSV' }).click()
-          await expect(page.getByTestId('export-upgrade')).toBeVisible()
-          await expect(page.getByText('CSV, PDF, and Export All are Pro features.')).toBeVisible()
-          await shot(page, testInfo, `${tag}-export-pro`)
+          const exportError = page.getByTestId('export-upgrade')
+          await expect(exportError).toBeVisible()
+          await expect(exportError).toContainText('CSV, PDF, and Export All are Pro features.')
+          await exportError.scrollIntoViewIfNeeded()
+          await shot(page, testInfo, `${tag}-export-error`)
 
           await openNav(page, viewport.width)
           await page.getByRole('link', { name: 'Master Settings' }).click()

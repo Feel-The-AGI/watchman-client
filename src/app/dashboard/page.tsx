@@ -42,6 +42,7 @@ import {
 import { normalizeCalendarDays } from '@/lib/calendar-day';
 import { activeCyclePattern, type BadgeBlock } from '@/lib/cycle-day-badge';
 import { parseDateOnly } from '@/lib/date-only';
+import { displayProfileName } from '@/lib/profile-display';
 import {
   freeHorizonNotice,
   FREE_HORIZON_MESSAGE,
@@ -79,7 +80,8 @@ interface CalendarStats {
 }
 
 export default function DashboardPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const scheduleName = displayProfileName(profile?.name, user?.email);
   const desktopLayout = useDesktopLayout();
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -353,7 +355,7 @@ export default function DashboardPage() {
                 <span className="text-gradient">{headerYear(viewedMonth)}</span> <span className="hidden sm:inline">Calendar</span>
               </h1>
               <p className="text-watchman-text-secondary text-xs sm:text-sm hidden sm:block">
-                {profile?.name ? `${profile.name}'s schedule` : 'Your schedule overview'}
+                {scheduleName ? `${scheduleName}'s schedule` : 'Your schedule overview'}
               </p>
             </div>
 

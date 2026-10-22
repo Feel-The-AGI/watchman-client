@@ -457,15 +457,15 @@ export function DayInspector({
               onClick={() => toggleSection('hours')}
               className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center">
                   <Clock className="w-5 h-5 text-blue-400" />
                 </div>
-                <div className="text-left">
+                <div className="text-left min-w-0">
                   <p className="font-semibold">Hours Worked</p>
-                  <p className="text-xs text-watchman-muted">
+                  <p className="text-xs text-watchman-muted leading-snug">
                     <span className="whitespace-nowrap">Expected: {expectedHours}h</span>
-                    <span className="whitespace-nowrap"> · Actual: {actualHoursText(actualHours)}</span>
+                    <span> · Actual: {actualHoursText(actualHours)}</span>
                     {overtimeHours > 0 && <span className="text-amber-400 ml-2 whitespace-nowrap">+{overtimeHours}h OT</span>}
                   </p>
                 </div>
@@ -519,24 +519,22 @@ export function DayInspector({
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-between">
-                        <div className="grid grid-cols-3 gap-4 flex-1">
-                          <div className="text-center p-3 glass rounded-xl">
-                            <p className="text-2xl font-bold text-blue-400">{expectedHours}h</p>
-                            <p className="text-xs text-watchman-muted">Expected</p>
-                          </div>
-                          <div className="text-center p-2 sm:p-3 glass rounded-xl min-w-0">
-                            <p className={actualHours === null ? 'text-xs font-semibold leading-tight text-zinc-200' : 'text-2xl font-bold text-emerald-400'}>
-                              {actualHoursText(actualHours)}
-                            </p>
-                            <p className="text-xs text-watchman-muted">Actual</p>
-                          </div>
-                          <div className="text-center p-3 glass rounded-xl">
-                            <p className="text-2xl font-bold text-amber-400">{overtimeHours || 0}h</p>
-                            <p className="text-xs text-watchman-muted">Overtime</p>
-                          </div>
+                      <div className="flex flex-wrap items-stretch gap-2">
+                        <div className="text-center p-2 glass rounded-xl min-w-[4.5rem]">
+                          <p className="text-2xl font-bold text-blue-400">{expectedHours}h</p>
+                          <p className="text-xs text-watchman-muted">Expected</p>
                         </div>
-                        <Button size="sm" variant="ghost" onClick={() => setEditingHours(true)} className="ml-4" aria-label="Edit hours">
+                        <div className="text-center px-3 py-2 glass rounded-xl">
+                          <p className={actualHours === null ? 'text-sm font-semibold text-zinc-200 whitespace-nowrap' : 'text-2xl font-bold text-emerald-400'}>
+                            {actualHoursText(actualHours)}
+                          </p>
+                          <p className="text-xs text-watchman-muted">Actual</p>
+                        </div>
+                        <div className="text-center p-2 glass rounded-xl min-w-[4.5rem]">
+                          <p className="text-2xl font-bold text-amber-400">{overtimeHours || 0}h</p>
+                          <p className="text-xs text-watchman-muted">Overtime</p>
+                        </div>
+                        <Button size="sm" variant="ghost" onClick={() => setEditingHours(true)} className="ml-auto shrink-0" aria-label="Edit hours">
                           <Edit2 className="w-4 h-4" />
                         </Button>
                       </div>

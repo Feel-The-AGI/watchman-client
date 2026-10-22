@@ -567,7 +567,7 @@ function MiniMonth({
             <span
               key={cell.key}
               data-date={cell.date}
-              data-kind={calendarCellKind(daysMap.get(cell.date))}
+              data-kind={kind}
               data-today={isTodayCell ? 'true' : undefined}
               className={cn(
                 'aspect-square rounded-[2px]',

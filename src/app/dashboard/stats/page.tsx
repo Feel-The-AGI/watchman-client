@@ -64,7 +64,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { toast } from '@/components/ui/Toast';
 import { IncidentModal, LogModal } from '@/components/ui/IncidentModal';
-import { api } from '@/lib/api';
+import { APIError, api } from '@/lib/api';
 import { subscribeCalendarCache } from '@/lib/calendar-sync';
 import { localDateFromStored } from '@/lib/date-only';
 import { cn } from '@/lib/utils';
@@ -189,6 +189,11 @@ const calculateShiftHours = (start?: string, end?: string): number => {
     return 12; // Default fallback
   }
 };
+
+function exportFailureText(error: unknown, denied: string, failed: string): string {
+  if (error instanceof APIError && error.status === 403) return denied
+  return failed
+}
 
 // Safe date formatter that handles invalid dates
 const safeFormatDate = (dateStr: string | undefined, formatStr: string, fallback = 'N/A'): string => {
@@ -374,8 +379,8 @@ export default function StatsPage() {
         try {
           const statsBlob = await api.stats.export(year, exportFormat);
           downloads.push({ name: `watchman-stats-${year}.${exportFormat}`, blob: statsBlob });
-        } catch (e) {
-          setExportProgress('Statistics export is part of Pro');
+        } catch (error) {
+          setExportProgress(exportFailureText(error, 'Statistics export is part of Pro', "Statistics couldn't be exported. Try again."));
         }
       }
 
@@ -384,8 +389,8 @@ export default function StatsPage() {
         try {
           const logsBlob = await api.dailyLogs.export(startDate, endDate, exportFormat);
           downloads.push({ name: `watchman-daily-logs-${year}.${exportFormat}`, blob: logsBlob });
-        } catch (e) {
-          setExportProgress('Daily log export is part of Pro');
+        } catch (error) {
+          setExportProgress(exportFailureText(error, 'Daily log export is part of Pro', "Daily logs couldn't be exported. Try again."));
         }
       }
 
@@ -394,8 +399,8 @@ export default function StatsPage() {
         try {
           const incidentsBlob = await api.incidents.export(startDate, endDate, exportFormat);
           downloads.push({ name: `watchman-incidents-${year}.${exportFormat}`, blob: incidentsBlob });
-        } catch (e) {
-          setExportProgress('Incident export is part of Pro');
+        } catch (error) {
+          setExportProgress(exportFailureText(error, 'Incident export is part of Pro', "Incidents couldn't be exported. Try again."));
         }
       }
 
