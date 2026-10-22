@@ -98,7 +98,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   const currentTier = tierBadge[profile?.tier as keyof typeof tierBadge] || tierBadge.free;
-  const accountName = displayProfileName(profile?.name, user.email) || user.email || '';
+  const accountName = displayProfileName(profile?.name, user.email) || 'Account';
 
   return (
     <div className="min-h-screen bg-watchman-bg text-white">
@@ -250,7 +250,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <User className="w-5 h-5 text-watchman-accent" />
               </div>
               <div className={cn(
-                'flex-1 text-left transition-all duration-300',
+                'min-w-0 flex-1 text-left transition-all duration-300',
                 collapsed && 'lg:hidden lg:opacity-0 lg:w-0'
               )}>
                 <p className="text-sm font-medium truncate">
