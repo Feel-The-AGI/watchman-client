@@ -96,3 +96,16 @@ describe('leave cell label and commitment times', () => {
     assert.equal(commitmentPanelLine(dayCommitments(day)[0]), 'Haircut, Personal, 16:00–17:00')
   })
 })
+
+describe('block index on a calendar day', () => {
+  it('keeps the position inside the block from state_json', () => {
+    const [day] = normalizeCalendarDays([{
+      date: '2026-10-25',
+      cycle_day: 6,
+      work_type: 'work_night',
+      state_json: { block_day: 1, shift_badge: 'N1' },
+    }])
+    assert.equal(day.cycle_day, 6)
+    assert.equal(day.block_day, 1)
+  })
+})

@@ -32,6 +32,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import { loadDashboardSnapshot } from '@/lib/dashboard-refresh';
 import { normalizeCalendarDays } from '@/lib/calendar-day';
+import { activeCyclePattern, type BadgeBlock } from '@/lib/cycle-day-badge';
 import Link from 'next/link';
 
 type ViewMode = 'month' | 'year';
@@ -55,6 +56,7 @@ export default function DashboardPage() {
   const viewedYearRef = useRef(headerYear(viewedMonth));
   const [initialYearSet, setInitialYearSet] = useState(false);
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
+  const [rotationPattern, setRotationPattern] = useState<BadgeBlock[]>([]);
   const [stats, setStats] = useState<CalendarStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,6 +79,7 @@ export default function DashboardPage() {
       if (yearToFetch !== viewedYearRef.current) return;
       if (Array.isArray(snapshot.cycles)) {
         setHasSetup(snapshot.cycles.length > 0);
+        setRotationPattern(activeCyclePattern(snapshot.cycles));
       }
       if (snapshot.calendar) {
         setCalendarDays(normalizeCalendarDays(snapshot.calendar) as CalendarDay[]);
@@ -119,6 +122,7 @@ export default function DashboardPage() {
       setHasSetup(true);
 
       const activeCycle = cyclesResponse.find((c: any) => c.is_active) || cyclesResponse[0];
+      setRotationPattern(activeCyclePattern(cyclesResponse));
 
       // Only set anchor year on FIRST load, not every navigation
       if (!initialYearSet && activeCycle?.anchor_date) {
@@ -370,6 +374,7 @@ export default function DashboardPage() {
                   initialMonth={gridMonthAfterViewToggle(viewedMonth)}
                   onMonthChange={showMonth}
                   userTier={profile?.tier as 'free' | 'pro' | 'admin' || 'free'}
+                  pattern={rotationPattern}
                 />
               ) : (
                 <div className="p-6">
