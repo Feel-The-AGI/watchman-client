@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { CARD_PAY_LABEL, lockedMonthPriceLine, MOBILE_MONEY_PAY_LABEL } from './upgrade-offer.ts'
+import { LOCKED_MONTH_PAY_LINE, lockedMonthPriceLine } from './upgrade-offer.ts'
 
 describe('locked month price', () => {
   it('places the server cedi amount next to the dollar price', () => {
@@ -17,8 +17,8 @@ describe('locked month price', () => {
     assert.equal(lockedMonthPriceLine({ ghs_amount: 186.4, display_ghs: 'GHS 186.40' }), null)
   })
 
-  it('names card and mobile money as the pay options', () => {
-    assert.equal(CARD_PAY_LABEL, 'Card')
-    assert.equal(MOBILE_MONEY_PAY_LABEL, 'Pay with Mobile Money')
+  it('offers mobile money or bank transfer, not card', () => {
+    assert.equal(LOCKED_MONTH_PAY_LINE, 'Pay with Mobile Money or bank transfer')
+    assert.equal(/card/i.test(LOCKED_MONTH_PAY_LINE), false)
   })
 })

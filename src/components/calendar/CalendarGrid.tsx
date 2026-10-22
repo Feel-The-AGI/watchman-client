@@ -21,7 +21,7 @@ import { cycleDayBadge } from '@/lib/cycle-day-badge';
 import { calendarCellKind, calendarHoverLabel, dayCommitments } from '@/lib/calendar-day';
 import { isFreeMonthLocked, isYearMonthVisible } from '@/lib/free-calendar-access';
 import { monthArrowLabel, UPGRADE_AHEAD_LABEL } from '@/lib/calendar-view';
-import { CARD_PAY_LABEL, lockedMonthPriceLine, MOBILE_MONEY_PAY_LABEL } from '@/lib/upgrade-offer';
+import { LOCKED_MONTH_PAY_LINE, lockedMonthPriceLine } from '@/lib/upgrade-offer';
 import { api } from '@/lib/api';
 import Link from 'next/link';
 
@@ -49,7 +49,7 @@ function LockedAheadDetails({ priceLine }: { priceLine: string | null }) {
     <>
       {priceLine && <p className="mt-1 text-[10px] text-white">{priceLine}</p>}
       <p className="mt-1 text-[10px] text-watchman-muted">
-        {CARD_PAY_LABEL} · {MOBILE_MONEY_PAY_LABEL}
+        {LOCKED_MONTH_PAY_LINE}
       </p>
     </>
   );

@@ -1,7 +1,6 @@
 import { ghsAmountLabel, type PricingAmounts } from './billing'
 
-export const CARD_PAY_LABEL = 'Card'
-export const MOBILE_MONEY_PAY_LABEL = 'Pay with Mobile Money'
+export const LOCKED_MONTH_PAY_LINE = 'Pay with Mobile Money or bank transfer'
 
 export type LockedMonthPricing = PricingAmounts & {
   usd_price?: number | null
