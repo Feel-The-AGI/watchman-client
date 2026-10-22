@@ -27,7 +27,7 @@ import { Logo } from '@/components/ui/Logo';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { api } from '@/lib/api';
 import { chatMessageText } from '@/lib/chat-display';
-import { copyRulesIntoSettings, rulesStillNeeded, saveOnboardingCycle } from '@/lib/onboarding-setup';
+import { copyRulesIntoSettings, createdCycleIdAfterChoiceChange, rulesStillNeeded, saveOnboardingCycle } from '@/lib/onboarding-setup';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { dashboardHandoffButton } from '@/lib/onboarding-handoff';
@@ -87,7 +87,26 @@ export default function OnboardingPage() {
   const [anchorCycleDay, setAnchorCycleDay] = useState(1);
   const [selectedConstraints, setSelectedConstraints] = useState<string[]>([]);
   const createdCycleIdRef = useRef<string | null>(null);
+  const setupChoiceRef = useRef({
+    pattern,
+    anchor_date: anchorDate,
+    anchor_cycle_day: anchorCycleDay,
+  });
   const finishingRef = useRef(false);
+
+  useEffect(() => {
+    const next = {
+      pattern,
+      anchor_date: anchorDate,
+      anchor_cycle_day: anchorCycleDay,
+    };
+    createdCycleIdRef.current = createdCycleIdAfterChoiceChange(
+      createdCycleIdRef.current,
+      setupChoiceRef.current,
+      next,
+    );
+    setupChoiceRef.current = next;
+  }, [pattern, anchorDate, anchorCycleDay]);
 
   const totalDays = pattern.reduce((sum, block) => sum + block.duration, 0);
 

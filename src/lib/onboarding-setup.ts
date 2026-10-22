@@ -39,6 +39,22 @@ function sameAnchor(cycle: Record<string, unknown>, choice: SetupCycleChoice): b
   return date === choice.anchor_date.slice(0, 10) && Number(cycle.anchor_cycle_day) === choice.anchor_cycle_day
 }
 
+function sameSetupChoice(left: SetupCycleChoice, right: SetupCycleChoice): boolean {
+  return left.anchor_cycle_day === right.anchor_cycle_day
+    && left.anchor_date.slice(0, 10) === right.anchor_date.slice(0, 10)
+    && samePattern(left.pattern, right.pattern)
+}
+
+/** A new pattern or anchor must not reuse the cycle saved for the previous choice. */
+export function createdCycleIdAfterChoiceChange(
+  createdCycleId: string | null,
+  previous: SetupCycleChoice,
+  next: SetupCycleChoice,
+): string | null {
+  if (!sameSetupChoice(previous, next)) return null
+  return createdCycleId
+}
+
 /** An active cycle for this exact pattern and anchor, or the id created on this page. */
 export function reusableSetupCycleId(
   cycles: unknown,

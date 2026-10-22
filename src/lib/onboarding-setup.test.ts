@@ -4,6 +4,7 @@ import {
   CYCLE_SAVE_ERROR,
   copyRulesIntoSettings,
   ONBOARDING_COMPLETE_ERROR,
+  createdCycleIdAfterChoiceChange,
   reusableSetupCycleId,
   rulesStillNeeded,
   saveOnboardingCycle,
@@ -36,6 +37,27 @@ describe('which cycle already belongs to this setup', () => {
     assert.equal(reusableSetupCycleId([inactive, otherAnchor], choice, null), null)
     assert.equal(reusableSetupCycleId([activeMatch], choice, null), 'cycle-active')
     assert.equal(reusableSetupCycleId([inactive], choice, 'cycle-this-session'), 'cycle-this-session')
+  })
+})
+
+describe('retry after the pattern or anchor changes', () => {
+  it('drops the saved cycle id so the next finish creates a new rotation', () => {
+    assert.equal(createdCycleIdAfterChoiceChange('cycle-1', choice, choice), 'cycle-1')
+    assert.equal(
+      createdCycleIdAfterChoiceChange('cycle-1', choice, { ...choice, anchor_date: '2026-11-01' }),
+      null,
+    )
+    assert.equal(
+      createdCycleIdAfterChoiceChange('cycle-1', choice, { ...choice, anchor_cycle_day: 2 }),
+      null,
+    )
+    assert.equal(
+      createdCycleIdAfterChoiceChange('cycle-1', choice, {
+        ...choice,
+        pattern: [{ label: 'work_day', duration: 14 }, { label: 'off', duration: 14 }],
+      }),
+      null,
+    )
   })
 })
 
