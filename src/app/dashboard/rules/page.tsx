@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { format } from 'date-fns';
+import { displayDateOnly, formatDateOnly } from '@/lib/date-only';
 import {
   Settings,
   Clock,
@@ -227,7 +227,8 @@ export default function MasterSettingsPage() {
       setLoadError(MASTER_SETTINGS_LOAD_ERROR);
       return;
     }
-    if (!cycle.anchor_date) {
+    const anchorDate = typeof cycle.anchor_date === 'string' ? formatDateOnly(cycle.anchor_date) : null;
+    if (!anchorDate) {
       setError('Set an anchor date before updating the rotation.');
       return;
     }
@@ -240,7 +241,7 @@ export default function MasterSettingsPage() {
           label: block.label,
           duration: Number(block.duration) || 0,
         })),
-        anchor_date: cycle.anchor_date,
+        anchor_date: anchorDate,
         anchor_cycle_day: Number(cycle.anchor_cycle_day) || 1,
       };
       if (active?.id) {
@@ -448,7 +449,7 @@ export default function MasterSettingsPage() {
                 disabled={savesDisabled}
                 onClick={() => {
                   setEditPattern([...settings.cycle.pattern]);
-                  setEditAnchorDate(settings.cycle.anchor_date || '');
+                  setEditAnchorDate(formatDateOnly(settings.cycle.anchor_date || '') ?? '');
                   setEditAnchorDay(settings.cycle.anchor_cycle_day);
                   setEditingSection('cycle');
                 }}
@@ -514,8 +515,8 @@ export default function MasterSettingsPage() {
               <Sparkles className="w-4 h-4 text-watchman-accent" />
               <span className="text-watchman-muted">Anchor:</span>
               <span className="font-medium">
-                {settings.cycle.anchor_date 
-                  ? format(new Date(settings.cycle.anchor_date), 'MMM d, yyyy')
+                {settings.cycle.anchor_date
+                  ? (displayDateOnly(settings.cycle.anchor_date) ?? settings.cycle.anchor_date)
                   : 'Not set'}
               </span>
             </div>
@@ -774,7 +775,7 @@ export default function MasterSettingsPage() {
                   </div>
                   {c.start_date && c.end_date && (
                     <span className="text-xs text-watchman-muted">
-                      {format(new Date(c.start_date), 'MMM d')} - {format(new Date(c.end_date), 'MMM d, yyyy')}
+                      {(displayDateOnly(c.start_date, 'month-day') ?? c.start_date)} - {(displayDateOnly(c.end_date) ?? c.end_date)}
                     </span>
                   )}
                 </motion.div>
@@ -824,7 +825,7 @@ export default function MasterSettingsPage() {
               >
                 <p className="font-medium text-teal-400">{l.name}</p>
                 <p className="text-sm text-watchman-muted mt-1">
-                  {format(new Date(l.start_date), 'MMM d')} - {format(new Date(l.end_date), 'MMM d, yyyy')}
+                  {(displayDateOnly(l.start_date, 'month-day') ?? l.start_date)} - {(displayDateOnly(l.end_date) ?? l.end_date)}
                 </p>
               </motion.div>
             ))}

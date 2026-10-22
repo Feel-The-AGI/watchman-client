@@ -48,6 +48,12 @@ jobs:
       - name: Unit tests
         run: pnpm test:unit
 
+      - name: Date-only tests across timezones
+        run: |
+          TZ=UTC pnpm test:date-zones
+          TZ=America/New_York pnpm test:date-zones
+          TZ=Asia/Tokyo pnpm test:date-zones
+
       - name: Build
         run: pnpm build
 
