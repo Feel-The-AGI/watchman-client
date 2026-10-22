@@ -27,6 +27,7 @@ import { Logo } from '@/components/ui/Logo';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { api } from '@/lib/api';
 import { chatMessageText } from '@/lib/chat-display';
+import { saveOnboardingCycle } from '@/lib/onboarding-setup';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { dashboardHandoffButton } from '@/lib/onboarding-handoff';
@@ -182,7 +183,16 @@ export default function OnboardingPage() {
         }
       }
 
-      await api.auth.completeOnboarding();
+      await saveOnboardingCycle({
+        listCycles: () => api.cycles.list(),
+        createCycle: () => api.cycles.create({
+          name: cycleName,
+          pattern,
+          anchor_date: anchorDate,
+          anchor_cycle_day: anchorCycleDay,
+        }),
+        completeOnboarding: () => api.auth.completeOnboarding(),
+      });
 
       const saved = await api.settings.getConstraints().catch(() => []);
       const master = await api.masterSettings.get().catch(() => null);
@@ -195,12 +205,6 @@ export default function OnboardingPage() {
         await api.masterSettings.updateSection('constraints', [...documentRules, ...missing]);
       }
 
-      await api.cycles.create({
-        name: cycleName,
-        pattern,
-        anchor_date: anchorDate,
-        anchor_cycle_day: anchorCycleDay,
-      });
       await refreshProfile();
 
       setTimeout(() => {
@@ -208,9 +212,10 @@ export default function OnboardingPage() {
         setStep(4);
       }, 1000);
     } catch (err: any) {
+      setShowQuickActions(true);
       const friendly = chatMessageText(err?.message) || 'Failed to complete setup';
       setError(friendly);
-      addMessage('assistant', `Oops, something went wrong: ${friendly}. Let's try again.`);
+      addMessage('assistant', friendly);
     } finally {
       setLoading(false);
     }
