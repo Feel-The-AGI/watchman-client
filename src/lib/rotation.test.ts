@@ -108,6 +108,11 @@ describe('onboarding chat pattern and anchor', () => {
       content: '5 on 5 off',
       auto_execute: false,
     })
+    const finishedStep = 4
+    assert.deepEqual(
+      onboardingChatRequest('hello after setup', finishedStep < 4 ? fiveFiveFive : undefined),
+      { content: 'hello after setup', auto_execute: false },
+    )
   })
 
   it('applies an anchor that fits the pattern and ignores one that does not', () => {

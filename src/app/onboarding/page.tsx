@@ -275,7 +275,7 @@ export default function OnboardingPage() {
     // Later steps stay in the same chat. The server does not apply changes from here.
     try {
       setLoading(true);
-      const response = await api.chat.sendMessage(userMessage, false, pattern);
+      const response = await api.chat.sendMessage(userMessage, false, step < 4 ? pattern : undefined);
       const anchor = anchorFromChatResponse(response, pattern);
       if (anchor) {
         advanceToRules(anchor.date, anchor.cycle_day);
