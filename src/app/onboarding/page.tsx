@@ -27,7 +27,7 @@ import { Logo } from '@/components/ui/Logo';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { api } from '@/lib/api';
 import { chatMessageText } from '@/lib/chat-display';
-import { copyRulesIntoSettings, createdCycleIdAfterChoiceChange, rulesStillNeeded, saveOnboardingCycle } from '@/lib/onboarding-setup';
+import { copyRulesIntoSettings, createdCycleIdAfterChoiceChange, rulesStillNeeded, saveOnboardingCycle, visibleOnboardingRules } from '@/lib/onboarding-setup';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { dashboardHandoffButton } from '@/lib/onboarding-handoff';
@@ -553,7 +553,7 @@ export default function OnboardingPage() {
                 className="space-y-4 pb-4"
               >
                 <div className="space-y-2">
-                  {PRESET_CONSTRAINTS.map((constraint, i) => (
+                  {visibleOnboardingRules(PRESET_CONSTRAINTS).map((constraint, i) => (
                     <motion.button
                       key={constraint.rule}
                       initial={{ opacity: 0, x: -20 }}

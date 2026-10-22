@@ -20,6 +20,13 @@ export interface SetupRule {
   rule: { type: string; value: string | number }
 }
 
+/** The only preset the server enforces. The others stay defined for saved rules. */
+export const ENFORCED_ONBOARDING_RULE = 'no_study_on:work_night'
+
+export function visibleOnboardingRules<T extends { rule: string }>(presets: T[]): T[] {
+  return presets.filter((preset) => preset.rule === ENFORCED_ONBOARDING_RULE)
+}
+
 function cycleRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   return value as Record<string, unknown>
