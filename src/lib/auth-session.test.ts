@@ -7,6 +7,9 @@ import {
   browserAuthCookieExpiryLines,
   expiredAuthCookieHeaders,
   isSupabaseAuthStorageKey,
+  requestHasAuthSessionCookie,
+  signedOutRedirect,
+  signedOutStorageKeys,
   supabaseAuthStorageKeys,
 } from './auth-session.ts'
 
@@ -36,18 +39,16 @@ describe('Supabase auth cookies', () => {
     ])
 
     const expired = expiredAuthCookieHeaders(header)
-    assert.deepEqual(expired, [
-      'sb-current-auth-token.0=; Path=/; Max-Age=0; SameSite=Lax',
-      'sb-current-auth-token.1=; Path=/; Max-Age=0; SameSite=Lax',
-      'sb-current-auth-token-code-verifier=; Path=/; Max-Age=0; SameSite=Lax',
-      'sb-amber-auth-token=; Path=/; Max-Age=0; SameSite=Lax',
-    ])
+    assert.equal(expired.length, 8)
+    assert.ok(expired.every((line) => line.includes('Max-Age=0') && line.includes('Path=/')))
+    assert.equal(expired.filter((line) => line.startsWith('sb-amber-auth-token=')).length, 2)
     assert.equal(expired.some((line) => line.includes('sidebar-collapsed')), false)
+    assert.equal(expired.some((line) => line.endsWith('; Secure')), true)
+    assert.equal(expired.some((line) => !line.includes('Secure')), true)
 
-    const browserLines = browserAuthCookieExpiryLines(header)
-    assert.equal(browserLines.length, 8)
-    assert.equal(browserLines.filter((line) => line.startsWith('sb-amber-auth-token=')).length, 2)
-    assert.equal(browserLines.some((line) => line.endsWith('; Secure')), true)
+    assert.deepEqual(browserAuthCookieExpiryLines(header), expired)
+    assert.equal(requestHasAuthSessionCookie(header), true)
+    assert.equal(requestHasAuthSessionCookie('theme=dark'), false)
   })
 
   it('ignores an empty jar and unrelated storage keys', () => {
@@ -63,5 +64,33 @@ describe('Supabase auth cookies', () => {
       ]),
       ['sb-proj-auth-token', 'supabase.auth.token'],
     )
+    assert.deepEqual(
+      signedOutStorageKeys([
+        'sb-proj-auth-token',
+        'supabase.auth.token',
+        'watchman_pro_celebration_user-1',
+        'watchman_landing_2026-10-20',
+        'watchman_checkout_reference',
+        'sidebar-collapsed',
+      ]),
+      [
+        'sb-proj-auth-token',
+        'supabase.auth.token',
+        'watchman_pro_celebration_user-1',
+        'watchman_landing_2026-10-20',
+        'watchman_checkout_reference',
+      ],
+    )
+  })
+})
+
+describe('dashboard without a session', () => {
+  it('sends every dashboard path to the login form', () => {
+    assert.equal(signedOutRedirect('/dashboard', false), '/login')
+    assert.equal(signedOutRedirect('/dashboard/settings', false), '/login')
+    assert.equal(signedOutRedirect('/dashboard/admin', false), '/login')
+    assert.equal(signedOutRedirect('/login', false), null)
+    assert.equal(signedOutRedirect('/', false), null)
+    assert.equal(signedOutRedirect('/dashboard', true), null)
   })
 })

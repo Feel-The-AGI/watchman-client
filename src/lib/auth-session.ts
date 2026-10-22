@@ -42,25 +42,52 @@ export function authCookieNamesFromHeader(cookieHeader: string | null | undefine
  * the session. A second Secure header for the same name can be collapsed by
  * the response cookie map and then fail to delete the real cookie.
  */
+/**
+ * Delete each auth cookie twice. A Secure cookie is only removed by a Secure
+ * Set-Cookie, and a non-Secure cookie is only removed without that flag.
+ * Both are sent so a shared browser cannot keep either copy.
+ */
 export function expiredAuthCookieHeaders(cookieHeader: string | null | undefined): string[] {
-  return authCookieNamesFromHeader(cookieHeader).map(
-    (name) => `${name}=; Path=/; Max-Age=0; SameSite=Lax`,
-  )
+  return authCookieNamesFromHeader(cookieHeader).flatMap((name) => [
+    `${name}=; Path=/; Max-Age=0; SameSite=Lax`,
+    `${name}=; Path=/; Max-Age=0; SameSite=Lax; Secure`,
+  ])
 }
 
-/** Browser assignments. Secure is attempted as well, because document.cookie keeps both. */
+/** Browser assignments. document.cookie keeps both Secure and non-Secure deletions. */
 export function browserAuthCookieExpiryLines(cookieHeader: string | null | undefined): string[] {
-  return expiredAuthCookieHeaders(cookieHeader).flatMap((line) => [line, `${line}; Secure`])
+  return expiredAuthCookieHeaders(cookieHeader)
 }
 
 export function supabaseAuthStorageKeys(keys: Iterable<string>): string[] {
   return [...keys].filter((key) => isSupabaseAuthStorageKey(key))
 }
 
+/** Profile and app leftovers, separate from the Supabase auth token itself. */
+export function isAppCacheKey(key: string): boolean {
+  return key.startsWith('watchman_')
+}
+
+/** localStorage and sessionStorage keys Sign Out removes. */
+export function signedOutStorageKeys(keys: Iterable<string>): string[] {
+  return [...keys].filter((key) => isSupabaseAuthStorageKey(key) || isAppCacheKey(key))
+}
+
+export function requestHasAuthSessionCookie(cookieHeader: string | null | undefined): boolean {
+  return authCookieNamesFromHeader(cookieHeader).length > 0
+}
+
+/** Where middleware sends a request that has no Supabase session. */
+export function signedOutRedirect(pathname: string, hasSession: boolean): string | null {
+  if (hasSession) return null
+  if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) return SIGNED_OUT_PATH
+  return null
+}
+
 function clearWebStorage(storage: Storage | undefined): void {
   if (!storage) return
   try {
-    for (const key of supabaseAuthStorageKeys(Object.keys(storage))) {
+    for (const key of signedOutStorageKeys(Object.keys(storage))) {
       storage.removeItem(key)
     }
   } catch {
