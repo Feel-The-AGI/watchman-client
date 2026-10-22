@@ -155,7 +155,7 @@ export default function OnboardingPage() {
     setAnchorCycleDay(cycleDay);
     setShowQuickActions(false);
     setTimeout(() => {
-      addMessage('assistant', "Great! Finally, what rules should I always respect? These are hard constraints that will never be broken.");
+      addMessage('assistant', 'Great! Finally, set hard rules for your rotation, like no study on night shifts.');
       setStep(3);
       setTimeout(() => setShowQuickActions(true), 500);
     }, 600);
@@ -501,7 +501,7 @@ export default function OnboardingPage() {
                       <strong>What is anchoring?</strong>
                     </p>
                     <p className="text-xs text-watchman-muted mt-1">
-                      Pick a date you know for sure (e.g., today) and tell us which day of your rotation cycle it is. This lets us calculate your entire year.
+                      Pick a date you know for sure (e.g., today) and tell us which day of your rotation cycle it is. The calendar is generated ahead from your rotation.
                     </p>
                   </div>
                   <div>
