@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Logo } from '@/components/ui/Logo';
 import { useAuth } from '@/hooks/useAuth';
 import { passwordRules, resendConfirmationFeedback, resendCooldownRemaining } from '@/lib/signup-flow';
+import { planFromCheckoutPath, rememberPendingCheckout } from '@/lib/stripe-checkout';
 
 type AuthMode = 'signin' | 'signup' | 'magic';
 
@@ -37,6 +38,8 @@ export default function LoginPage() {
     if (requested === 'signup' || requested === 'magic' || requested === 'signin') {
       setMode(requested);
     }
+    const plan = planFromCheckoutPath(params.get('redirect_to'));
+    if (plan) rememberPendingCheckout(plan);
     const message = params.get('message');
     const authError = params.get('error');
     if (message) {

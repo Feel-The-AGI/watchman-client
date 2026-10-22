@@ -40,10 +40,9 @@ describe('marketing copy', () => {
       assert.equal(/overtime on a leave day/i.test(line), false)
     }
     assert.match(ROTATION_FEATURE, /rotation shows up on the calendar/)
-    assert.equal(
-      RENEWAL_FAQ.startsWith('Pro does not renew automatically. Each payment covers a fixed period.'),
-      true,
-    )
+    assert.match(RENEWAL_FAQ, /renew automatically/i)
+    assert.equal(/paystack/i.test(RENEWAL_FAQ), false)
+    assert.equal(/\$12/.test(RENEWAL_FAQ), false)
     assert.equal(/automatic card subscription/i.test(RENEWAL_FAQ), false)
   })
 })

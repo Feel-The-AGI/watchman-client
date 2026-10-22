@@ -5,6 +5,7 @@ import { User, Session } from '@supabase/supabase-js'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import api from '@/lib/api'
+import { authCallbackUrl, pendingCheckoutReturn, readPendingCheckout } from '@/lib/stripe-checkout'
 import {
   SIGN_OUT_ENDPOINT,
   blockAuthPersistence,
@@ -146,6 +147,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isOnPublicPage = PUBLIC_PATHS.some(path => pathname === path || pathname?.startsWith('/auth/'))
     
     if (isOnPublicPage) {
+      const returnPath = pendingCheckoutReturn(window.location.search)
+      if (returnPath) {
+        router.push(returnPath)
+        return
+      }
       // Check if onboarding is complete
       if (profile && !profile.onboarding_completed) {
         router.push('/onboarding')
@@ -265,7 +271,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       options: {
         data: emailSignupData(name, browserFirstTouchStorage()),
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`,
+        emailRedirectTo: authCallbackUrl(
+          process.env.NEXT_PUBLIC_SITE_URL || window.location.origin,
+          readPendingCheckout(),
+        ),
       },
     })
     return { error, needsEmailConfirmation: !error && !data.session }
@@ -320,7 +329,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${siteUrl}/auth/callback`,
+        redirectTo: authCallbackUrl(siteUrl, readPendingCheckout()),
       },
     })
     return { error }
@@ -332,7 +341,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       type: 'signup',
       email,
       options: {
-        emailRedirectTo: `${siteUrl}/auth/callback`,
+        emailRedirectTo: authCallbackUrl(siteUrl, readPendingCheckout()),
       },
     })
     return { error }
@@ -344,7 +353,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${siteUrl}/auth/callback`,
+        emailRedirectTo: authCallbackUrl(siteUrl, readPendingCheckout()),
         shouldCreateUser: true,
         ...(firstTouch ? { data: firstTouch } : {}),
       },

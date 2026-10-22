@@ -1,477 +1,402 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Check, ArrowRight, Zap, Crown, X, Sparkles, Shield, Clock, Loader2 } from 'lucide-react';
+import { ArrowRight, Check, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Logo } from '@/components/ui/Logo';
-import { cn } from '@/lib/utils';
+import { PlanComparison } from '@/components/billing/PlanComparison';
 import { useAuth } from '@/hooks/useAuth';
-import { authNavChoice } from '@/lib/signup-flow';
 import { api } from '@/lib/api';
-import { cedisChargeLine, OPENING_CHECKOUT_LABEL, plainCheckoutError, type PricingAmounts } from '@/lib/billing';
-import { pricingRowMotion } from '@/lib/pricing-display';
-import { rememberCheckoutReference } from '@/lib/checkout';
-import { AGENT_FAQ, BINARY_CONSTRAINT_FAQ, RENEWAL_FAQ } from '@/lib/marketing-copy';
-
-const tiers = [
-  {
-    name: 'Free',
-    price: '$0',
-    period: 'forever',
-    description: 'For individuals getting started with structured scheduling.',
-    icon: Zap,
-    gradient: 'from-zinc-500 to-zinc-600',
-    glow: 'shadow-zinc-500/20',
-    features: [
-      '3 months calendar planning',
-      '1 rotation cycle',
-      '2 commitments max',
-      'Binary constraints only',
-      '100 Watchman messages/month',
-      'Basic dashboard stats',
-      'Leave planning',
-    ],
-    limitations: [
-      'No weighted constraints',
-      'No CSV/PDF exports',
-      'No calendar sharing',
-    ],
-    cta: 'Get Started Free',
-    variant: 'glass' as const,
-    popular: false,
-  },
-  {
-    name: 'Pro',
-    price: '$12',
-    period: 'for 30 days',
-    description: 'Paid through Paystack for 30 days. Another checkout extends it. This one does not bill you again on its own.',
-    icon: Crown,
-    gradient: 'from-watchman-accent to-watchman-purple',
-    glow: 'shadow-watchman-accent/30',
-    features: [
-      'Unlimited years',
-      'Unlimited rotations',
-      'Unlimited commitments',
-      'Binary + weighted constraints',
-      'Unlimited Watchman Agent',
-      'Full statistics & analytics',
-      'CSV & PDF exports',
-      'Leave planning',
-      'Calendar sharing',
-    ],
-    limitations: [],
-    cta: 'Upgrade to Pro',
-    variant: 'gradient' as const,
-    popular: true,
-  },
-];
-
-const faqs = [
-  {
-    question: 'What is the Watchman Agent?',
-    answer: AGENT_FAQ,
-  },
-  {
-    question: 'Does Pro renew automatically?',
-    answer: RENEWAL_FAQ,
-  },
-  {
-    question: 'What does "binary constraints" mean?',
-    answer: BINARY_CONSTRAINT_FAQ,
-  },
-  {
-    question: 'Is my data secure?',
-    answer: 'Yes. All data is encrypted at rest and in transit. We use Supabase with Row-Level Security. Your calendar is yours.',
-  },
-];
+import { authNavChoice } from '@/lib/signup-flow';
+import { paymentsProvider } from '@/lib/payments-provider';
+import {
+  COMING_SOON_LABEL,
+  FOUNDING_BADGE_PREFIX,
+  FOUNDING_BUTTON_LABEL,
+  FOUNDING_FULL_MESSAGE,
+  FREE_FEATURES,
+  PLAN_FREE_TICK,
+  FREE_PLAN_BLURB,
+  PLAN_PRICES,
+  PRICING_HEADLINE,
+  PRICING_SUB,
+  PRO_EXTRA_FEATURES,
+  PRO_INTRO,
+  READABLE_TEXT,
+  SMALL_PRINT,
+  START_FREE_LABEL,
+  YEARLY_INTRO,
+  foundingBadge,
+  foundingFeatures,
+  monthlyButtonLabel,
+  pricingFaqs,
+  yearlyAboutLine,
+  yearlyButtonLabel,
+} from '@/lib/plan-catalog';
+import {
+  clearPendingCheckout,
+  isCheckoutPlan,
+  normalizeSeatsLeft,
+  readPendingCheckout,
+  rememberPendingCheckout,
+  signupPathForPlan,
+  stripeBillingError,
+  type CheckoutPlan,
+} from '@/lib/stripe-checkout';
 
 export default function PricingPage() {
-  const { user, profile, loading: authLoading } = useAuth();
-  const reduceMotion = useReducedMotion();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [upgrading, setUpgrading] = useState(false);
+  const checkoutOpen = paymentsProvider() === 'stripe';
+  const [paymentsClosed, setPaymentsClosed] = useState(false);
+  const [pending, setPending] = useState<CheckoutPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pricingAmounts, setPricingAmounts] = useState<PricingAmounts | null>(null);
+  const [seatsLeft, setSeatsLeft] = useState<number | null>(null);
+  const autoStarted = useRef(false);
+  const canCharge = checkoutOpen && !paymentsClosed;
+  const foundingFull = seatsLeft !== null && seatsLeft <= 0;
 
   useEffect(() => {
     let cancelled = false;
-    api.payments.getPricing()
-      .then((pricing) => {
-        if (!cancelled) setPricingAmounts(pricing);
+    api.billing.founding()
+      .then((payload) => {
+        if (!cancelled) setSeatsLeft(normalizeSeatsLeft(payload));
       })
       .catch(() => {
-        if (!cancelled) setPricingAmounts(null);
+        if (!cancelled) setSeatsLeft(null);
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const isLoggedIn = !!user;
-  const isPro = profile?.tier === 'pro' || profile?.tier === 'admin';
+  useEffect(() => {
+    if (authLoading || autoStarted.current) return;
+    const plan = new URLSearchParams(window.location.search).get('checkout');
+    if (!isCheckoutPlan(plan)) return;
+    if (!user) return;
+    autoStarted.current = true;
+    clearPendingCheckout();
+    const url = new URL(window.location.href);
+    url.searchParams.delete('checkout');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+    if (!canCharge) return;
+    void choosePlan(plan);
+  }, [authLoading, user, canCharge]);
 
-  const handleUpgrade = async () => {
-    if (!isLoggedIn) {
-      router.push('/login');
+  const choosePlan = async (plan: CheckoutPlan) => {
+    if (!canCharge) return;
+    if (!user) {
+      rememberPendingCheckout(plan);
+      router.push(signupPathForPlan(plan));
       return;
     }
-
+    if (plan === 'founding' && foundingFull) return;
     try {
-      setUpgrading(true);
+      setPending(plan);
       setError(null);
-      const result = await api.payments.createCheckout();
-      if (result.reference) rememberCheckoutReference(result.reference);
-      if (result.checkout_url) {
-        window.location.href = result.checkout_url;
+      const result = await api.billing.checkout(plan);
+      if (result?.url) {
+        window.location.assign(result.url);
         return;
       }
-      setError("Paystack didn't open. Nothing was charged. Try again in a moment.");
-      setUpgrading(false);
+      setError("Checkout didn't open. Nothing was charged.");
+      setPending(null);
     } catch (err: unknown) {
-      setError(plainCheckoutError(err));
-      setUpgrading(false);
+      const mapped = stripeBillingError(err);
+      if (mapped.code === 'unconfigured') setPaymentsClosed(true);
+      if (mapped.code === 'full') setSeatsLeft(0);
+      setError(mapped.message);
+      setPending(null);
     }
   };
 
-  const handleGetStarted = () => {
-    if (isLoggedIn) {
-      router.push('/dashboard');
-    } else {
-      router.push('/login?mode=signup');
-    }
+  const startFree = () => {
+    router.push(user ? '/dashboard' : '/login?mode=signup');
   };
+
+  // A signed-out visitor who already picked a plan should still land in sign-up
+  // if they refresh the pricing page before the session exists.
+  useEffect(() => {
+    if (authLoading || user) return;
+    const pendingPlan = readPendingCheckout();
+    const requested = new URLSearchParams(window.location.search).get('checkout');
+    if (pendingPlan && isCheckoutPlan(requested) && requested === pendingPlan) {
+      router.replace(signupPathForPlan(pendingPlan));
+    }
+  }, [authLoading, router, user]);
 
   return (
-    <div className="min-h-screen bg-watchman-bg text-white relative overflow-hidden">
-      {/* Background Effects */}
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/3 w-[600px] h-[600px] bg-watchman-accent/10 rounded-full blur-[180px]" />
-        <div className="absolute bottom-0 right-1/3 w-[500px] h-[500px] bg-watchman-purple/10 rounded-full blur-[150px]" />
+    <div className="min-h-screen bg-watchman-bg text-white">
+      <div className="pointer-events-none fixed inset-0">
+        <div className="absolute top-0 left-1/3 h-[600px] w-[600px] rounded-full bg-watchman-accent/10 blur-[180px]" />
+        <div className="absolute bottom-0 right-1/3 h-[500px] w-[500px] rounded-full bg-watchman-purple/10 blur-[150px]" />
       </div>
 
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 glass-strong border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 glass-strong">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
+          <Link href="/" className="flex min-w-0 items-center gap-3">
             <Logo size="md" />
-            <span className="text-xl font-bold tracking-tight">Watchman</span>
+            <span className="truncate text-xl font-bold tracking-tight">Watchman</span>
           </Link>
-          <div className="flex items-center gap-6">
-            <Link href="/" className="text-watchman-muted hover:text-white transition-colors text-sm">
+          <div className="flex shrink-0 items-center gap-3 sm:gap-6">
+            <Link href="/" className="text-sm transition-colors hover:text-white" style={{ color: READABLE_TEXT }}>
               Home
             </Link>
             {authNavChoice(authLoading, user) === 'pending' ? (
               <span className="inline-block h-9 w-24 rounded-xl bg-white/5" aria-hidden="true" />
             ) : authNavChoice(authLoading, user) === 'in' ? (
               <Link href="/dashboard">
-                <Button variant="gradient" size="sm">
-                  Dashboard
-                </Button>
+                <Button variant="gradient" size="sm">Dashboard</Button>
               </Link>
             ) : (
               <Link href="/login">
-                <Button variant="gradient" size="sm">
-                  Sign In
-                </Button>
+                <Button variant="gradient" size="sm">Sign In</Button>
               </Link>
             )}
           </div>
         </div>
       </nav>
 
-      {/* Error Message */}
+      <section className="relative px-4 pb-8 pt-28 sm:px-6 sm:pt-32">
+        <div className="mx-auto max-w-3xl text-center">
+          <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-watchman-accent to-watchman-purple shadow-xl shadow-watchman-accent/30">
+            <Sparkles className="h-7 w-7 text-white" />
+          </div>
+          <h1 className="text-balance text-4xl font-bold tracking-tight sm:text-5xl">{PRICING_HEADLINE}</h1>
+          <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed sm:text-xl" style={{ color: READABLE_TEXT }}>
+            {PRICING_SUB}
+          </p>
+        </div>
+      </section>
+
       {error && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-sm">
-          {error}
+        <div className="relative mx-auto mb-6 max-w-3xl px-4 sm:px-6">
+          <p className="rounded-xl border border-red-500/30 bg-red-500/15 px-4 py-3 text-sm text-red-200" role="alert" data-testid="billing-error">
+            {error}
+          </p>
         </div>
       )}
 
-      {/* Header */}
-      <section className="relative pt-32 pb-16 px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.2, type: 'spring' }}
-              className="w-16 h-16 rounded-2xl bg-gradient-to-br from-watchman-accent to-watchman-purple flex items-center justify-center mx-auto mb-8 shadow-xl shadow-watchman-accent/30"
-            >
-              <Sparkles className="w-8 h-8 text-white" />
-            </motion.div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-6">
-              Simple, <span className="text-gradient">Honest</span> Pricing
-            </h1>
-            <p className="text-xl text-watchman-muted max-w-2xl mx-auto">
-              Start on the free plan. Pro is $12 for 30 days through Paystack.
-              It does not bill you again on its own.
-            </p>
-          </motion.div>
+      <section className="relative px-4 pb-16 sm:px-6">
+        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 xl:gap-5">
+          <PlanCard
+            name="Free"
+            price={`$${PLAN_PRICES.free}`}
+            period=""
+            note={FREE_PLAN_BLURB}
+            features={[...FREE_FEATURES]}
+            action={(
+              <Button variant="glass" size="lg" className="w-full whitespace-normal" onClick={startFree}>
+                {START_FREE_LABEL}
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            )}
+          />
+          <PlanCard
+            name="Pro monthly"
+            price={`$${PLAN_PRICES.monthly}`}
+            period="/ month"
+            note="billed monthly"
+            intro={PRO_INTRO}
+            features={[...PRO_EXTRA_FEATURES]}
+            action={(
+              <PaidButton
+                plan="monthly"
+                label={canCharge ? monthlyButtonLabel() : COMING_SOON_LABEL}
+                disabled={!canCharge}
+                pending={pending === 'monthly'}
+                onClick={() => void choosePlan('monthly')}
+              />
+            )}
+          />
+          <PlanCard
+            name="Pro yearly"
+            price={`$${PLAN_PRICES.yearly}`}
+            period="/ year"
+            badge={PLAN_PRICES.yearlySavingsBadge}
+            note="billed yearly"
+            detail={yearlyAboutLine()}
+            intro={YEARLY_INTRO}
+            highlighted
+            action={(
+              <PaidButton
+                plan="yearly"
+                label={canCharge ? yearlyButtonLabel() : COMING_SOON_LABEL}
+                disabled={!canCharge}
+                pending={pending === 'yearly'}
+                onClick={() => void choosePlan('yearly')}
+              />
+            )}
+          />
+          <PlanCard
+            name="Founding 100"
+            price={`$${PLAN_PRICES.founding}`}
+            period="/ year"
+            badge={seatsLeft === null ? FOUNDING_BADGE_PREFIX : foundingBadge(seatsLeft)}
+            note="billed yearly"
+            features={[...foundingFeatures()]}
+            tone="founding"
+            action={foundingFull ? (
+              <p className="rounded-xl border border-white/10 px-4 py-3 text-center text-sm text-zinc-100" data-testid="founding-sold-out">
+                {FOUNDING_FULL_MESSAGE}
+              </p>
+            ) : (
+              <PaidButton
+                plan="founding"
+                label={canCharge ? FOUNDING_BUTTON_LABEL : COMING_SOON_LABEL}
+                disabled={!canCharge}
+                pending={pending === 'founding'}
+                onClick={() => void choosePlan('founding')}
+              />
+            )}
+          />
+        </div>
+        <p
+          className="mx-auto mt-8 max-w-3xl text-center text-sm leading-relaxed"
+          style={{ color: READABLE_TEXT }}
+          data-testid="billing-small-print"
+        >
+          {SMALL_PRINT}
+        </p>
+      </section>
+
+      <section className="relative border-t border-white/5 px-4 py-16 sm:px-6">
+        <div className="mx-auto max-w-4xl">
+          <h2 className="mb-8 text-center text-2xl font-bold">Feature Comparison</h2>
+          <div className="rounded-2xl border border-white/10 bg-watchman-surface/80 p-3 sm:p-5">
+            <PlanComparison />
+          </div>
         </div>
       </section>
 
-      {/* Pricing Cards */}
-      <section className="relative py-16 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {tiers.map((tier, index) => (
-              <motion.div
-                key={tier.name}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.15 }}
-                whileHover={{ y: -8, scale: 1.02 }}
-                className={cn(
-                  'relative p-8 rounded-3xl border overflow-hidden',
-                  tier.popular
-                    ? 'glass-strong border-watchman-accent/30'
-                    : 'glass border-white/10'
-                )}
-              >
-                {/* Popular Badge */}
-                {tier.popular && (
-                  <div className="absolute -top-px left-1/2 -translate-x-1/2">
-                    <div className="px-6 py-2 bg-gradient-to-r from-watchman-accent to-watchman-purple rounded-b-2xl shadow-lg shadow-watchman-accent/30">
-                      <span className="text-sm font-semibold text-white">Most Popular</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Glow Effect for Pro */}
-                {tier.popular && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-watchman-accent/5 to-watchman-purple/5 pointer-events-none" />
-                )}
-
-                <div className="relative mb-8 pt-4">
-                  <div className={cn(
-                    'w-14 h-14 rounded-2xl bg-gradient-to-br flex items-center justify-center mb-6 shadow-lg',
-                    tier.gradient,
-                    tier.glow
-                  )}>
-                    <tier.icon className="w-7 h-7 text-white" />
-                  </div>
-                  <h3 className="text-2xl font-bold">{tier.name}</h3>
-                  <div className="mt-3 flex items-baseline gap-1">
-                    <span className="text-5xl font-bold">{tier.price}</span>
-                    <span className="text-watchman-muted text-lg">{tier.period}</span>
-                  </div>
-                  {tier.name === 'Pro' && (
-                    <p className="mt-3 text-sm text-watchman-muted leading-relaxed" data-testid="ghs-charge-note">
-                      {cedisChargeLine(pricingAmounts)}
-                    </p>
-                  )}
-                  <p className="mt-4 text-sm text-watchman-muted leading-relaxed">{tier.description}</p>
-                </div>
-
-                {/* Dynamic CTA based on tier and auth state */}
-                {tier.name === 'Free' ? (
-                  <Button
-                    variant={tier.variant}
-                    size="lg"
-                    className="w-full gap-2 mb-8"
-                    onClick={handleGetStarted}
-                  >
-                    {isLoggedIn ? 'Go to Dashboard' : tier.cta}
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
-                ) : isPro ? (
-                  <Button
-                    variant="glass"
-                    size="lg"
-                    className="w-full gap-2 mb-8"
-                    onClick={() => router.push('/dashboard')}
-                  >
-                    You're on Pro
-                    <Check className="w-4 h-4" />
-                  </Button>
-                ) : (
-                  <Button
-                    variant={tier.variant}
-                    size="lg"
-                    className="w-full gap-2 mb-8"
-                    onClick={handleUpgrade}
-                    disabled={upgrading}
-                  >
-                    {upgrading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        {OPENING_CHECKOUT_LABEL}
-                      </>
-                    ) : (
-                      <>
-                        {isLoggedIn ? 'Upgrade Now' : tier.cta}
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </Button>
-                )}
-
-                <div className="space-y-3">
-                  {tier.features.map((feature, i) => (
-                    <motion.div
-                      key={feature}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.5 + i * 0.05 }}
-                      className="flex items-start gap-3"
-                    >
-                      <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <Check className="w-3 h-3 text-emerald-400" />
-                      </div>
-                      <span className="text-sm">{feature}</span>
-                    </motion.div>
-                  ))}
-                  {tier.limitations.map((limitation, i) => (
-                    <motion.div
-                      key={limitation}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.7 + i * 0.05 }}
-                      className="flex items-start gap-3 opacity-50"
-                    >
-                      <div className="w-5 h-5 rounded-full bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <X className="w-3 h-3 text-watchman-muted" />
-                      </div>
-                      <span className="text-sm text-watchman-muted">{limitation}</span>
-                    </motion.div>
-                  ))}
-                </div>
-              </motion.div>
+      <section className="relative border-t border-white/5 px-4 py-16 sm:px-6">
+        <div className="mx-auto max-w-3xl">
+          <h2 className="mb-8 text-center text-2xl font-bold">Frequently Asked Questions</h2>
+          <div className="space-y-4" data-testid="pricing-faq">
+            {pricingFaqs().map((faq) => (
+              <div key={faq.question} className="rounded-2xl border border-white/5 bg-watchman-surface/70 p-5 sm:p-6">
+                <h3 className="font-semibold">{faq.question}</h3>
+                <p className="mt-2 text-sm leading-relaxed" style={{ color: READABLE_TEXT }}>{faq.answer}</p>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Compare Section */}
-      <section className="relative py-16 px-6 border-t border-white/5">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-2xl font-bold text-center mb-12">
-            Feature Comparison
-          </h2>
-          
-          <div className="glass rounded-2xl border border-white/10 overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/10 bg-white/[0.02]">
-                  <th className="text-left py-4 px-6 text-watchman-muted font-medium">Feature</th>
-                  <th className="text-center px-6 py-4 text-watchman-muted font-medium">Free</th>
-                  <th className="text-center px-6 py-4 font-medium">
-                    <span className="text-gradient">Pro</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="text-sm">
-                {[
-                  { feature: 'Calendar planning', free: '3 months', pro: 'Unlimited' },
-                  { feature: 'Rotation cycles', free: '1', pro: 'Unlimited' },
-                  { feature: 'Commitments', free: '2', pro: 'Unlimited' },
-                  { feature: 'Watchman Agent', free: '100/month', pro: 'Unlimited' },
-                  { feature: 'Weighted constraints', free: false, pro: true },
-                  { feature: 'Leave planning', free: true, pro: true },
-                  { feature: 'Exports (CSV/PDF)', free: false, pro: true },
-                  { feature: 'Calendar sharing', free: false, pro: true },
-                ].map((row, i) => (
-                  <motion.tr
-                    key={row.feature}
-                    {...pricingRowMotion(reduceMotion)}
-                    transition={{ delay: reduceMotion ? 0 : i * 0.03 }}
-                    className="border-b border-white/5 last:border-0"
-                  >
-                    <td className="py-4 px-6">{row.feature}</td>
-                    <td className="text-center px-6 py-4 text-watchman-muted">
-                      {typeof row.free === 'boolean' ? (
-                        row.free ? <Check className="w-4 h-4 mx-auto text-emerald-400" /> : <span className="text-watchman-muted/50">—</span>
-                      ) : row.free}
-                    </td>
-                    <td className="text-center px-6 py-4">
-                      {typeof row.pro === 'boolean' ? (
-                        row.pro ? <Check className="w-4 h-4 mx-auto text-emerald-400" /> : <span className="text-watchman-muted/50">—</span>
-                      ) : <span className="text-watchman-accent font-medium">{row.pro}</span>}
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ Section */}
-      <section className="relative py-16 px-6 border-t border-white/5">
-        <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl font-bold text-center mb-12">
-            Frequently Asked Questions
-          </h2>
-          
-          <div className="space-y-4">
-            {faqs.map((faq, index) => (
-              <motion.div
-                key={faq.question}
-                {...pricingRowMotion(reduceMotion)}
-                transition={{ duration: 0.3, delay: reduceMotion ? 0 : index * 0.05 }}
-                whileHover={reduceMotion ? undefined : { scale: 1.01 }}
-                className="p-6 glass rounded-2xl border border-white/5"
-              >
-                <h3 className="font-semibold mb-3 flex items-center gap-3">
-                  <div className="w-6 h-6 rounded-lg bg-watchman-accent/10 flex items-center justify-center">
-                    <Shield className="w-3.5 h-3.5 text-watchman-accent" />
-                  </div>
-                  {faq.question}
-                </h3>
-                <p className="text-sm text-watchman-muted leading-relaxed pl-9">{faq.answer}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="relative py-24 px-6 border-t border-white/5">
-        <div className="max-w-3xl mx-auto text-center">
-          <motion.div {...pricingRowMotion(reduceMotion)}>
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-watchman-accent/20 to-watchman-purple/20 flex items-center justify-center mx-auto mb-8">
-              <Clock className="w-8 h-8 text-watchman-accent" />
-            </div>
-                        <h2 className="text-3xl font-bold mb-4">Ready to take control?</h2>
-            <p className="text-watchman-muted mb-8 text-lg">
-              Start with Free. Upgrade when you&apos;re ready. No pressure.
-            </p>
-            <Button 
-              variant="gradient" 
-              size="lg" 
-              className="gap-2 shadow-lg shadow-watchman-accent/30"
-              onClick={handleGetStarted}
-            >
-              {isLoggedIn ? 'Go to Dashboard' : 'Get Started'}
-              <ArrowRight className="w-5 h-5" />
-            </Button>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="relative py-12 px-6 border-t border-white/5">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+      <footer className="relative border-t border-white/5 px-4 py-12 sm:px-6">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 md:flex-row">
           <div className="flex items-center gap-3">
             <Logo size="sm" />
             <span className="font-semibold">Watchman</span>
           </div>
-          <div className="flex items-center gap-6 text-sm text-watchman-muted">
-            <Link href="/" className="hover:text-white transition-colors">Home</Link>
-            <Link href="/legal/privacy" className="hover:text-white transition-colors">Privacy</Link>
-            <Link href="/legal/terms" className="hover:text-white transition-colors">Terms</Link>
+          <div className="flex items-center gap-6 text-sm" style={{ color: READABLE_TEXT }}>
+            <Link href="/" className="hover:text-white">Home</Link>
+            <Link href="/legal/privacy" className="hover:text-white">Privacy</Link>
+            <Link href="/legal/terms" className="hover:text-white">Terms</Link>
           </div>
-          <p className="text-sm text-watchman-muted">
-            © {new Date().getFullYear()} Watchman
-          </p>
+          <p className="text-sm" style={{ color: READABLE_TEXT }}>© {new Date().getFullYear()} Watchman</p>
         </div>
       </footer>
     </div>
+  );
+}
+
+function PlanCard({
+  name,
+  price,
+  period,
+  badge,
+  note,
+  detail,
+  intro,
+  features,
+  action,
+  highlighted = false,
+  tone = 'default',
+}: {
+  name: string
+  price: string
+  period: string
+  badge?: string
+  note?: string
+  detail?: string
+  intro?: string
+  features?: string[]
+  action: ReactNode
+  highlighted?: boolean
+  tone?: 'default' | 'founding'
+}) {
+  return (
+    <article
+      className={`flex min-w-0 flex-col rounded-3xl border p-5 sm:p-6 ${
+        highlighted
+          ? 'border-watchman-accent/40 bg-watchman-surface'
+          : tone === 'founding'
+            ? 'border-amber-400/30 bg-watchman-surface'
+            : 'border-white/10 bg-watchman-surface/80'
+      }`}
+      data-testid={`plan-${name.toLowerCase().replace(/\s+/g, '-')}`}
+    >
+      {badge && (
+        <p
+          className={`mb-4 w-fit max-w-full break-words rounded-full px-3 py-1 text-xs font-semibold ${
+            tone === 'founding' ? 'bg-amber-400/15 text-amber-100' : 'bg-watchman-accent/15 text-sky-100'
+          }`}
+          data-testid={tone === 'founding' ? 'founding-badge' : undefined}
+        >
+          {badge}
+        </p>
+      )}
+      <h2 className="text-xl font-bold">{name}</h2>
+      <p className="mt-3 flex flex-wrap items-baseline gap-x-1">
+        <span className="text-4xl font-bold tracking-tight sm:text-5xl">{price}</span>
+        {period && <span className="text-lg" style={{ color: READABLE_TEXT }}>{period}</span>}
+      </p>
+      {note && <p className="mt-2 text-sm" style={{ color: READABLE_TEXT }}>{note}</p>}
+      {detail && <p className="mt-1 text-sm text-zinc-100">{detail}</p>}
+      <div className="my-5">{action}</div>
+      {intro && <p className="mb-3 text-sm font-medium text-zinc-100">{intro}</p>}
+      {features && features.length > 0 && (
+        <ul className="space-y-2.5">
+          {features.map((feature) => (
+            <li key={feature} className="flex items-start gap-2.5 text-sm leading-relaxed">
+              <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: PLAN_FREE_TICK }} aria-hidden="true" />
+              <span style={{ color: READABLE_TEXT }}>{feature}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </article>
+  );
+}
+
+function PaidButton({
+  plan,
+  label,
+  disabled,
+  pending,
+  onClick,
+}: {
+  plan: CheckoutPlan
+  label: string
+  disabled: boolean
+  pending: boolean
+  onClick: () => void
+}) {
+  return (
+    <Button
+      variant={disabled ? 'secondary' : 'gradient'}
+      size="lg"
+      className="w-full whitespace-normal text-center"
+      data-testid={`checkout-${plan}`}
+      onClick={onClick}
+      disabled={disabled || pending}
+    >
+      {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+      {label}
+    </Button>
   );
 }

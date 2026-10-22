@@ -3,6 +3,7 @@
 import { ReactNode, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { AuthProvider } from '@/hooks/useAuth'
+import { BillingReturn } from '@/components/billing/BillingReturn'
 import { ToastContainer } from '@/components/ui/Toast'
 import { browserFirstTouchStorage, captureFirstTouch } from '@/lib/first-touch'
 
@@ -24,6 +25,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <AuthProvider>
       <FirstTouchCapture />
       {children}
+      <BillingReturn />
       <ToastContainer />
     </AuthProvider>
   )

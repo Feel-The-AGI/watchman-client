@@ -48,7 +48,7 @@ describe('calendar view across years', () => {
     assert.equal(selectedDateAfterMonthChange(selected, new Date(2027, 0, 1)), null)
     const kept = selectedDateAfterMonthChange(selected, new Date(2026, 11, 1))
     assert.equal(kept?.getDate(), 22)
-    assert.equal(UPGRADE_AHEAD_LABEL, 'Upgrade to see further ahead')
+    assert.equal(UPGRADE_AHEAD_LABEL, 'See further ahead with Pro, from $4 a month.')
   })
 
   it('names the month arrows for assistive tech', () => {

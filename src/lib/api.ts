@@ -249,6 +249,24 @@ class APIService {
     }>('/api/payments/pricing'),
   }
 
+  billing = {
+    checkout: (plan: 'monthly' | 'yearly' | 'founding') => this.request<{ url: string }>('/api/billing/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ plan }),
+    }),
+    portal: () => this.request<{ url: string }>('/api/billing/portal', {
+      method: 'POST',
+    }),
+    status: () => this.request<{
+      plan: string | null;
+      status: string | null;
+      current_period_end: string | null;
+      cancel_at_period_end: boolean;
+      founding_seats_left: number | null;
+    }>('/api/billing/status'),
+    founding: () => this.request<{ seats_left: number }>('/api/billing/founding'),
+  }
+
   auth = {
     getProfile: () => this.request<any>('/api/auth/me'),
     completeOnboarding: () => this.request<any>('/api/auth/complete-onboarding', {

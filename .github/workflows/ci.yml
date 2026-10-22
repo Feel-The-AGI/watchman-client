@@ -91,3 +91,67 @@ jobs:
           name: playwright-report
           path: e2e/artifacts/html-report
           if-no-files-found: ignore
+
+  stripe-billing-e2e:
+    name: stripe-billing-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ci-publishable-key
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:9
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_PAYMENTS_PROVIDER: stripe
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Playwright stripe billing
+        run: |
+          pnpm exec next start -H 0.0.0.0 -p 3000 &
+          server_pid=$!
+          ready=0
+          for _ in $(seq 1 40); do
+            if curl -sf http://127.0.0.1:3000/ >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "Next.js did not start"
+            kill "$server_pid" || true
+            exit 1
+          fi
+          set +e
+          BASE_URL=http://127.0.0.1:3000 E2E_PAYMENTS_PROVIDER=stripe pnpm exec playwright test -c e2e/playwright.config.ts e2e/stripe-billing.spec.ts e2e/visual-qa.spec.ts e2e/pricing.spec.ts
+          status=$?
+          set -e
+          kill "$server_pid" || true
+          exit "$status"
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-stripe-report
+          path: e2e/artifacts
+          if-no-files-found: ignore
