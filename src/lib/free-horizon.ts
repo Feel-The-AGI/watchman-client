@@ -2,6 +2,8 @@ import { displayDateOnly, formatDateOnly, parseDateOnly } from './date-only'
 
 export const FREE_HORIZON_MESSAGE = 'The free plan shows 3 months ahead. Upgrade to Pro to plan further.'
 
+export const SEE_FURTHER_AHEAD = 'See further ahead with Pro'
+
 export const PRO_UPGRADE_FALLBACK = 'This is part of the Pro plan. Upgrade to Pro to use it.'
 
 const GENERIC_API_MESSAGE = 'Something went wrong while talking to Watchman.'
@@ -64,6 +66,39 @@ export function freeHorizonNotice(value: unknown): { horizonEnd: string | null }
 export function horizonThroughLabel(horizonEnd: unknown): string | null {
   const label = displayDateOnly(horizonEnd)
   return label ? `through ${label}` : null
+}
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+function compareParts(left: { year: number; month: number; day: number }, right: { year: number; month: number; day: number }): number {
+  if (left.year !== right.year) return left.year - right.year
+  if (left.month !== right.month) return left.month - right.month
+  return left.day - right.day
+}
+
+export type StatsPeriod = { kind: 'year' | 'window' | 'past'; label: string }
+
+/** Caption for the stat cards. A partial year names the visible window. */
+export function statsPeriodLabel(year: number, horizonEnd: unknown): StatsPeriod {
+  const end = parseDateOnly(horizonEnd)
+  if (!end) return { kind: 'year', label: `${year} totals` }
+  const start = { year, month: 1, day: 1 }
+  const yearEnd = { year, month: 12, day: 31 }
+  if (compareParts(start, end) > 0) return { kind: 'past', label: `${year} is past the free plan` }
+  if (compareParts(yearEnd, end) <= 0) return { kind: 'year', label: `${year} totals` }
+  const startLabel = displayDateOnly(`${year}-01-01`)
+  const endLabel = displayDateOnly(horizonEnd)
+  return { kind: 'window', label: `Showing ${startLabel} – ${endLabel}` }
+}
+
+/** "February–December 2027" for the months gathered under one lock banner. */
+export function lockedMonthSpanLabel(year: number, monthIndexes: number[]): string | null {
+  const indexes = [...new Set(monthIndexes.filter((index) => index >= 0 && index <= 11))].sort((a, b) => a - b)
+  if (indexes.length === 0) return null
+  const first = MONTH_NAMES[indexes[0]]
+  const last = MONTH_NAMES[indexes[indexes.length - 1]]
+  if (indexes.length === 1) return `${first} ${year}`
+  return `${first}–${last} ${year}`
 }
 
 function readableText(value: unknown): string | null {

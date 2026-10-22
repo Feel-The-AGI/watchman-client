@@ -41,3 +41,30 @@ export function displayDateOnly(value: unknown, style: 'full' | 'month-day' = 'f
   if (style === 'month-day') return `${month} ${parsed.day}`
   return `${month} ${parsed.day}, ${parsed.year}`
 }
+
+/**
+ * Calendar parts of a date-only value.
+ * `YYYY-MM` and `YYYY-MM-DD` are calendar dates. A timestamp is not.
+ */
+export function parseCalendarDate(value: unknown): DateOnly | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  const monthKey = /^(\d{4})-(\d{2})$/.exec(trimmed)
+  if (monthKey) return parseDateOnly(`${monthKey[1]}-${monthKey[2]}-01`)
+  return parseDateOnly(trimmed)
+}
+
+/**
+ * Local calendar date for a stored value.
+ * `new Date('YYYY-MM')` and `new Date('YYYY-MM-DD')` are UTC and shift the day
+ * behind UTC. Date-only strings are built from their parts. Timestamps stay instants.
+ */
+export function localDateFromStored(value: unknown): Date | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  const calendar = parseCalendarDate(trimmed)
+  if (calendar) return new Date(calendar.year, calendar.month - 1, calendar.day)
+  const instant = new Date(trimmed)
+  return Number.isNaN(instant.getTime()) ? null : instant
+}

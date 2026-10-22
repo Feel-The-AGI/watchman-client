@@ -1,13 +1,15 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns'
+import { localDateFromStored } from '@/lib/date-only'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
 export function formatDate(date: string | Date, formatStr: string = 'MMM d, yyyy'): string {
-  const d = typeof date === 'string' ? parseISO(date) : date
+  const d = typeof date === 'string' ? localDateFromStored(date) : date
+  if (!d) return ''
   return format(d, formatStr)
 }
 

@@ -38,6 +38,6 @@ export default [
     },
   },
   {
-    ignores: ["node_modules/**", ".next/**", "out/**", "e2e/artifacts/**", "test-results/**", "playwright-report/**"],
+    ignores: ["node_modules/**", ".next/**", "out/**", "e2e/artifacts/**", "e2e/mock-server.mjs", "test-results/**", "playwright-report/**"],
   },
 ];

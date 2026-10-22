@@ -36,14 +36,16 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import { invalidateCalendar } from '@/lib/calendar-sync';
+import { localDateFromStored } from '@/lib/date-only';
 import { checkoutReferenceFromReturn, clearCheckoutReference, rememberCheckoutReference } from '@/lib/checkout';
+import { browserTimeZone, displayProfileName, resolvePreferenceTimezone, type TimezoneSource } from '@/lib/profile-display';
 import { cedisChargeLine, OPENING_CHECKOUT_LABEL, plainCheckoutError } from '@/lib/billing';
 import { BlockSkeleton, LoadingState } from '@/components/ui/LoadingState';
 import { cn } from '@/lib/utils';
 
 function formatAccessDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
+  const date = localDateFromStored(value);
+  if (!date) return value;
   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
@@ -122,6 +124,7 @@ export default function SettingsPage() {
     theme: 'dark',
     weighted_mode: false,
   });
+  const [timezoneSource, setTimezoneSource] = useState<TimezoneSource>('browser');
   const [subscription, setSubscription] = useState<Subscription | null>(null);
 
   // Sharing states
@@ -175,7 +178,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (profile) {
-      setName(profile.name || '');
+      setName(displayProfileName(profile.name, user?.email));
       setEmail(user?.email || '');
     }
   }, [profile, user]);
@@ -211,12 +214,19 @@ export default function SettingsPage() {
       
       // Handle settings response
       if (settingsRes.status === 'fulfilled' && settingsRes.value) {
+        const storedSettings = settingsRes.value?.settings;
+        const timezone = resolvePreferenceTimezone({
+          settingsTimezone: storedSettings?.timezone,
+          profileTimezone: profile?.timezone,
+          browserTimezone: browserTimeZone(),
+        });
+        setTimezoneSource(timezone.source);
         setSettings({
-          timezone: settingsRes.value?.settings?.timezone || 'UTC',
-          notifications_email: settingsRes.value?.settings?.notifications_email ?? true,
-          notifications_push: settingsRes.value?.settings?.notifications_push ?? false,
-          theme: settingsRes.value?.settings?.theme || 'dark',
-          weighted_mode: settingsRes.value?.settings?.weighted_mode_enabled ?? false,
+          timezone: timezone.timezone,
+          notifications_email: storedSettings?.notifications_email ?? true,
+          notifications_push: storedSettings?.notifications_push ?? false,
+          theme: storedSettings?.theme || 'dark',
+          weighted_mode: storedSettings?.weighted_mode_enabled ?? false,
         });
       }
       
@@ -921,16 +931,25 @@ export default function SettingsPage() {
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div>
-                      <label className="block text-sm font-medium mb-2">Timezone</label>
+                      <label className="block text-sm font-medium mb-2" htmlFor="preference-timezone">Timezone</label>
                       <select
+                        id="preference-timezone"
                         value={settings.timezone}
-                        onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
+                        onChange={(e) => {
+                          setTimezoneSource('settings');
+                          setSettings({ ...settings, timezone: e.target.value });
+                        }}
                         className="w-full px-4 py-3 bg-watchman-bg border border-white/10 rounded-xl focus:border-watchman-accent focus:outline-none"
                       >
-                        {timezones.map((tz) => (
+                        {(timezones.includes(settings.timezone) ? timezones : [settings.timezone, ...timezones]).map((tz) => (
                           <option key={tz} value={tz}>{tz}</option>
                         ))}
                       </select>
+                      {timezoneSource === 'browser' && (
+                        <p className="text-xs text-watchman-muted mt-2">
+                          No timezone is saved on this account yet, so this starts as your browser timezone.
+                        </p>
+                      )}
                     </div>
 
                     <div>

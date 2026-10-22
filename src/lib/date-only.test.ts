@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { displayDateOnly, formatDateOnly, parseDateOnly } from './date-only.ts'
+import { displayDateOnly, formatDateOnly, localDateFromStored, parseCalendarDate, parseDateOnly } from './date-only.ts'
 
 const storedAnchor = '2026-10-22'
 
@@ -36,6 +36,22 @@ describe('date-only anchor', () => {
       assert.equal(formatDateOnly(value), null)
       assert.equal(displayDateOnly(value), null)
     }
+  })
+
+  it('reads YYYY-MM and YYYY-MM-DD as local calendar dates in every timezone', () => {
+    for (const value of ['2026-01', '2026-01-01']) {
+      const date = localDateFromStored(value)
+      assert.ok(date)
+      assert.equal(date.getFullYear(), 2026)
+      assert.equal(date.getMonth(), 0)
+      assert.equal(date.getDate(), 1)
+    }
+    const december = localDateFromStored('2026-12')
+    assert.equal(december?.getMonth(), 11)
+    assert.equal(december?.getDate(), 1)
+    assert.deepEqual(parseCalendarDate('2026-01'), { year: 2026, month: 1, day: 1 })
+    assert.equal(localDateFromStored('2026-01-01T00:00:00.000Z')?.toISOString(), '2026-01-01T00:00:00.000Z')
+    assert.equal(parseCalendarDate('2026-01-01T00:00:00.000Z'), null)
   })
 
   it('returns null for missing values instead of throwing', () => {
