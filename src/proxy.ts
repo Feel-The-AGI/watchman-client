@@ -15,11 +15,10 @@ function supabaseEnv(): { url: string; key: string } | null {
 }
 
 /**
- * Dashboard routes are signed-in pages. With no Supabase session, the
- * response is a redirect to /login and any auth cookies on the request are
- * expired so the next request still has nothing to restore.
+ * Next.js 16 runs this before the dashboard page. With no Supabase session
+ * the response redirects to /login and expires any auth cookies on the request.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const cookieHeader = request.headers.get('cookie')
   let response = NextResponse.next({ request })
   let hasSession = false
