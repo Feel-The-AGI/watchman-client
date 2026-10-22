@@ -1,3 +1,5 @@
+import type { AuthNavChoice } from '@/lib/signup-flow'
+
 /** Full navigation target after Sign Out. `/` keeps a signed-in visitor on the landing page. */
 export const SIGNED_OUT_PATH = '/login'
 
@@ -38,20 +40,137 @@ export function authCookieNamesFromHeader(cookieHeader: string | null | undefine
 }
 
 /**
+ * Supabase numbers chunk cookies `name.0`, `name.1`, … The browser client probes
+ * the first five. Expire a few more so a chunk written after the request was
+ * built is still cleared by the response.
+ */
+const AUTH_COOKIE_CHUNK_SLOTS = 8
+
+let authPersistenceBlocked = false
+
+/** Sign Out sets this before the client can write the session back. */
+export function blockAuthPersistence(): void {
+  authPersistenceBlocked = true
+}
+
+export function isAuthPersistenceBlocked(): boolean {
+  return authPersistenceBlocked
+}
+
+/** A deletion has an empty value and must still be written. A session write must not. */
+export function allowAuthCookieWrite(name: string, value: string, persistenceBlocked: boolean): boolean {
+  if (!persistenceBlocked || !value) return true
+  return !isSupabaseAuthStorageKey(name)
+}
+
+export function supabaseProjectRef(supabaseUrl: string | null | undefined): string | null {
+  if (!supabaseUrl) return null
+  try {
+    const ref = new URL(supabaseUrl).hostname.split('.')[0]
+    if (!ref) return null
+    return ref
+  } catch {
+    return null
+  }
+}
+
+/** `sb-<ref>-auth-token.0` and the code verifier share one base name. */
+export function authCookieBaseName(name: string): string | null {
+  if (name === 'supabase.auth.token') return name
+  if (!isSupabaseAuthStorageKey(name)) return null
+  return name.replace(/-code-verifier$/, '').replace(/\.\d+$/, '')
+}
+
+/**
+ * Every auth cookie Sign Out expires. Seen names grow into the whole chunk
+ * family, and the project ref covers a cookie that was not on the request.
+ */
+export function authCookieNamesToExpire(cookieHeader: string | null | undefined, projectRef?: string | null): string[] {
+  const bases = new Set<string>()
+  const legacy: string[] = []
+  if (projectRef) bases.add(`sb-${projectRef}-auth-token`)
+  for (const name of authCookieNamesFromHeader(cookieHeader)) {
+    const base = authCookieBaseName(name)
+    if (!base) continue
+    if (base === 'supabase.auth.token') legacy.push(base)
+    else bases.add(base)
+  }
+  const names: string[] = []
+  for (const base of bases) {
+    names.push(base, `${base}-code-verifier`)
+    for (let i = 0; i < AUTH_COOKIE_CHUNK_SLOTS; i += 1) names.push(`${base}.${i}`)
+  }
+  for (const name of legacy) {
+    if (!names.includes(name)) names.push(name)
+  }
+  return names
+}
+
+/**
  * Delete each auth cookie twice. A Secure cookie is only removed by a Secure
  * Set-Cookie, and a non-Secure cookie is only removed without that flag.
  * Both are sent so a shared browser cannot keep either copy.
  */
-export function expiredAuthCookieHeaders(cookieHeader: string | null | undefined): string[] {
-  return authCookieNamesFromHeader(cookieHeader).flatMap((name) => [
+export function expiredAuthCookieHeaders(cookieHeader: string | null | undefined, projectRef?: string | null): string[] {
+  return authCookieNamesToExpire(cookieHeader, projectRef).flatMap((name) => [
     `${name}=; Path=/; Max-Age=0; SameSite=Lax`,
     `${name}=; Path=/; Max-Age=0; SameSite=Lax; Secure`,
   ])
 }
 
 /** Browser assignments. document.cookie keeps both Secure and non-Secure deletions. */
-export function browserAuthCookieExpiryLines(cookieHeader: string | null | undefined): string[] {
-  return expiredAuthCookieHeaders(cookieHeader)
+export function browserAuthCookieExpiryLines(cookieHeader: string | null | undefined, projectRef?: string | null): string[] {
+  return expiredAuthCookieHeaders(cookieHeader, projectRef)
+}
+
+export interface AuthCookieWriteOptions {
+  path?: string
+  domain?: string
+  maxAge?: number
+  expires?: Date
+  secure?: boolean
+  sameSite?: boolean | string
+}
+
+/** Same attribute order as the cookie package, which is what @supabase/ssr writes. */
+export function formatAuthCookie(name: string, value: string, options?: AuthCookieWriteOptions): string {
+  const parts = [`${name}=${encodeURIComponent(value)}`]
+  if (typeof options?.maxAge === 'number' && Number.isFinite(options.maxAge)) {
+    parts.push(`Max-Age=${Math.floor(options.maxAge)}`)
+  }
+  if (options?.domain) parts.push(`Domain=${options.domain}`)
+  if (options?.path) parts.push(`Path=${options.path}`)
+  if (options?.expires instanceof Date && !Number.isNaN(options.expires.valueOf())) {
+    parts.push(`Expires=${options.expires.toUTCString()}`)
+  }
+  if (options?.secure) parts.push('Secure')
+  const sameSite = sameSiteAttribute(options?.sameSite)
+  if (sameSite) parts.push(sameSite)
+  return parts.join('; ')
+}
+
+function sameSiteAttribute(value: boolean | string | undefined): string | null {
+  if (value === true) return 'SameSite=Strict'
+  if (typeof value !== 'string') return null
+  const lower = value.toLowerCase()
+  if (lower === 'lax') return 'SameSite=Lax'
+  if (lower === 'strict') return 'SameSite=Strict'
+  if (lower === 'none') return 'SameSite=None'
+  return null
+}
+
+/** What remains after Sign Out expires auth cookies and drops auth storage keys. */
+export function authStateAfterSignOut(state: {
+  cookieHeader: string
+  storageKeys: string[]
+  projectRef?: string | null
+}): { cookieNames: string[]; storageKeys: string[] } {
+  const expire = new Set(authCookieNamesToExpire(state.cookieHeader, state.projectRef))
+  const removedStorage = new Set(signedOutStorageKeys(state.storageKeys))
+  return {
+    cookieNames: authCookieNamesFromHeader(state.cookieHeader).filter((name) => !expire.has(name)),
+    storageKeys: state.storageKeys.filter((key) => !removedStorage.has(key)),
+  }
 }
 
 export function supabaseAuthStorageKeys(keys: Iterable<string>): string[] {
@@ -117,6 +236,37 @@ const REJECTED_SESSION_CODES = new Set([
   'refresh_token_already_used',
 ])
 
+export type VerifiedSessionDecision = 'valid' | 'invalid' | 'unreachable'
+
+/**
+ * A server-confirmed user is signed in. A rejected session is signed out.
+ * A network failure keeps whatever session was already on the device.
+ */
+export function verifiedSessionDecision(check: {
+  localUser: unknown
+  user: unknown
+  error?: DashboardAuthError | null
+}): VerifiedSessionDecision {
+  if (check.user) return 'valid'
+  if (isRejectedSession(check.error)) return 'invalid'
+  if (check.error) return 'unreachable'
+  return 'invalid'
+}
+
+/** Home nav while getUser() is still running stays on the placeholder. */
+export function navChoiceAfterUserCheck(input: {
+  checked: boolean
+  localUser: unknown
+  user: unknown
+  error?: DashboardAuthError | null
+}): AuthNavChoice {
+  if (!input.checked) return 'pending'
+  const decision = verifiedSessionDecision(input)
+  if (decision === 'valid') return 'in'
+  if (decision === 'unreachable' && input.localUser) return 'in'
+  return 'out'
+}
+
 function isRejectedSession(error: DashboardAuthError | null | undefined): boolean {
   if (!error) return false
   const status = typeof error.status === 'number' ? error.status : undefined
@@ -144,11 +294,14 @@ function clearWebStorage(storage: Storage | undefined): void {
 
 /** Drop Supabase auth cookies and any leftover auth keys in web storage. */
 export function clearSupabaseBrowserSession(): void {
-  if (typeof document === 'undefined') return
-  for (const line of browserAuthCookieExpiryLines(document.cookie)) {
-    document.cookie = line
+  const doc = globalThis.document
+  if (!doc) return
+  const projectRef = supabaseProjectRef(process.env.NEXT_PUBLIC_SUPABASE_URL)
+  for (const line of browserAuthCookieExpiryLines(doc.cookie, projectRef)) {
+    doc.cookie = line
   }
-  if (typeof window === 'undefined') return
-  clearWebStorage(window.localStorage)
-  clearWebStorage(window.sessionStorage)
+  const win = globalThis.window
+  if (!win) return
+  clearWebStorage(win.localStorage)
+  clearWebStorage(win.sessionStorage)
 }

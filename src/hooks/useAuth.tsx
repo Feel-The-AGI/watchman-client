@@ -1,15 +1,18 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import api from '@/lib/api'
 import {
   SIGN_OUT_ENDPOINT,
+  blockAuthPersistence,
   clearSupabaseBrowserSession,
   isSignOutNavigationPending,
   markSignOutNavigationPending,
+  navChoiceAfterUserCheck,
+  type DashboardAuthError,
 } from '@/lib/auth-session'
 
 interface UserProfile {
@@ -54,6 +57,7 @@ const NO_REDIRECT_PATHS = ['/', '/pricing']
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
+  const sessionCheck = useRef(false)
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -102,21 +106,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const initAuth = async () => {
+      sessionCheck.current = true
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (isSignOutNavigationPending()) return
+        if (!session) return
 
-        if (session) {
-          setSession(session)
-          setUser(session.user)
-          const userProfile = await fetchProfile(session.access_token)
-          if (isSignOutNavigationPending()) return
-          // Redirect if we have session and on public page
-          handleAuthRedirect(session, userProfile)
+        let checkedUser: User | null = null
+        let checkedError: DashboardAuthError | null = null
+        try {
+          const { data, error } = await supabase.auth.getUser()
+          checkedUser = data.user
+          checkedError = error
+        } catch (error) {
+          checkedError = thrownAuthError(error)
         }
+        if (isSignOutNavigationPending()) return
+
+        const choice = navChoiceAfterUserCheck({
+          checked: true,
+          localUser: session.user,
+          user: checkedUser,
+          error: checkedError,
+        })
+        if (choice !== 'in') {
+          // The cookie still answered getSession(), but the server rejected it.
+          clearSupabaseBrowserSession()
+          setSession(null)
+          setUser(null)
+          setProfile(null)
+          api.setToken(null)
+          return
+        }
+
+        setSession(session)
+        setUser(checkedUser ?? session.user)
+        const userProfile = await fetchProfile(session.access_token)
+        if (isSignOutNavigationPending()) return
+        handleAuthRedirect(session, userProfile)
       } catch (error) {
         console.error('Auth init error:', error)
       } finally {
+        sessionCheck.current = false
         if (!isSignOutNavigationPending()) setLoading(false)
       }
     }
@@ -127,6 +158,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // inside the auth lock, and an awaited profile fetch there blocks signOut.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('Auth state changed:', event, session?.user?.email)
+      // getSession() already published this. initAuth validates it with getUser().
+      if (event === 'INITIAL_SESSION') return
+      if (isSignOutNavigationPending()) return
+      if (sessionCheck.current && event !== 'SIGNED_IN' && event !== 'SIGNED_OUT') return
 
       setSession(session)
       setUser(session?.user ?? null)
@@ -134,7 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!session?.access_token) {
         setProfile(null)
         api.setToken(null)
-        if (event === 'SIGNED_OUT' && !isSignOutNavigationPending()) {
+        if (event === 'SIGNED_OUT' && !sessionCheck.current) {
           router.push('/login')
         }
         return
@@ -142,9 +177,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const accessToken = session.access_token
       setTimeout(() => {
-        if (isSignOutNavigationPending()) return
+        if (isSignOutNavigationPending() || sessionCheck.current) return
         void fetchProfile(accessToken).then((userProfile) => {
-          if (isSignOutNavigationPending()) return
+          if (isSignOutNavigationPending() || sessionCheck.current) return
           if (event === 'SIGNED_IN') {
             handleAuthRedirect(session, userProfile)
           }
@@ -178,16 +213,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     // auth-js leaves the cookie in place when the revoke request returns anything
-    // other than success, 401, 403, or 404. The promise still resolves, so the
-    // caller cannot tell the session survived. Always drop local state, then
-    // load a document that expires whatever cookies the browser still sends.
+    // other than success, 401, 403, or 404. The promise still resolves. Block
+    // later session writes, remove the local session anyway, then load a
+    // document that expires the whole auth-cookie family.
     markSignOutNavigationPending()
+    blockAuthPersistence()
     try {
       await supabase.auth.stopAutoRefresh()
       const { error } = await supabase.auth.signOut()
-      if (error) console.error('Sign out failed:', error)
+      if (error) {
+        console.error('Sign out failed:', error)
+        const local = await supabase.auth.signOut({ scope: 'local' })
+        if (local.error) console.error('Sign out failed:', local.error)
+      }
     } catch (error) {
       console.error('Sign out failed:', error)
+      try {
+        await supabase.auth.signOut({ scope: 'local' })
+      } catch (localError) {
+        console.error('Sign out failed:', localError)
+      }
     }
     clearSupabaseBrowserSession()
     setSession(null)
@@ -261,6 +306,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   )
+}
+
+function thrownAuthError(error: unknown): DashboardAuthError {
+  if (error instanceof Error) {
+    const status = (error as { status?: unknown }).status
+    const code = (error as { code?: unknown }).code
+    return {
+      name: error.name,
+      message: error.message,
+      status: typeof status === 'number' ? status : undefined,
+      code: typeof code === 'string' ? code : undefined,
+    }
+  }
+  return { name: 'TypeError', message: 'Failed to fetch' }
 }
 
 export function useAuth() {
