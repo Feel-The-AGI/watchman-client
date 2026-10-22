@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { isSignOutNavigationPending } from '@/lib/auth-session';
-import { configureCalendarRefresh, invalidateCalendar, watchCalendarFocus } from '@/lib/calendar-sync';
+import { configureCalendarRefresh, invalidateCalendar, isCalendarRefreshPending, watchCalendarFocus } from '@/lib/calendar-sync';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -69,6 +69,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     return watchCalendarFocus(() => {
+      if (isCalendarRefreshPending()) return
       void invalidateCalendar();
     });
   }, []);

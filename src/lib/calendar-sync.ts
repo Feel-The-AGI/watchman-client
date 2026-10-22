@@ -14,9 +14,17 @@ export interface CalendarRefreshRequest {
   dates: string[]
 }
 
+export interface CalendarRefreshResult {
+  cyclesFailed: boolean
+  failedYears: number[]
+}
+
+const EMPTY_REFRESH: CalendarRefreshResult = { cyclesFailed: false, failedYears: [] }
+
 let client: DashboardSnapshotClient | null = null
 let cycles: unknown = null
 let viewedYear = new Date().getFullYear()
+let pendingRefreshes = 0
 let refreshLock: Promise<void> = Promise.resolve()
 const yearCache = new Map<number, CachedCalendarYear>()
 const listeners = new Set<() => void>()
@@ -124,30 +132,53 @@ export function yearsToRefetch(source: unknown | undefined, screenYear: number):
   return [...new Set([...targets, screenYear])].sort((left, right) => left - right)
 }
 
-export async function refetchCalendarYears(targetYears: number[]): Promise<void> {
+export async function refetchCalendarYears(targetYears: number[]): Promise<CalendarRefreshResult> {
   const unique = [...new Set(targetYears.filter((year) => Number.isInteger(year)))]
   if (!client || unique.length === 0) {
     notify()
-    return
+    return EMPTY_REFRESH
   }
   const loaded = await loadDashboardYears(client, unique)
-  if (loaded.cycles != null) cycles = loaded.cycles
+  const cyclesFailed = loaded.cycles == null
+  if (!cyclesFailed) cycles = loaded.cycles
+  const failedYears: number[] = []
   for (const entry of loaded.calendars) {
+    if (entry.calendar == null) {
+      failedYears.push(entry.year)
+      continue
+    }
     const stats = loaded.statsByYear.find((item) => item.year === entry.year)?.stats ?? yearCache.get(entry.year)?.stats ?? null
-    if (entry.calendar == null && !yearCache.has(entry.year)) continue
-    yearCache.set(entry.year, {
-      calendar: entry.calendar ?? yearCache.get(entry.year)?.calendar ?? null,
-      stats,
-    })
+    yearCache.set(entry.year, { calendar: entry.calendar, stats })
   }
   notify()
+  return { cyclesFailed, failedYears }
+}
+
+/** Same refetch, serialized so an older response cannot overwrite a newer one. */
+export function refreshCalendarYears(targetYears: number[]): Promise<CalendarRefreshResult> {
+  pendingRefreshes += 1
+  const run = refreshLock.then(() => refetchCalendarYears(targetYears))
+  refreshLock = run.then(() => undefined, () => undefined)
+  void run.finally(() => {
+    pendingRefreshes -= 1
+  })
+  return run
+}
+
+export function isCalendarRefreshPending(): boolean {
+  return pendingRefreshes > 0
+}
+
+/** True when this refresh failed and there is no cached data to keep on screen. */
+export function calendarLoadFailed(result: CalendarRefreshResult, year: number): boolean {
+  if (result.cyclesFailed && !Array.isArray(cachedCycles())) return true
+  if (result.failedYears.includes(year) && !cachedCalendarYear(year)?.calendar) return true
+  return false
 }
 
 /** Refetch the on-screen year and every other year the change touched. */
-export function invalidateCalendar(source?: unknown): Promise<void> {
-  const run = refreshLock.then(() => refetchCalendarYears(yearsToRefetch(source, viewedYear)))
-  refreshLock = run.catch(() => undefined)
-  return run
+export function invalidateCalendar(source?: unknown): Promise<CalendarRefreshResult> {
+  return refreshCalendarYears(yearsToRefetch(source, viewedYear))
 }
 
 /** Tab focus. A hidden tab does not refetch until it is visible again. */

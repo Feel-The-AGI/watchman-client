@@ -32,8 +32,9 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   cachedCalendarYear,
   cachedCycles,
+  calendarLoadFailed,
   invalidateCalendar,
-  refetchCalendarYears,
+  refreshCalendarYears,
   setViewedCalendarYear,
   subscribeCalendarCache,
 } from '@/lib/calendar-sync';
@@ -78,6 +79,7 @@ export default function DashboardPage() {
   const horizonLabel = parseDateOnly(freeHorizonEnd)?.year === headerYear(viewedMonth) ? horizonThroughLabel(freeHorizonEnd) : null;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [hasSetup, setHasSetup] = useState(false);
 
   // Use ref to track current year to avoid stale closures
@@ -96,6 +98,8 @@ export default function DashboardPage() {
     setCalendarDays(normalizeCalendarDays(view.days) as CalendarDay[]);
     setFreeHorizonEnd(view.horizonEnd);
     if (entry.stats) setStats(entry.stats as CalendarStats);
+    setLoadFailed(false);
+    setError(null);
   }, []);
 
   const fetchCalendarData = useCallback(async (yearOverride?: number) => {
@@ -113,8 +117,14 @@ export default function DashboardPage() {
     let fetchYear = yearToFetch;
 
     try {
-      await refetchCalendarYears([yearToFetch]);
+      const loaded = await refreshCalendarYears([yearToFetch]);
       if (yearToFetch !== viewedYearRef.current) return;
+      if (calendarLoadFailed(loaded, yearToFetch)) {
+        setLoadFailed(true);
+        setError('Failed to load calendar');
+        return;
+      }
+      setLoadFailed(false);
       const cyclesResponse = cachedCycles();
       if (!Array.isArray(cyclesResponse) || cyclesResponse.length === 0) {
         setHasSetup(false);
@@ -132,7 +142,13 @@ export default function DashboardPage() {
           viewedYearRef.current = anchorYear;
           setViewedCalendarYear(anchorYear);
           fetchYear = anchorYear;
-          await refetchCalendarYears([anchorYear]);
+          const anchorLoaded = await refreshCalendarYears([anchorYear]);
+          if (fetchYear !== viewedYearRef.current) return;
+          if (calendarLoadFailed(anchorLoaded, fetchYear)) {
+            setLoadFailed(true);
+            setError('Failed to load calendar');
+            return;
+          }
         }
         setInitialYearSet(true);
       }
@@ -142,7 +158,8 @@ export default function DashboardPage() {
     } catch (err: any) {
       if (fetchYear !== viewedYearRef.current) return;
       console.error('Failed to fetch calendar:', err);
-      setError(freeHorizonNotice(err) ? FREE_HORIZON_MESSAGE : (err.message || 'Failed to load calendar'));
+      setLoadFailed(true);
+      setError(freeHorizonNotice(err) ? FREE_HORIZON_MESSAGE : 'Failed to load calendar');
     } finally {
       if (fetchYear === viewedYearRef.current) {
         setLoading(false);
@@ -167,7 +184,7 @@ export default function DashboardPage() {
     if (cached?.calendar) {
       applyCachedYear(currentYearRef.current);
       setLoading(false);
-      void refetchCalendarYears([currentYearRef.current]);
+      void refreshCalendarYears([currentYearRef.current]);
       return;
     }
     fetchCalendarData();
@@ -191,6 +208,21 @@ export default function DashboardPage() {
   const selectedDayData = selectedDate 
     ? calendarDays.find(d => d.date === format(selectedDate, 'yyyy-MM-dd')) || null
     : null;
+
+  if (!loading && loadFailed) {
+    return (
+      <div className="max-w-xl mx-auto py-16 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-6">
+          <AlertCircle className="w-8 h-8 text-red-400" />
+        </div>
+        <h1 className="text-2xl font-bold mb-3">Failed to load calendar</h1>
+        <p className="text-watchman-text-secondary mb-8">{error}</p>
+        <Button variant="primary" onClick={() => { void fetchCalendarData(); }}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
   if (!loading && error && !hasSetup) {
     return (

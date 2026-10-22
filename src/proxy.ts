@@ -23,9 +23,7 @@ function supabaseEnv(): { url: string; key: string } | null {
  * getUser() leaves the request and its cookies alone.
  */
 export async function proxy(request: NextRequest) {
-  const host = request.nextUrl.hostname
-  const localHost = host === 'localhost' || host === '127.0.0.1'
-  if (localHost && (request.nextUrl.searchParams.get('e2e') === '1' || request.cookies.get('wm_e2e')?.value === '1')) {
+  if (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_E2E_AUTH === '1') {
     return NextResponse.next()
   }
 

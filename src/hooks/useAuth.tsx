@@ -174,7 +174,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: e2eUser,
       } as Session
       api.setToken('e2e')
-      document.cookie = 'wm_e2e=1; path=/'
       setSession(e2eSession)
       setUser(e2eUser)
       setProfile({
@@ -182,7 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: 'e2e@trywatchman.app',
         name: 'Tim',
         timezone: 'UTC',
-        tier: 'pro',
+        tier: 'free',
         role: 'user',
         onboarding_completed: true,
         settings: {

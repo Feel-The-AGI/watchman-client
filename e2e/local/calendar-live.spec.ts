@@ -1,8 +1,4 @@
-import fs from 'fs'
-import path from 'path'
 import { expect, test, type Page, type Route } from '@playwright/test'
-
-const ARTIFACTS = '/opt/cursor/artifacts/calendar-live'
 
 interface DayRow {
   date: string
@@ -12,7 +8,8 @@ interface DayRow {
   overtime_hours: number
 }
 
-function installCalendar(page: Page) {
+function installCalendar(page: Page, options?: { failLoads?: number; horizonEnd?: string }) {
+  let failedLoadsLeft = options?.failLoads ?? 0
   const days = new Map<string, DayRow>([
     ['2026-10-14', { date: '2026-10-14', work_type: 'work_day', cycle_day: 5, actual_hours_worked: 12, overtime_hours: 0 }],
     ['2026-10-15', { date: '2026-10-15', work_type: 'work_night', cycle_day: 6, actual_hours_worked: 0, overtime_hours: 0 }],
@@ -77,6 +74,10 @@ function installCalendar(page: Page) {
         const method = route.request().method()
 
         if (pathname === '/api/cycles' && method === 'GET') {
+          if (failedLoadsLeft > 0) {
+            failedLoadsLeft -= 1
+            return json(route, { detail: 'down' }, 500)
+          }
           return json(route, [{ id: 'c1', is_active: true, anchor_date: '2026-01-01', pattern: [{ label: 'work_night', duration: 5 }] }])
         }
         if (pathname === '/api/cycles/active') {
@@ -89,7 +90,9 @@ function installCalendar(page: Page) {
         }
         if (pathname.startsWith('/api/calendar/year/')) {
           const year = Number(pathname.split('/').pop())
-          return json(route, yearPayload(year))
+          const days = yearPayload(year)
+          if (options?.horizonEnd) return json(route, { days, free_horizon_end: options.horizonEnd })
+          return json(route, days)
         }
         if (pathname === '/api/stats/summary') {
           return json(route, stats)
@@ -224,7 +227,7 @@ test('calendar updates as soon as a change is applied', async ({ page }, testInf
   await page.addInitScript(() => {
     localStorage.setItem('watchman_pro_celebration_e2e-user', 'true')
   })
-  await page.goto('/dashboard?e2e=1')
+  await page.goto('/dashboard')
 
   const cell = page.locator('[data-date="2026-10-15"]').first()
   await expect(cell).toHaveAttribute('data-work-type', 'work_night')
@@ -265,9 +268,7 @@ test('calendar updates as soon as a change is applied', async ({ page }, testInf
   expect(Math.abs(after.x - before.x)).toBeLessThan(2)
   expect(Math.abs(after.y - before.y)).toBeLessThan(2)
 
-  fs.mkdirSync(ARTIFACTS, { recursive: true })
-  const approved = path.join(ARTIFACTS, `${testInfo.project.name}-approved.png`)
-  await page.screenshot({ path: approved, fullPage: true })
+  await page.screenshot({ path: testInfo.outputPath(`${testInfo.project.name}-approved.png`), fullPage: true })
 
   await page.getByTitle('Undo last change').click()
   await expect(cell).toHaveAttribute('data-work-type', 'work_night')
@@ -330,6 +331,41 @@ test('calendar updates as soon as a change is applied', async ({ page }, testInf
   await goTo(page, 'Calendar')
   await expect(page.getByText('7h')).toBeVisible()
 
-  const finished = path.join(ARTIFACTS, `${testInfo.project.name}-after-settings.png`)
-  await page.screenshot({ path: finished, fullPage: true })
+  await page.screenshot({ path: testInfo.outputPath(`${testInfo.project.name}-after-settings.png`), fullPage: true })
+})
+
+test('a failed first load shows retry instead of onboarding', async ({ page }, testInfo) => {
+  const mock = installCalendar(page, { failLoads: 2 })
+  await mock.route()
+  await page.addInitScript(() => {
+    localStorage.setItem('watchman_pro_celebration_e2e-user', 'true')
+  })
+  await page.goto('/dashboard')
+  await expect(page.getByRole('heading', { name: 'Failed to load calendar' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible()
+  await expect(page.getByText('set up your rotation', { exact: false })).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath(`${testInfo.project.name}-load-failed.png`), fullPage: true })
+  await page.getByRole('button', { name: 'Retry' }).click()
+  await expect(page.locator('[data-date="2026-10-15"]').first()).toHaveAttribute('data-work-type', 'work_night')
+  await expect(page.getByRole('heading', { name: 'Failed to load calendar' })).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath(`${testInfo.project.name}-load-retried.png`), fullPage: true })
+})
+
+test('a free account shows the three-month lock past the horizon', async ({ page }, testInfo) => {
+  const mock = installCalendar(page, { horizonEnd: '2027-01-22' })
+  await mock.route()
+  await page.addInitScript(() => {
+    localStorage.setItem('watchman_pro_celebration_e2e-user', 'true')
+  })
+  await page.goto('/dashboard')
+  await expect(page.locator('[data-date="2026-10-15"]').first()).toBeVisible()
+  for (let step = 0; step < 4; step += 1) {
+    await page.getByRole('button', { name: 'Next month' }).click()
+  }
+  await expect(page.getByRole('heading', { name: 'February 2027' })).toBeVisible()
+  await expect(page.getByText('The free plan shows 3 months ahead. Upgrade to Pro to plan further.')).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath(`${testInfo.project.name}-horizon-month.png`), fullPage: true })
+  await page.getByRole('button', { name: 'Year' }).click()
+  await expect(page.getByText('The free plan shows 3 months ahead. Upgrade to Pro to plan further.').first()).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath(`${testInfo.project.name}-horizon-year.png`), fullPage: true })
 })
