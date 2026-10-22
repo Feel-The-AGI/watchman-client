@@ -7,6 +7,7 @@ import {
   MASTER_SETTINGS_CONFLICT_MESSAGE,
   MASTER_SETTINGS_LOAD_ERROR,
   saveMasterSettings,
+  settingsWithWorkHours,
 } from './master-settings-save.ts'
 
 const loadedSettings = {
@@ -97,6 +98,72 @@ describe('master settings save', () => {
       if (previousUrl === undefined) delete process.env.NEXT_PUBLIC_API_URL
       else process.env.NEXT_PUBLIC_API_URL = previousUrl
     }
+  })
+
+  it('keeps a null cycle, preferences, and server work fields when saving work hours', async () => {
+    const settings = {
+      cycle: null,
+      preferences: { timezone: 'Africa/Accra' },
+      constraints: [],
+      work: {
+        shift_hours: 12,
+        shift_start: '06:00',
+        shift_end: '18:00',
+        break_minutes: 60,
+        day_hours: { start: '06:00', end: '18:00' },
+        night_hours: { start: '18:00', end: '06:00' },
+        available_hours_on_off: 12,
+        available_hours_on_work: 2,
+      },
+    }
+    let sent: unknown
+    let sentVersion: number | undefined
+    const saved = await saveMasterSettings(
+      { settings, version: 3 },
+      settingsWithWorkHours(settings, {
+        day_hours: { start: '08:00', end: '20:00' },
+        night_hours: { start: '19:00', end: '07:00' },
+        available_hours_on_off: 10,
+        available_hours_on_work: 1,
+      }),
+      {
+        get: async () => {
+          throw new Error('reload should not run')
+        },
+        update: async (nextSettings, expectedVersion) => {
+          sent = nextSettings
+          sentVersion = expectedVersion
+          return { settings: nextSettings, version: 4 }
+        },
+      },
+    )
+
+    assert.equal(sentVersion, 3)
+    assert.equal(saved.ok, true)
+    const body = sent as {
+      cycle: unknown
+      preferences: { timezone: string }
+      work: {
+        shift_hours: number
+        shift_start: string
+        shift_end: string
+        break_minutes: number
+        day_hours: { start: string; end: string }
+        night_hours: { start: string; end: string }
+        available_hours_on_off: number
+        available_hours_on_work: number
+      }
+    }
+    assert.equal(body.cycle, null)
+    assert.deepEqual(body.preferences, { timezone: 'Africa/Accra' })
+    assert.equal(body.work.shift_hours, 12)
+    assert.equal(body.work.shift_start, '06:00')
+    assert.equal(body.work.shift_end, '18:00')
+    assert.equal(body.work.break_minutes, 60)
+    assert.deepEqual(body.work.day_hours, { start: '08:00', end: '20:00' })
+    assert.deepEqual(body.work.night_hours, { start: '19:00', end: '07:00' })
+    assert.equal(body.work.available_hours_on_off, 10)
+    assert.equal(body.work.available_hours_on_work, 1)
   })
 
   it('reloads settings and shows the conflict message on 409', async () => {

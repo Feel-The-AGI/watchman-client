@@ -35,6 +35,7 @@ import {
   loadMasterSettings,
   MASTER_SETTINGS_LOAD_ERROR,
   saveMasterSettings,
+  settingsWithWorkHours,
   type LoadedMasterSettings,
 } from '@/lib/master-settings-save';
 import { cn } from '@/lib/utils';
@@ -190,7 +191,7 @@ export default function MasterSettingsPage() {
     }
   };
 
-  const saveSettings = async (newSettings: MasterSettings) => {
+  const saveSettings = async (newSettings: unknown) => {
     if (saving || !canSaveMasterSettings(loadedDocument)) return;
     setSaving(true);
     setError(null);
@@ -198,7 +199,7 @@ export default function MasterSettingsPage() {
       const result = await saveMasterSettings(loadedDocument, newSettings, api.masterSettings);
       if (result.ok) {
         setLoadedDocument(result.document);
-        setSettings(newSettings);
+        setSettings(settingsFromDocument(result.document.settings));
         setSuccess('Settings saved successfully');
         setTimeout(() => setSuccess(null), 3000);
         setEditingSection(null);
@@ -267,16 +268,13 @@ export default function MasterSettingsPage() {
   };
 
   const handleSaveWorkHours = () => {
-    const newSettings = {
-      ...settings,
-      work: {
-        day_hours: { start: editDayStart, end: editDayEnd },
-        night_hours: { start: editNightStart, end: editNightEnd },
-        available_hours_on_off: editOffHours,
-        available_hours_on_work: editWorkHours,
-      },
-    };
-    saveSettings(newSettings);
+    if (!canSaveMasterSettings(loadedDocument)) return;
+    void saveSettings(settingsWithWorkHours(loadedDocument.settings, {
+      day_hours: { start: editDayStart, end: editDayEnd },
+      night_hours: { start: editNightStart, end: editNightEnd },
+      available_hours_on_off: editOffHours,
+      available_hours_on_work: editWorkHours,
+    }));
   };
 
   const openWorkHoursEditor = () => {

@@ -49,6 +49,30 @@ export function canSaveMasterSettings(
   return document !== null
 }
 
+export interface WorkHoursEdit {
+  day_hours: { start: string; end: string }
+  night_hours: { start: string; end: string }
+  available_hours_on_off: number
+  available_hours_on_work: number
+}
+
+export function settingsWithWorkHours(
+  settings: Record<string, unknown>,
+  hours: WorkHoursEdit,
+): Record<string, unknown> {
+  const work = settings.work
+  return {
+    ...settings,
+    work: {
+      ...(isRecord(work) ? work : {}),
+      day_hours: hours.day_hours,
+      night_hours: hours.night_hours,
+      available_hours_on_off: hours.available_hours_on_off,
+      available_hours_on_work: hours.available_hours_on_work,
+    },
+  }
+}
+
 function httpStatus(error: unknown): number | null {
   if (!isRecord(error)) return null
   return typeof error.status === 'number' ? error.status : null
