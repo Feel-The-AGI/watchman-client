@@ -14,6 +14,7 @@ import {
   navChoiceAfterUserCheck,
   type DashboardAuthError,
 } from '@/lib/auth-session'
+import { browserFirstTouchStorage, emailSignupData, magicLinkSignupData } from '@/lib/first-touch'
 
 interface UserProfile {
   id: string
@@ -211,7 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       password,
       options: {
-        data: { name },
+        data: emailSignupData(name, browserFirstTouchStorage()),
         emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`,
       },
     })
@@ -261,6 +262,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signInWithGoogle = async () => {
+    // auth-js 2.89 signInWithOAuth has no options.data, so first_touch cannot
+    // be stored as user metadata on the Google path.
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -285,10 +288,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithMagicLink = async (email: string) => {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
+    const firstTouch = magicLinkSignupData(browserFirstTouchStorage())
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
         emailRedirectTo: `${siteUrl}/auth/callback`,
+        shouldCreateUser: true,
+        ...(firstTouch ? { data: firstTouch } : {}),
       },
     })
     return { error }
