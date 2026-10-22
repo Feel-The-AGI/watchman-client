@@ -27,6 +27,8 @@ import { Logo } from '@/components/ui/Logo';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { api } from '@/lib/api';
 import { chatMessageText } from '@/lib/chat-display';
+import { FREE_HORIZON_MESSAGE, freeHorizonNotice } from '@/lib/free-horizon';
+import { FreeHorizonNotice } from '@/components/upgrade/FreeHorizonNotice';
 import { copyRulesIntoSettings, createdCycleIdAfterChoiceChange, rulesStillNeeded, saveOnboardingCycle, visibleOnboardingRules } from '@/lib/onboarding-setup';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
@@ -250,7 +252,9 @@ export default function OnboardingPage() {
       }, 1000);
     } catch (err: any) {
       setShowQuickActions(true);
-      const friendly = chatMessageText(err?.message) || 'Failed to complete setup';
+      const friendly = freeHorizonNotice(err)
+        ? FREE_HORIZON_MESSAGE
+        : (chatMessageText(err?.message) || 'Failed to complete setup');
       setError(friendly);
       addMessage('assistant', friendly);
     } finally {
@@ -283,6 +287,11 @@ export default function OnboardingPage() {
       try {
         setLoading(true);
         const response = await api.chat.sendMessage(rotationParsePrompt(userMessage), false, pattern);
+        if (freeHorizonNotice(response)) {
+          addMessage('assistant', FREE_HORIZON_MESSAGE);
+          setShowQuickActions(true);
+          return;
+        }
         const fromChat = rotationFromChatResponse(response);
         const chosen = fromChat?.understood ? fromChat.pattern : pattern;
         if (fromChat?.understood) setPattern(fromChat.pattern);
@@ -319,6 +328,11 @@ export default function OnboardingPage() {
     try {
       setLoading(true);
       const response = await api.chat.sendMessage(userMessage, false, step < 4 ? pattern : undefined);
+      if (freeHorizonNotice(response)) {
+        addMessage('assistant', FREE_HORIZON_MESSAGE);
+        setTimeout(() => setShowQuickActions(true), 500);
+        return;
+      }
       const anchor = anchorFromChatResponse(response, pattern);
       if (anchor) {
         advanceToRules(anchor.date, anchor.cycle_day);
@@ -328,7 +342,7 @@ export default function OnboardingPage() {
       addMessage('assistant', reply || "I couldn't use that reply. Try the options below.");
       setTimeout(() => setShowQuickActions(true), 500);
     } catch (err: any) {
-      addMessage('assistant', "I couldn't process that right now. Try using the options above.");
+      addMessage('assistant', freeHorizonNotice(err) ? FREE_HORIZON_MESSAGE : "I couldn't process that right now. Try using the options above.");
       setTimeout(() => setShowQuickActions(true), 500);
     } finally {
       setLoading(false);
@@ -418,9 +432,13 @@ export default function OnboardingPage() {
                       ? 'glass border border-white/10' 
                       : 'bg-watchman-accent text-white'
                   )}>
+                    {message.content === FREE_HORIZON_MESSAGE ? (
+                      <FreeHorizonNotice compact />
+                    ) : (
                     <p className="text-sm leading-relaxed">{message.role === 'assistant' || typeof message.content !== 'string'
                       ? (chatMessageText(message.content) ?? '')
                       : message.content}</p>
+                    )}
                   </div>
                 </motion.div>
               ))}

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { displayDateOnly, formatDateOnly } from '@/lib/date-only';
+import { FREE_HORIZON_MESSAGE, freeHorizonNotice } from '@/lib/free-horizon';
+import { FreeHorizonNotice } from '@/components/upgrade/FreeHorizonNotice';
 import {
   Settings,
   Clock,
@@ -254,7 +256,7 @@ export default function MasterSettingsPage() {
       setTimeout(() => setSuccess(null), 3000);
       setEditingSection(null);
     } catch (err: any) {
-      setError(err.message || 'Failed to save rotation');
+      setError(freeHorizonNotice(err) ? FREE_HORIZON_MESSAGE : (err.message || 'Failed to save rotation'));
     } finally {
       setSaving(false);
     }
@@ -392,7 +394,13 @@ export default function MasterSettingsPage() {
             className="p-4 rounded-2xl glass border border-red-500/30 flex items-center gap-3"
           >
             <AlertCircle className="w-5 h-5 text-red-400" />
-            <p className="text-sm text-red-400 flex-1">{error}</p>
+            {error === FREE_HORIZON_MESSAGE ? (
+              <div className="flex-1">
+                <FreeHorizonNotice compact />
+              </div>
+            ) : (
+              <p className="text-sm text-red-400 flex-1">{error}</p>
+            )}
             <Button variant="ghost" size="sm" onClick={() => setError(null)}>
               <X className="w-4 h-4" />
             </Button>

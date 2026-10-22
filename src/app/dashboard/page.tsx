@@ -34,6 +34,14 @@ import { loadDashboardSnapshot } from '@/lib/dashboard-refresh';
 import { normalizeCalendarDays } from '@/lib/calendar-day';
 import { activeCyclePattern, type BadgeBlock } from '@/lib/cycle-day-badge';
 import { parseDateOnly } from '@/lib/date-only';
+import {
+  freeHorizonNotice,
+  FREE_HORIZON_MESSAGE,
+  horizonThroughLabel,
+  readCalendarYearPayload,
+  shiftCountsThroughHorizon,
+} from '@/lib/free-horizon';
+import { FreeHorizonNotice } from '@/components/upgrade/FreeHorizonNotice';
 import Link from 'next/link';
 
 type ViewMode = 'month' | 'year';
@@ -59,6 +67,9 @@ export default function DashboardPage() {
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   const [rotationPattern, setRotationPattern] = useState<BadgeBlock[]>([]);
   const [stats, setStats] = useState<CalendarStats | null>(null);
+  const [freeHorizonEnd, setFreeHorizonEnd] = useState<string | null>(null);
+  const horizonCounts = freeHorizonEnd ? shiftCountsThroughHorizon(calendarDays, freeHorizonEnd) : null;
+  const horizonLabel = parseDateOnly(freeHorizonEnd)?.year === headerYear(viewedMonth) ? horizonThroughLabel(freeHorizonEnd) : null;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasSetup, setHasSetup] = useState(false);
@@ -83,7 +94,9 @@ export default function DashboardPage() {
         setRotationPattern(activeCyclePattern(snapshot.cycles));
       }
       if (snapshot.calendar) {
-        setCalendarDays(normalizeCalendarDays(snapshot.calendar) as CalendarDay[]);
+        const view = readCalendarYearPayload(snapshot.calendar);
+        setCalendarDays(normalizeCalendarDays(view.days) as CalendarDay[]);
+        setFreeHorizonEnd(view.horizonEnd);
       }
       if (snapshot.stats) {
         setStats(snapshot.stats as CalendarStats);
@@ -140,7 +153,9 @@ export default function DashboardPage() {
       // Fetch calendar data for the correct year
       const calendarResponse = await api.calendar.getYear(fetchYear);
       if (fetchYear !== viewedYearRef.current) return;
-      setCalendarDays(normalizeCalendarDays(calendarResponse) as CalendarDay[]);
+      const view = readCalendarYearPayload(calendarResponse);
+      setCalendarDays(normalizeCalendarDays(view.days) as CalendarDay[]);
+      setFreeHorizonEnd(view.horizonEnd);
 
       const statsResponse = await api.stats.getSummary(fetchYear);
       if (fetchYear !== viewedYearRef.current) return;
@@ -148,7 +163,7 @@ export default function DashboardPage() {
     } catch (err: any) {
       if (fetchYear !== viewedYearRef.current) return;
       console.error('Failed to fetch calendar:', err);
-      setError(err.message || 'Failed to load calendar');
+      setError(freeHorizonNotice(err) ? FREE_HORIZON_MESSAGE : (err.message || 'Failed to load calendar'));
     } finally {
       if (fetchYear === viewedYearRef.current) {
         setLoading(false);
@@ -338,10 +353,18 @@ export default function DashboardPage() {
             className="p-4 rounded-2xl glass-accent border border-red-500/20 flex items-center gap-3"
           >
             <AlertCircle className="w-5 h-5 text-watchman-error flex-shrink-0" />
-            <p className="text-sm text-watchman-error">{error}</p>
-            <Button variant="ghost" size="sm" onClick={() => fetchCalendarData()} className="ml-auto">
-              Retry
-            </Button>
+            {error === FREE_HORIZON_MESSAGE ? (
+              <div className="flex-1">
+                <FreeHorizonNotice compact />
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-watchman-error">{error}</p>
+                <Button variant="ghost" size="sm" onClick={() => fetchCalendarData()} className="ml-auto">
+                  Retry
+                </Button>
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -376,6 +399,7 @@ export default function DashboardPage() {
                   onMonthChange={showMonth}
                   userTier={profile?.tier as 'free' | 'pro' | 'admin' || 'free'}
                   pattern={rotationPattern}
+                  freeHorizonEnd={freeHorizonEnd}
                 />
               ) : (
                 <div className="p-6">
@@ -387,6 +411,7 @@ export default function DashboardPage() {
                       setViewMode('month');
                     }}
                     userTier={profile?.tier as 'free' | 'pro' | 'admin' || 'free'}
+                    freeHorizonEnd={freeHorizonEnd}
                   />
                 </div>
               )}
@@ -434,33 +459,36 @@ export default function DashboardPage() {
                   className="space-y-4"
                 >
                   {/* Quick Stats Grid */}
+                  {stats && horizonLabel && (
+                    <p className="text-xs text-watchman-muted">{horizonLabel}</p>
+                  )}
                   {stats && (
                     <div className="grid grid-cols-2 gap-3">
                       <StatCard
                         icon={<Sun className="w-4 h-4" />}
                         label="Day Shifts"
-                        value={stats.work_days}
+                        value={horizonCounts ? horizonCounts.work_days : stats.work_days}
                         color="bg-work-day"
                         glow="shadow-work-day/30"
                       />
                       <StatCard
                         icon={<Moon className="w-4 h-4" />}
                         label="Night Shifts"
-                        value={stats.work_nights}
+                        value={horizonCounts ? horizonCounts.work_nights : stats.work_nights}
                         color="bg-work-night"
                         glow="shadow-work-night/30"
                       />
                       <StatCard
                         icon={<Coffee className="w-4 h-4" />}
                         label="Off Days"
-                        value={stats.off_days}
+                        value={horizonCounts ? horizonCounts.off_days : stats.off_days}
                         color="bg-work-off"
                         glow="shadow-work-off/30"
                       />
                       <StatCard
                         icon={<Plane className="w-4 h-4" />}
                         label="Leave Days"
-                        value={stats.leave_days}
+                        value={horizonCounts ? horizonCounts.leave_days : stats.leave_days}
                         color="bg-commit-leave"
                         glow="shadow-commit-leave/30"
                       />
