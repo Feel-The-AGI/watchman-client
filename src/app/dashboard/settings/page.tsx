@@ -746,7 +746,7 @@ export default function SettingsPage() {
                           </div>
                         </div>
                         {[
-                          { feature: 'Calendar planning', free: '6 months', pro: 'Unlimited' },
+                          { feature: 'Calendar planning', free: '3 months', pro: 'Unlimited' },
                           { feature: 'Rotation cycles', free: '1', pro: 'Unlimited' },
                           { feature: 'Commitments', free: '2', pro: 'Unlimited' },
                           { feature: 'Watchman Agent', free: '100/mo', pro: 'Unlimited' },

@@ -26,7 +26,7 @@ const tiers = [
     gradient: 'from-zinc-500 to-zinc-600',
     glow: 'shadow-zinc-500/20',
     features: [
-      '6 months calendar planning',
+      '3 months calendar planning',
       '1 rotation cycle',
       '2 commitments max',
       'Binary constraints only',
@@ -368,7 +368,7 @@ export default function PricingPage() {
               </thead>
               <tbody className="text-sm">
                 {[
-                  { feature: 'Calendar planning', free: '6 months', pro: 'Unlimited' },
+                  { feature: 'Calendar planning', free: '3 months', pro: 'Unlimited' },
                   { feature: 'Rotation cycles', free: '1', pro: 'Unlimited' },
                   { feature: 'Commitments', free: '2', pro: 'Unlimited' },
                   { feature: 'Watchman Agent', free: '100/month', pro: 'Unlimited' },

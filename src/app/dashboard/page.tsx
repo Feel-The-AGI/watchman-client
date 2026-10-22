@@ -69,7 +69,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<CalendarStats | null>(null);
   const [freeHorizonEnd, setFreeHorizonEnd] = useState<string | null>(null);
   const horizonCounts = freeHorizonEnd ? shiftCountsThroughHorizon(calendarDays, freeHorizonEnd) : null;
-  const horizonLabel = horizonThroughLabel(freeHorizonEnd);
+  const horizonLabel = parseDateOnly(freeHorizonEnd)?.year === headerYear(viewedMonth) ? horizonThroughLabel(freeHorizonEnd) : null;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasSetup, setHasSetup] = useState(false);
