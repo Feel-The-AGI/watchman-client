@@ -308,7 +308,7 @@ function proposalRecord(proposal: unknown): ProposalRecord | null {
   return proposal as ProposalRecord
 }
 
-const CLEAR_DAYS_WORD = /\b(blank|clear|untrack(?:ed)?)\b/i
+const CLEAR_DAYS_WORD = /\b(blank|clear|untrack)(?:s|ed|ing)?\b/i
 
 /** Whole words in the user's message. "unclear" and "clearly" do not count. */
 export function userAskedToClearDays(text: string): boolean {
@@ -317,33 +317,58 @@ export function userAskedToClearDays(text: string): boolean {
 
 type ChatTurn = { id?: string; role?: string; content?: string }
 
-/**
- * A blank-days override the user did not ask for. The explanation is ignored;
- * the server rewrites that sentence.
- */
-export function isHiddenBlankDaysProposal(proposal: unknown, messages: ChatTurn[]): boolean {
+function isBlankDaysOverride(proposal: unknown): boolean {
   const record = proposalRecord(proposal)
-  if (!record?.id) return false
-  if (record.command?.action !== 'override_days') return false
-  if (record.command?.payload?.work_type !== 'blank') return false
-  const trigger = messages.find((message) => message.role === 'user' && message.id && message.id === record.message_id)
-  return !userAskedToClearDays(trigger?.content || '')
+  return Boolean(record?.id)
+    && record?.command?.action === 'override_days'
+    && record?.command?.payload?.work_type === 'blank'
 }
 
-export function hiddenBlankDayProposalIds(proposals: unknown[] | null | undefined, messages: ChatTurn[]): string[] {
+/**
+ * show: the user asked for it.
+ * decline: history loaded and the source message is an onboarding prompt or a user
+ * message that does not ask to clear days.
+ * hide: keep it pending, but do not show the card.
+ */
+export function blankDaysProposalFate(
+  proposal: unknown,
+  rawHistory: ChatTurn[],
+  historyLoaded: boolean,
+): 'show' | 'hide' | 'decline' {
+  if (!isBlankDaysOverride(proposal)) return 'show'
+  if (!historyLoaded) return 'hide'
+  const record = proposalRecord(proposal)
+  const source = rawHistory.find((message) => message.id && message.id === record?.message_id)
+  if (!source) return 'hide'
+  if (isInternalChatMessage(source)) return 'decline'
+  const text = typeof source.content === 'string' ? source.content : ''
+  if (source.role === 'user' && !userAskedToClearDays(text)) return 'decline'
+  if (source.role === 'user' && userAskedToClearDays(text)) return 'show'
+  return 'hide'
+}
+
+export function blankDaysProposalIdsToDecline(
+  proposals: unknown[] | null | undefined,
+  rawHistory: ChatTurn[],
+  historyLoaded: boolean,
+): string[] {
   const ids: string[] = []
   for (const proposal of proposals || []) {
     const record = proposalRecord(proposal)
-    if (record?.id && isHiddenBlankDaysProposal(record, messages)) ids.push(record.id)
+    if (record?.id && blankDaysProposalFate(proposal, rawHistory, historyLoaded) === 'decline') ids.push(record.id)
   }
   return ids
 }
 
 /** Newest by created_at. The pending list itself is oldest first. */
-export function newestVisibleProposal<T>(proposals: T[] | null | undefined, messages: ChatTurn[]): T | null {
+export function newestVisibleProposal<T>(
+  proposals: T[] | null | undefined,
+  rawHistory: ChatTurn[],
+  historyLoaded = true,
+): T | null {
   const visible = (proposals || []).filter((proposal) => {
     const record = proposalRecord(proposal)
-    return Boolean(record?.id) && !isHiddenBlankDaysProposal(proposal, messages)
+    return Boolean(record?.id) && blankDaysProposalFate(proposal, rawHistory, historyLoaded) === 'show'
   })
   if (visible.length === 0) return null
   return [...visible].sort((left, right) => {

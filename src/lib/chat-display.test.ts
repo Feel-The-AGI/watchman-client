@@ -11,7 +11,7 @@ import {
   isInternalChatMessage,
   mergeChatHistory,
   messagesAfterSend,
-  hiddenBlankDayProposalIds,
+  blankDaysProposalIdsToDecline,
   newestVisibleProposal,
   proposalAppliedText,
   proposalCardText,
@@ -184,6 +184,8 @@ describe('chat display', () => {
     assert.equal(userAskedToClearDays('the schedule is unclear'), false)
     assert.equal(userAskedToClearDays('clearly a day shift'), false)
     assert.equal(userAskedToClearDays('please clear the days before Oct 22'), true)
+    assert.equal(userAskedToClearDays('clearing the days before Jan'), true)
+    assert.equal(userAskedToClearDays('blanked days'), true)
     assert.equal(userAskedToClearDays('mark them blank'), true)
     assert.equal(userAskedToClearDays('leave those days untracked'), true)
   })
@@ -214,7 +216,7 @@ describe('chat display', () => {
       { id: 'u-setup', role: 'user', content: 'I work 5 days, 5 nights, 5 off' },
       { id: 'u-hair', role: 'user', content: 'Book a haircut on Thursday' },
     ]
-    assert.deepEqual(hiddenBlankDayProposalIds([hidden, newer], turns), ['old'])
+    assert.deepEqual(blankDaysProposalIdsToDecline([hidden, newer], turns, true), ['old'])
     assert.equal(newestVisibleProposal([hidden, newer], turns)?.id, 'new')
     assert.equal(proposalCardText(newer), 'Add Haircut on Thu 5 Nov, 16:00-17:00')
     assert.equal(proposalModelNote(newer), "I'll add the haircut.")
@@ -240,6 +242,42 @@ describe('chat display', () => {
     ]
     assert.equal(newestVisibleProposal([older, newest], turns)?.id, 'newest')
     assert.equal(newestVisibleProposal([newest, older], turns)?.id, 'newest')
+  })
+
+  it('hides a blank-days card without declining when history did not load', () => {
+    const proposal = {
+      id: 'p-blank',
+      message_id: 'u-setup',
+      command: { action: 'override_days', payload: { work_type: 'blank' } },
+    }
+    assert.deepEqual(blankDaysProposalIdsToDecline([proposal], [], false), [])
+    assert.equal(newestVisibleProposal([proposal], [], false), null)
+  })
+
+  it('hides a blank-days card without declining when its source message is missing', () => {
+    const proposal = {
+      id: 'p-blank',
+      message_id: 'missing',
+      command: { action: 'override_days', payload: { work_type: 'blank' } },
+    }
+    const raw = [{ id: 'other', role: 'user', content: 'Book a haircut' }]
+    assert.deepEqual(blankDaysProposalIdsToDecline([proposal], raw, true), [])
+    assert.equal(newestVisibleProposal([proposal], raw, true), null)
+  })
+
+  it('declines a blank-days card whose source is the onboarding prompt', () => {
+    const proposal = {
+      id: 'p-blank',
+      message_id: 'u-parse',
+      command: { action: 'override_days', payload: { work_type: 'blank' } },
+    }
+    const raw = [{
+      id: 'u-parse',
+      role: 'user',
+      content: 'The user is describing their work shift rotation pattern: "5-5-5". Respond in this EXACT JSON format.',
+    }]
+    assert.deepEqual(blankDaysProposalIdsToDecline([proposal], raw, true), ['p-blank'])
+    assert.equal(newestVisibleProposal([proposal], raw, true), null)
   })
 
   it('shows one copy of a message sent while a proposal card is pending', () => {

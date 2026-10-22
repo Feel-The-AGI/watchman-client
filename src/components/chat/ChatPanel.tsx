@@ -18,7 +18,7 @@ import {
   isInternalChatMessage,
   mergeChatHistory,
   messagesAfterSend,
-  hiddenBlankDayProposalIds,
+  blankDaysProposalIdsToDecline,
   newestVisibleProposal,
   proposalAppliedText,
   proposalCardText,
@@ -134,6 +134,8 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
   const [historyLimitReached, setHistoryLimitReached] = useState(false)
   const [historyError, setHistoryError] = useState<string | null>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const rawHistoryRef = useRef<Message[]>([])
+  const historyLoadedRef = useRef(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [initialLoadComplete, setInitialLoadComplete] = useState(false)
 
@@ -161,17 +163,19 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
     })
   }, [messages, initialLoadComplete])
 
-  const choosePendingProposal = async (turns: { id?: string; role?: string; content?: string }[]) => {
+  const choosePendingProposal = async () => {
     const pending = await api.commands.pendingProposals()
     const list = Array.isArray(pending?.proposals) ? pending.proposals : []
-    await Promise.all(hiddenBlankDayProposalIds(list, turns).map(async (id) => {
+    const rawHistory = rawHistoryRef.current
+    const historyLoaded = historyLoadedRef.current
+    await Promise.all(blankDaysProposalIdsToDecline(list, rawHistory, historyLoaded).map(async (id) => {
       try {
         await api.commands.reviewProposal(id, 'reject')
       } catch (error) {
         console.error('Failed to decline an unrequested proposal:', error)
       }
     }))
-    return newestVisibleProposal(list, turns)
+    return newestVisibleProposal(list, rawHistory, historyLoaded)
   }
 
   const loadHistory = async () => {
@@ -182,6 +186,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
     const pullHistory = async () => {
       const response = await api.chat.getHistory(limit)
       const raw = Array.isArray(response?.messages) ? response.messages as Message[] : []
+      rawHistoryRef.current = raw
       history = raw
         .filter((message) => !isInternalChatMessage(message))
         .map((message) => ({
@@ -193,6 +198,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
       const historyLimit = typeof response?.history_limit === 'number' ? response.history_limit : null
       setHistoryLimitReached(historyLimit !== null && history.length >= historyLimit)
       historyLoaded = true
+      historyLoadedRef.current = true
       setHistoryError(null)
     }
 
@@ -215,7 +221,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
     }
 
     try {
-      const proposal = await choosePendingProposal(history)
+      const proposal = await choosePendingProposal()
       setPendingProposal(proposal)
       history = withProposalCard(history, proposal)
       if (historyLoaded) setHistoryError(null)
@@ -314,7 +320,7 @@ export function ChatPanel({ onCalendarUpdate, className, autoExecute = false, us
 
   const loadNextProposal = async () => {
     try {
-      const visible = await choosePendingProposal(messages)
+      const visible = await choosePendingProposal()
       setPendingProposal(visible)
       setMessages(prev => withProposalCard(prev, visible))
     } catch (error) {
