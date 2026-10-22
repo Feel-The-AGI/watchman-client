@@ -4,6 +4,7 @@ import {
   dashboardAuthDecision,
   expiredAuthCookieHeaders,
   requestHasAuthSessionCookie,
+  supabaseProjectRef,
   type DashboardAuthDecision,
   type DashboardAuthError,
 } from '@/lib/auth-session'
@@ -80,7 +81,8 @@ export async function proxy(request: NextRequest) {
   url.search = ''
   const redirect = NextResponse.redirect(url)
   if (decision === 'redirect-and-clear') {
-    for (const header of expiredAuthCookieHeaders(cookieHeader)) {
+    const projectRef = supabaseProjectRef(process.env.NEXT_PUBLIC_SUPABASE_URL)
+    for (const header of expiredAuthCookieHeaders(cookieHeader, projectRef)) {
       redirect.headers.append('Set-Cookie', header)
     }
   }
