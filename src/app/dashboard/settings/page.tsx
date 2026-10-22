@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Settings,
@@ -18,7 +19,6 @@ import {
   AlertTriangle,
   Crown,
   Zap,
-  ExternalLink,
   Star,
   Share2,
   Copy,
@@ -35,9 +35,19 @@ import { Celebration } from '@/components/ui/Celebration';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
-import { checkoutReferenceFromReturn, clearCheckoutReference, rememberCheckoutReference } from '@/lib/checkout';
-import { cedisChargeLine, OPENING_CHECKOUT_LABEL, plainCheckoutError } from '@/lib/billing';
+import { checkoutReferenceFromReturn, clearCheckoutReference } from '@/lib/checkout';
 import { BlockSkeleton, LoadingState } from '@/components/ui/LoadingState';
+import { PlanComparison } from '@/components/billing/PlanComparison';
+import { StripeBillingPanel } from '@/components/billing/StripeBillingPanel';
+import { paymentsProvider } from '@/lib/payments-provider';
+import { READABLE_TEXT } from '@/lib/plan-catalog';
+import {
+  normalizeBillingStatus,
+  stripeBillingError,
+  tierFromBillingPlan,
+  type BillingStatus,
+  type CheckoutPlan,
+} from '@/lib/stripe-checkout';
 import { cn } from '@/lib/utils';
 
 function formatAccessDate(value: string) {
@@ -105,6 +115,8 @@ interface Payment {
 
 export default function SettingsPage() {
   const { user, profile, signOut, refreshProfile } = useAuth();
+  const router = useRouter();
+  const stripeBilling = paymentsProvider() === 'stripe';
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -122,6 +134,9 @@ export default function SettingsPage() {
     weighted_mode: false,
   });
   const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
+  const [billingPending, setBillingPending] = useState<CheckoutPlan | 'portal' | null>(null);
+  const [checkoutOpen, setCheckoutOpen] = useState(stripeBilling);
 
   // Sharing states
   const [shares, setShares] = useState<CalendarShare[]>([]);
@@ -136,7 +151,6 @@ export default function SettingsPage() {
 
   const [cancelSubscriptionModal, setCancelSubscriptionModal] = useState(false);
   const [cancellingSubscription, setCancellingSubscription] = useState(false);
-  const [pricingUnavailable, setPricingUnavailable] = useState(false);
 
   // Confirmation modal states
   const [deleteAccountModal, setDeleteAccountModal] = useState(false);
@@ -150,19 +164,58 @@ export default function SettingsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
 
-  // Upgrade modal state
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [upgrading, setUpgrading] = useState(false);
-  const [pricingInfo, setPricingInfo] = useState<{
-    usd_price: number;
-    ghs_amount: number;
-    exchange_rate: number;
-    display_ghs: string;
-    period_days?: number;
-  } | null>(null);
-  const [loadingPricing, setLoadingPricing] = useState(false);
+  const applySettingsPayload = (value: any) => {
+    setSettings({
+      timezone: value?.settings?.timezone || 'UTC',
+      notifications_email: value?.settings?.notifications_email ?? true,
+      notifications_push: value?.settings?.notifications_push ?? false,
+      theme: value?.settings?.theme || 'dark',
+      weighted_mode: value?.settings?.weighted_mode_enabled ?? false,
+    });
+  };
+
+  const fetchStripeSettings = async (showSpinner = true) => {
+    try {
+      if (showSpinner) setLoading(true);
+      const [settingsRes, billingRes] = await Promise.allSettled([
+        api.settings.get(),
+        api.billing.status(),
+      ]);
+      if (settingsRes.status === 'fulfilled' && settingsRes.value) {
+        applySettingsPayload(settingsRes.value);
+      }
+      if (billingRes.status === 'fulfilled') {
+        const next = normalizeBillingStatus(billingRes.value);
+        setBillingStatus(next);
+        setSubscription({
+          tier: tierFromBillingPlan(next.plan),
+          status: next.cancel_at_period_end ? 'cancelled' : 'active',
+          current_period_end: next.current_period_end || undefined,
+          cancel_at_period_end: next.cancel_at_period_end,
+        });
+      } else if (showSpinner) {
+        setBillingStatus(null);
+        setSubscription({
+          tier: profile?.tier || 'free',
+          status: 'active',
+        });
+      }
+    } catch (err: any) {
+      if (err.status !== 404) setError(err.message || 'Failed to load settings');
+    } finally {
+      if (showSpinner) setLoading(false);
+    }
+  };
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('billing') === 'success' || params.get('billing') === 'cancel') {
+      setActiveTab('subscription');
+    }
+    if (stripeBilling) {
+      void fetchStripeSettings();
+      return;
+    }
     const reference = checkoutReferenceFromReturn();
     if (!reference) {
       fetchSettings();
@@ -314,44 +367,54 @@ export default function SettingsPage() {
     }
   };
 
-  const handleUpgrade = async () => {
-    setShowUpgradeModal(true);
-    setLoadingPricing(true);
-    setPricingUnavailable(false);
-    setPricingInfo(null);
+  const openStripeCheckout = async (plan: CheckoutPlan) => {
+    if (!checkoutOpen) return;
     try {
-      const pricing = await api.payments.getPricing();
-      if (!pricing?.display_ghs || pricing.ghs_amount == null) {
-        setPricingUnavailable(true);
+      setBillingPending(plan);
+      setError(null);
+      const result = await api.billing.checkout(plan);
+      if (result?.url) {
+        window.location.assign(result.url);
         return;
       }
-      setPricingInfo(pricing);
-    } catch (err) {
-      console.error('Failed to fetch pricing:', err);
-      setPricingUnavailable(true);
-    } finally {
-      setLoadingPricing(false);
+      setError("Checkout didn't open. Nothing was charged.");
+      setBillingPending(null);
+    } catch (err: unknown) {
+      const mapped = stripeBillingError(err);
+      if (mapped.code === 'unconfigured') setCheckoutOpen(false);
+      if (mapped.code === 'full') {
+        setBillingStatus((current) => current ? { ...current, founding_seats_left: 0 } : current);
+      }
+      setError(mapped.message);
+      setBillingPending(null);
     }
   };
 
-  const handleProceedToCheckout = async () => {
-    if (pricingUnavailable || !pricingInfo) return;
+  const openPortal = async () => {
     try {
-      setUpgrading(true);
+      setBillingPending('portal');
       setError(null);
-      const result = await api.payments.createCheckout();
-      if (result.reference) rememberCheckoutReference(result.reference);
-      if (result.checkout_url) {
-        window.location.href = result.checkout_url;
+      const result = await api.billing.portal();
+      if (result?.url) {
+        window.location.assign(result.url);
         return;
       }
-      setError("Paystack didn't open. Nothing was charged. Try again in a moment.");
-      setUpgrading(false);
+      setError("The subscription page didn't open. Try again in a moment.");
+      setBillingPending(null);
     } catch (err: unknown) {
-      setError(plainCheckoutError(err));
-      setUpgrading(false);
+      const mapped = stripeBillingError(err, 'portal');
+      if (mapped.code === 'unconfigured') setCheckoutOpen(false);
+      setError(mapped.message);
+      setBillingPending(null);
     }
   };
+
+  useEffect(() => {
+    if (!stripeBilling) return;
+    const onRefresh = () => { void fetchStripeSettings(false); };
+    window.addEventListener('watchman-billing-refresh', onRefresh);
+    return () => window.removeEventListener('watchman-billing-refresh', onRefresh);
+  }, [stripeBilling]);
 
   const confirmCancelSubscription = async () => {
     try {
@@ -499,7 +562,7 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
-    if (activeTab === 'subscription' && (subscription?.tier === 'pro' || subscription?.tier === 'admin')) {
+    if (!stripeBilling && activeTab === 'subscription' && (subscription?.tier === 'pro' || subscription?.tier === 'admin')) {
       fetchPayments();
     }
   }, [activeTab, subscription?.tier]);
@@ -641,14 +704,24 @@ export default function SettingsPage() {
               )}
 
               {/* Subscription Tab */}
-              {activeTab === 'subscription' && (
+              {activeTab === 'subscription' && stripeBilling && (
+                <StripeBillingPanel
+                  status={billingStatus}
+                  pending={billingPending}
+                  checkoutOpen={checkoutOpen}
+                  error={error}
+                  onCheckout={(plan) => { void openStripeCheckout(plan); }}
+                  onPortal={() => { void openPortal(); }}
+                />
+              )}
+              {activeTab === 'subscription' && !stripeBilling && (
                 <div className="space-y-6">
                   <Card>
                     <CardHeader>
                       <CardTitle>Current Plan</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex items-center justify-between p-4 bg-watchman-bg rounded-xl">
+                      <div className="flex flex-col gap-4 p-4 bg-watchman-bg rounded-xl sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-4">
                           <div className={cn(
                             'w-12 h-12 rounded-xl flex items-center justify-center',
@@ -676,7 +749,7 @@ export default function SettingsPage() {
                         </div>
                         
                         {subscription?.tier === 'free' && (
-                          <Button variant="primary" onClick={handleUpgrade} className="gap-2">
+                          <Button variant="primary" onClick={() => router.push('/pricing')} className="w-full gap-2 sm:w-auto">
                             <Crown className="w-4 h-4" />
                             Upgrade to Pro
                           </Button>
@@ -737,33 +810,10 @@ export default function SettingsPage() {
                       <CardDescription>Compare what you get with each plan</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between py-2 border-b border-white/10">
-                          <span className="text-sm font-medium">Feature</span>
-                          <div className="flex items-center gap-8">
-                            <span className="text-sm font-medium text-watchman-muted w-24 text-center">Free</span>
-                            <span className="text-sm font-medium text-watchman-accent w-24 text-center">Pro</span>
-                          </div>
-                        </div>
-                        {[
-                          { feature: 'Calendar planning', free: '3 months', pro: 'Unlimited' },
-                          { feature: 'Rotation cycles', free: '1', pro: 'Unlimited' },
-                          { feature: 'Commitments', free: '2', pro: 'Unlimited' },
-                          { feature: 'Watchman Agent', free: '100/mo', pro: 'Unlimited' },
-                          { feature: 'Weighted constraints', free: '—', pro: '✓' },
-                          { feature: 'Leave planning', free: '✓', pro: '✓' },
-                          { feature: 'CSV/PDF exports', free: '—', pro: '✓' },
-                          { feature: 'Calendar sharing', free: '—', pro: '✓' },
-                        ].map((row) => (
-                          <div key={row.feature} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
-                            <span className="text-sm">{row.feature}</span>
-                            <div className="flex items-center gap-8">
-                              <span className="text-sm text-watchman-muted w-24 text-center">{row.free}</span>
-                              <span className="text-sm text-watchman-accent w-24 text-center">{row.pro}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                      <p className="mb-4 text-sm" style={{ color: READABLE_TEXT }}>
+                        The same list as the pricing page. Leave planning is part of Pro.
+                      </p>
+                      <PlanComparison />
                     </CardContent>
                   </Card>
 
@@ -1001,7 +1051,7 @@ export default function SettingsPage() {
                         <p className="text-sm text-watchman-muted mb-4">
                           Calendar sharing is available for Pro users. Share your schedule with family, friends, or colleagues.
                         </p>
-                        <Button variant="gradient" size="sm" onClick={handleUpgrade}>
+                        <Button variant="gradient" size="sm" onClick={() => router.push('/pricing')}>
                           Upgrade to Pro
                         </Button>
                       </div>
@@ -1274,114 +1324,6 @@ export default function SettingsPage() {
         loading={cancellingSubscription}
       />
 
-      {/* Upgrade to Pro Modal */}
-      {showUpgradeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div 
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => !upgrading && setShowUpgradeModal(false)}
-          />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="relative z-10 w-full max-w-md mx-4 p-6 rounded-2xl bg-watchman-surface border border-white/10 shadow-2xl"
-          >
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-watchman-accent to-watchman-purple flex items-center justify-center mx-auto mb-4 shadow-lg shadow-watchman-accent/30">
-                <Crown className="w-8 h-8 text-white" />
-              </div>
-              <h2 className="text-2xl font-bold">Upgrade to Pro</h2>
-              <p className="text-watchman-muted mt-2">Unlock all features and unlimited access</p>
-            </div>
-
-            {loadingPricing ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-watchman-accent" />
-              </div>
-            ) : pricingUnavailable || !pricingInfo ? (
-              <div className="text-center py-4">
-                <p className="font-medium">Pricing unavailable. Try again.</p>
-                <p className="text-sm text-watchman-muted mt-2">
-                  The exchange rate could not be loaded, so checkout stays closed. No estimated price is shown.
-                </p>
-                <div className="mt-6 flex gap-3">
-                  <Button variant="glass" className="flex-1" onClick={() => setShowUpgradeModal(false)}>
-                    Close
-                  </Button>
-                  <Button variant="gradient" className="flex-1" onClick={handleUpgrade}>
-                    Try again
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="bg-watchman-bg rounded-xl p-4 mb-6">
-                  <div className="flex items-baseline justify-center gap-2">
-                    <span className="text-4xl font-bold">${pricingInfo.usd_price || 12}</span>
-                    <span className="text-watchman-muted">for {pricingInfo.period_days || 30} days</span>
-                  </div>
-                  <p className="text-center text-sm text-watchman-muted mt-2" data-testid="upgrade-ghs-note">
-                    {cedisChargeLine(pricingInfo)}
-                  </p>
-                </div>
-
-                {error && (
-                  <p className="mb-4 text-sm text-center text-red-300">{error}</p>
-                )}
-
-                <div className="space-y-2 mb-6">
-                  {[
-                    'Unlimited calendar years',
-                    'Unlimited rotations & commitments',
-                    'Unlimited Watchman AI agent',
-                    'Weighted constraints',
-                    'CSV & PDF exports',
-                    'Calendar sharing',
-                  ].map((feature) => (
-                    <div key={feature} className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="w-4 h-4 text-watchman-mint" />
-                      <span>{feature}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex gap-3">
-                  <Button
-                    variant="glass"
-                    className="flex-1"
-                    onClick={() => setShowUpgradeModal(false)}
-                    disabled={upgrading}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="gradient"
-                    className="flex-1 gap-2"
-                    onClick={handleProceedToCheckout}
-                    disabled={upgrading}
-                  >
-                    {upgrading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        {OPENING_CHECKOUT_LABEL}
-                      </>
-                    ) : (
-                      <>
-                        <CreditCard className="w-4 h-4" />
-                        Pay with Paystack
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                <p className="text-center text-xs text-watchman-muted mt-4">
-                  Paystack checkout for {pricingInfo.period_days || 30} days. It does not bill you again on its own.
-                </p>
-              </>
-            )}
-          </motion.div>
-        </div>
-      )}
     </div>
   );
 }

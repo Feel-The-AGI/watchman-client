@@ -34,6 +34,7 @@ import { useRef, useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { authNavChoice } from '@/lib/signup-flow';
 import { BOUNDARY_STEP, CLOSING_LINE, ROTATION_FEATURE, RULES_FEATURE } from '@/lib/marketing-copy';
+import { READABLE_TEXT } from '@/lib/plan-catalog';
 
 // Features with emotional copy
 const features = [
@@ -83,38 +84,52 @@ const industries = [
 
 // Floating calendar days for background animation
 function FloatingDays() {
-  const days = ['D', 'N', 'O', 'D', 'N', 'O', 'D', 'N'];
+  const days = ['D', 'N', 'O', 'D', 'N', 'O'];
   const colors = {
     D: 'from-amber-400/20 to-orange-500/20 border-amber-500/30',
     N: 'from-indigo-400/20 to-purple-500/20 border-indigo-500/30',
     O: 'from-emerald-400/20 to-green-500/20 border-emerald-500/30',
   };
+  // Side gutters only, and only once the headline column no longer fills the viewport.
+  // At 1280 the centered copy is max-w-5xl, so tiles pinned to the outer edge stay off the words.
+  const slots = [
+    { side: 'left' as const, top: '14%' },
+    { side: 'left' as const, top: '42%' },
+    { side: 'left' as const, top: '70%' },
+    { side: 'right' as const, top: '22%' },
+    { side: 'right' as const, top: '50%' },
+    { side: 'right' as const, top: '76%' },
+  ];
 
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none hidden sm:block">
-      {days.map((day, i) => (
-        <motion.div
-          key={i}
-          className={`absolute w-12 h-12 rounded-xl bg-gradient-to-br ${colors[day as keyof typeof colors]} border backdrop-blur-sm flex items-center justify-center text-white/60 font-mono text-sm`}
-          style={{
-            left: `${10 + (i * 12)}%`,
-            top: `${20 + (i % 3) * 25}%`,
-          }}
-          animate={{
-            y: [0, -20, 0],
-            rotate: [0, 5, -5, 0],
-            opacity: [0.3, 0.6, 0.3],
-          }}
-          transition={{
-            duration: 4 + i * 0.5,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: i * 0.3,
-          }}
-        >
-          {day}
-        </motion.div>
-      ))}
+    <div className="pointer-events-none absolute inset-0 hidden overflow-hidden xl:block" aria-hidden="true">
+      {slots.map((slot, i) => {
+        const day = days[i];
+        return (
+          <motion.div
+            key={`${slot.side}-${slot.top}`}
+            data-testid="floating-day"
+            className={`absolute flex h-12 w-12 items-center justify-center rounded-xl border bg-gradient-to-br font-mono text-sm backdrop-blur-sm ${colors[day as keyof typeof colors]}`}
+            style={{
+              [slot.side]: '1.25rem',
+              top: slot.top,
+              color: READABLE_TEXT,
+            }}
+            animate={{
+              y: [0, -16, 0],
+              opacity: [0.55, 0.85, 0.55],
+            }}
+            transition={{
+              duration: 4 + i * 0.4,
+              repeat: Infinity,
+              ease: 'easeInOut',
+              delay: i * 0.25,
+            }}
+          >
+            {day}
+          </motion.div>
+        );
+      })}
     </div>
   );
 }
@@ -942,11 +957,11 @@ export default function LandingPage() {
 
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50">
-        <div className="mx-4 mt-4">
-          <div className="max-w-7xl mx-auto px-6 py-4 rounded-2xl bg-white/[0.02] backdrop-blur-xl border border-white/[0.05]">
-            <div className="flex items-center justify-between">
-              <Link href="/" className="flex items-center gap-3 group">
-                <div className="relative">
+        <div className="mx-2 mt-3 sm:mx-4 sm:mt-4">
+          <div className="max-w-7xl mx-auto px-3 py-3 sm:px-6 sm:py-4 rounded-2xl bg-white/[0.02] backdrop-blur-xl border border-white/[0.05]">
+            <div className="flex items-center justify-between gap-2">
+              <Link href="/" className="flex min-w-0 items-center gap-2 sm:gap-3 group">
+                <div className="relative shrink-0">
                   <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-emerald-500 rounded-full blur-lg opacity-50 group-hover:opacity-75 transition-opacity" />
                   <Image
                     src="/watchman-logo.png"
@@ -956,11 +971,11 @@ export default function LandingPage() {
                     className="relative object-contain rounded-full"
                   />
                 </div>
-                <span className="text-xl font-bold tracking-tight">Watchman</span>
+                <span className="hidden min-[420px]:inline text-xl font-bold tracking-tight">Watchman</span>
               </Link>
 
-              <div className="flex items-center gap-6">
-                <Link href="/pricing" className="text-white/60 hover:text-white transition-colors hidden sm:block text-sm">
+              <div className="flex shrink-0 items-center gap-2 sm:gap-6">
+                <Link href="/pricing" className="text-sm transition-colors hover:text-white" style={{ color: READABLE_TEXT }}>
                   Pricing
                 </Link>
                 {navChoice === 'pending' ? (
@@ -1015,7 +1030,7 @@ export default function LandingPage() {
           >
             <span className="text-white">Your Life Isn't</span>
             <br />
-            <span className="text-white/40">Event-Based.</span>
+            <span style={{ color: READABLE_TEXT }}>Event-Based.</span>
             <br />
             <span className="bg-gradient-to-r from-cyan-400 via-emerald-400 to-green-400 bg-clip-text text-transparent">
               It's Rule-Based.
@@ -1024,7 +1039,8 @@ export default function LandingPage() {
 
           {/* Subheadline - Pain Point */}
           <motion.p
-            className="text-lg sm:text-xl md:text-2xl text-white/50 mb-12 max-w-3xl mx-auto leading-relaxed"
+            className="text-lg sm:text-xl md:text-2xl mb-12 max-w-3xl mx-auto leading-relaxed"
+            style={{ color: READABLE_TEXT }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}

@@ -3,7 +3,7 @@ import { assertNoHorizontalOverflow, shot, trackPageHealth } from './helpers'
 
 const pages = [
   { path: '/', name: 'landing', heading: /Your Life Isn/i },
-  { path: '/pricing', name: 'pricing', heading: /Honest/i },
+  { path: '/pricing', name: 'pricing', heading: /Simple pricing/i },
   { path: '/privacy', name: 'privacy', heading: /Privacy Policy/i },
   { path: '/terms', name: 'terms', heading: /Terms/i },
   { path: '/login', name: 'login', heading: /Welcome back/i },
@@ -22,10 +22,11 @@ test.describe('public pages @viewport', () => {
     })
   }
 
-  test('pricing keeps the $12 headline and explains cedis billing', async ({ page }) => {
+  test('pricing explains card billing in USD', async ({ page }) => {
     await page.goto('/pricing')
-    await expect(page.getByText('$12').first()).toBeVisible()
-    await expect(page.getByText('for 30 days').first()).toBeVisible()
-    await expect(page.getByTestId('ghs-charge-note')).toContainText(/charged in cedis via Paystack/i)
+    await expect(page.getByRole('heading', { name: /Simple pricing/i })).toBeVisible()
+    await expect(page.getByText('$6').first()).toBeVisible()
+    await expect(page.getByTestId('billing-small-print')).toContainText(/Billed in USD by card via Stripe/i)
+    await expect(page.getByText(/Paystack|GHS/i)).toHaveCount(0)
   })
 })

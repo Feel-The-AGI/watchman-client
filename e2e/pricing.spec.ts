@@ -1,36 +1,58 @@
 import { expect, test } from '@playwright/test'
+import { assertNoHorizontalOverflow } from './helpers'
 
-const pricingPayload = {
-  usd_price: 12,
-  ghs_amount: 139.86,
-  exchange_rate: 11.6547,
-  currency: 'GHS',
-  display_price: '$12',
-  display_ghs: 'GHS 139.86',
-  period_days: 30,
-  note: '$12 USD for 30 days at the current exchange rate',
-}
-
-test.describe('pricing currency @desktop-only', () => {
-  test('shows the approximate cedi amount from the pricing endpoint', async ({ page }) => {
-    await page.route('**/api/payments/pricing', (route) => route.fulfill({
+test.describe('pricing plans @desktop-only', () => {
+  test('shows the Stripe plans and drops Paystack and cedis copy', async ({ page }) => {
+    await page.route('**/api/billing/founding', (route) => route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(pricingPayload),
+      body: JSON.stringify({ seats_left: 17 }),
     }))
     await page.goto('/pricing')
-    await expect(page.getByText('$12').first()).toBeVisible()
-    await expect(page.getByTestId('ghs-charge-note')).toHaveText('≈ GHS 139.86, charged in cedis via Paystack')
+    await expect(page.getByRole('heading', { name: 'Simple pricing. Cancel anytime.' })).toBeVisible()
+    await expect(page.getByText('Built by a miner, for rotation workers everywhere')).toBeVisible()
+    await expect(page.getByText('$6').first()).toBeVisible()
+    await expect(page.getByText('$48').first()).toBeVisible()
+    await expect(page.getByText('$36').first()).toBeVisible()
+    await expect(page.getByText('Save 33%')).toBeVisible()
+    await expect(page.getByTestId('founding-badge')).toHaveText('First 100 only · 17 left')
+    await expect(page.getByText("That's about $4 a month.")).toBeVisible()
+    await expect(page.getByTestId('billing-small-print')).toContainText('Billed in USD by card via Stripe')
+    await expect(page.getByText('Leave planning')).toBeVisible()
+    await expect(page.locator('[data-feature="Leave planning"] [data-column="free"]')).toHaveAttribute('data-included', 'false')
+    await expect(page.locator('[data-feature="Leave planning"] [data-column="pro"]')).toHaveAttribute('data-included', 'true')
+    await expect(page.getByText(/Paystack|GHS|\$12|for 30 days/i)).toHaveCount(0)
   })
 
-  test('keeps the cedis note when the pricing endpoint fails', async ({ page }) => {
-    await page.route('**/api/payments/pricing', (route) => route.fulfill({
-      status: 503,
+  test('does not clip the comparison table at 360px or 390px', async ({ page }) => {
+    await page.route('**/api/billing/founding', (route) => route.fulfill({
+      status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ detail: { error: 'upstream' } }),
+      body: JSON.stringify({ seats_left: 8 }),
+    }))
+    for (const width of [360, 390]) {
+      await page.setViewportSize({ width, height: 800 })
+      await page.goto('/pricing')
+      await expect(page.getByTestId('plan-comparison')).toBeVisible()
+      await assertNoHorizontalOverflow(page)
+      const clipped = await page.locator('[data-testid="plan-comparison"] th, [data-testid="plan-comparison"] td').evaluateAll((cells) =>
+        cells
+          .filter((cell) => cell.scrollWidth > cell.clientWidth + 1)
+          .map((cell) => (cell.textContent || '').trim()),
+      )
+      expect(clipped, `${width}px clipped cells`).toEqual([])
+    }
+  })
+
+  test('keeps checkout closed until the Stripe provider is on', async ({ page }) => {
+    test.skip(process.env.E2E_PAYMENTS_PROVIDER === 'stripe', 'Stripe build opens checkout instead')
+    await page.route('**/api/billing/founding', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ seats_left: 3 }),
     }))
     await page.goto('/pricing')
-    await expect(page.getByTestId('ghs-charge-note')).toHaveText(/Charged in cedis via Paystack at the day.s rate/)
-    await expect(page.getByText(/≈ GHS/)).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Coming soon' })).toHaveCount(3)
+    await expect(page.getByRole('button', { name: 'Start free' })).toBeEnabled()
   })
 })

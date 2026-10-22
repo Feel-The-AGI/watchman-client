@@ -1,4 +1,5 @@
 import { isFreeMonthLocked } from './free-calendar-access'
+import { upgradeAheadLabel } from './plan-catalog'
 
 /** First of the month the grid is actually showing. */
 export function startOfViewedMonth(date: Date): Date {
@@ -19,7 +20,7 @@ export function gridMonthAfterViewToggle(viewedMonth: Date): Date {
   return startOfViewedMonth(viewedMonth)
 }
 
-/** Month to open, or null when a free account is past the six-month horizon. */
+/** Month to open, or null when a free account is past the free horizon. */
 export function monthToShow(
   month: Date,
   today: Date,
@@ -34,7 +35,7 @@ export function monthArrowLabel(direction: 'previous' | 'next'): string {
   return direction === 'previous' ? 'Previous month' : 'Next month'
 }
 
-export const UPGRADE_AHEAD_LABEL = 'Upgrade to see further ahead'
+export const UPGRADE_AHEAD_LABEL = upgradeAheadLabel()
 
 /** A different month closes the day panel. The same month keeps the selection. */
 export function selectedDateAfterMonthChange(selected: Date | null, nextMonth: Date): Date | null {

@@ -23,39 +23,7 @@ import { isFreeMonthLocked, isYearMonthVisible } from '@/lib/free-calendar-acces
 import { horizonThroughLabel, isDayPastFreeHorizon, isMonthEntirelyPastHorizon, yearMonthShiftCounts } from '@/lib/free-horizon';
 import { FreeHorizonNotice } from '@/components/upgrade/FreeHorizonNotice';
 import { monthArrowLabel, UPGRADE_AHEAD_LABEL } from '@/lib/calendar-view';
-import { LOCKED_MONTH_PAY_LINE, lockedMonthPriceLine } from '@/lib/upgrade-offer';
-import { api } from '@/lib/api';
 import Link from 'next/link';
-
-function useLockedMonthPrice(userTier: 'free' | 'pro' | 'admin'): string | null {
-  const [priceLine, setPriceLine] = useState<string | null>(null);
-  useEffect(() => {
-    if (userTier !== 'free') return;
-    let cancelled = false;
-    api.payments.getPricing()
-      .then((pricing) => {
-        if (!cancelled) setPriceLine(lockedMonthPriceLine(pricing));
-      })
-      .catch(() => {
-        if (!cancelled) setPriceLine(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [userTier]);
-  return userTier === 'free' ? priceLine : null;
-}
-
-function LockedAheadDetails({ priceLine }: { priceLine: string | null }) {
-  return (
-    <>
-      {priceLine && <p className="mt-1 text-[10px] text-white">{priceLine}</p>}
-      <p className="mt-1 text-[10px] text-watchman-muted">
-        {LOCKED_MONTH_PAY_LINE}
-      </p>
-    </>
-  );
-}
 
 export interface DailyLog {
   id: string;
@@ -169,7 +137,6 @@ export function CalendarGrid({
   pattern = null,
   freeHorizonEnd = null,
 }: CalendarGridProps) {
-  const lockedPriceLine = useLockedMonthPrice(userTier);
   const [currentMonth, setCurrentMonth] = useState(initialMonth || new Date());
   const [direction, setDirection] = useState(0);
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
@@ -312,7 +279,6 @@ export function CalendarGrid({
           <Link href="/pricing" className="text-watchman-accent hover:underline">
             {UPGRADE_AHEAD_LABEL}
           </Link>
-          <LockedAheadDetails priceLine={lockedPriceLine} />
         </div>
       )}
 
@@ -525,7 +491,6 @@ export function CalendarGrid({
           <Link href="/pricing" className="text-[10px] text-watchman-accent hover:underline">
             {UPGRADE_AHEAD_LABEL}
           </Link>
-          <LockedAheadDetails priceLine={lockedPriceLine} />
         </div>
       )}
       </div>
@@ -579,7 +544,6 @@ interface YearOverviewProps {
 }
 
 export function YearOverview({ days, year, onSelectMonth, userTier = 'free', freeHorizonEnd = null }: YearOverviewProps) {
-  const lockedPriceLine = useLockedMonthPrice(userTier);
   const daysMap = useMemo(() => {
     const map = new Map<string, CalendarDay>();
     days.forEach((day) => {
@@ -684,7 +648,6 @@ export function YearOverview({ days, year, onSelectMonth, userTier = 'free', fre
                 <Link href="/pricing" className="text-[10px] text-watchman-accent hover:underline" title={UPGRADE_AHEAD_LABEL}>
                   {UPGRADE_AHEAD_LABEL}
                 </Link>
-                <LockedAheadDetails priceLine={lockedPriceLine} />
               </div>
             </motion.div>
           );

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowLeft, FileText } from 'lucide-react';
+import { TERMS_CANCELLATION, TERMS_PAYMENT, TERMS_REFUND, termsProParagraph } from '@/lib/plan-catalog';
 
 export default function TermsOfServicePage() {
   return (
@@ -81,19 +82,19 @@ export default function TermsOfServicePage() {
                   <div>
                     <h3 className="font-medium text-white">Pro Plan</h3>
                     <p>
-                      Pro is $12 for 30 days, paid through Paystack in GHS at the exchange rate shown at checkout. It unlocks calendar sharing, CSV and PDF exports, weighted constraints, and unlimited Watchman messages. Leave planning is included on the free plan. Pro does not renew automatically. Each payment covers a fixed period. Another checkout adds another 30 days.
+                      {termsProParagraph()}
                     </p>
                   </div>
                   <div>
                     <h3 className="font-medium text-white">Payment</h3>
                     <p>
-                      Payments are processed by Paystack. We do not store your payment details. A verified payment turns on Pro until the end of that 30-day period. We do not charge the same payment method again unless you start another checkout.
+                      {TERMS_PAYMENT}
                     </p>
                   </div>
                   <div>
                     <h3 className="font-medium text-white">Cancellation</h3>
                     <p>
-                      You can cancel from account settings. Cancellation does not end Pro early. Access lasts until the end of the period you already paid for, and the settings page shows that date.
+                      {TERMS_CANCELLATION}
                     </p>
                   </div>
                 </div>
@@ -103,7 +104,7 @@ export default function TermsOfServicePage() {
                 <h2 className="text-xl font-semibold text-amber-400 mb-4">5. Refund Policy</h2>
                 <div className="space-y-4 text-watchman-text-secondary">
                   <p>
-                    Refunds are not issued automatically in the app. Email support@trywatchman.app from your account address if you want to ask about a payment, and we will tell you whether that payment can be refunded.
+                    {TERMS_REFUND}
                   </p>
                 </div>
               </section>
