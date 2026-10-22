@@ -14,7 +14,7 @@ import { api } from '@/lib/api';
 import { cedisChargeLine, OPENING_CHECKOUT_LABEL, plainCheckoutError, type PricingAmounts } from '@/lib/billing';
 import { pricingRowMotion } from '@/lib/pricing-display';
 import { rememberCheckoutReference } from '@/lib/checkout';
-import { AGENT_FAQ, BINARY_CONSTRAINT_FAQ } from '@/lib/marketing-copy';
+import { AGENT_FAQ, BINARY_CONSTRAINT_FAQ, RENEWAL_FAQ } from '@/lib/marketing-copy';
 
 const tiers = [
   {
@@ -76,7 +76,7 @@ const faqs = [
   },
   {
     question: 'Does Pro renew automatically?',
-    answer: 'Checkout does not start an automatic card subscription. $12 through Paystack covers 30 days. Another checkout adds 30 more days. If you cancel, Pro stays until the end of the days you already paid for.',
+    answer: RENEWAL_FAQ,
   },
   {
     question: 'What does "binary constraints" mean?',

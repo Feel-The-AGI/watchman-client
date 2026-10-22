@@ -5,6 +5,7 @@ import {
   BINARY_CONSTRAINT_FAQ,
   BOUNDARY_STEP,
   CLOSING_LINE,
+  RENEWAL_FAQ,
   ROTATION_FEATURE,
   RULES_FEATURE,
   SHARE_DESCRIPTION,
@@ -18,6 +19,7 @@ const lines = [
   SHARE_DESCRIPTION,
   AGENT_FAQ,
   BINARY_CONSTRAINT_FAQ,
+  RENEWAL_FAQ,
 ]
 
 describe('marketing copy', () => {
@@ -27,16 +29,21 @@ describe('marketing copy', () => {
       assert.equal(/generate your year/i.test(line), false)
       assert.equal(/never break/i.test(line), false)
       assert.equal(/never bend/i.test(line), false)
-      assert.equal(/\bstudy\b/i.test(line), false)
     }
   })
 
-  it('uses shift-work examples for rules', () => {
-    assert.match(RULES_FEATURE, /night shifts/)
-    assert.match(RULES_FEATURE, /Leave/)
-    assert.match(RULES_FEATURE, /overtime/)
-    assert.match(BINARY_CONSTRAINT_FAQ, /night shifts/)
-    assert.match(BINARY_CONSTRAINT_FAQ, /leave/)
+  it('uses the night-study rule Watchman actually checks', () => {
+    assert.match(RULES_FEATURE, /no study on night shifts/i)
+    assert.match(BINARY_CONSTRAINT_FAQ, /no study on night shifts/i)
+    for (const line of [RULES_FEATURE, BINARY_CONSTRAINT_FAQ]) {
+      assert.equal(/day off after/i.test(line), false)
+      assert.equal(/overtime on a leave day/i.test(line), false)
+    }
     assert.match(ROTATION_FEATURE, /rotation shows up on the calendar/)
+    assert.equal(
+      RENEWAL_FAQ.startsWith('Pro does not renew automatically. Each payment covers a fixed period.'),
+      true,
+    )
+    assert.equal(/automatic card subscription/i.test(RENEWAL_FAQ), false)
   })
 })
