@@ -266,8 +266,12 @@ export default function DashboardPage() {
         <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-6">
           <AlertCircle className="w-8 h-8 text-red-400" />
         </div>
-        <h1 className="text-2xl font-bold mb-3">Failed to load calendar</h1>
-        <p className="text-watchman-text-secondary mb-8">{error}</p>
+        <h1 className="text-2xl font-bold mb-3">Your calendar didn&apos;t load</h1>
+        <p className="text-watchman-text-secondary mb-8">
+          {error && error !== 'Failed to load calendar'
+            ? error
+            : "Watchman can't reach its server right now. Nothing was changed. Check your connection and try again."}
+        </p>
         <Button variant="primary" onClick={() => { void fetchCalendarData(); }}>
           Retry
         </Button>
@@ -342,6 +346,7 @@ export default function DashboardPage() {
             {/* Year Navigation */}
             <motion.button
               onClick={() => showMonth(shiftViewedMonth(viewedMonth, -12))}
+              aria-label="Jump back"
               className="p-2 sm:p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -361,6 +366,7 @@ export default function DashboardPage() {
 
             <motion.button
               onClick={() => showMonth(shiftViewedMonth(viewedMonth, 12))}
+              aria-label="Jump ahead"
               className="p-2 sm:p-2.5 rounded-xl glass border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -378,6 +384,7 @@ export default function DashboardPage() {
               onClick={() => { void invalidateCalendar(); }}
               disabled={loading}
               className="gap-2"
+              aria-label="Refresh calendar"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Refresh</span>

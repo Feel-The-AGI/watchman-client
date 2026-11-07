@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Logo } from '@/components/ui/Logo';
 import { useAuth } from '@/hooks/useAuth';
 import { passwordRules, resendConfirmationFeedback, resendCooldownRemaining } from '@/lib/signup-flow';
-import { OTHER_BROWSER_MESSAGE, OTHER_BROWSER_NOTICE } from '@/lib/auth-callback';
+import { OTHER_BROWSER_MESSAGE, OTHER_BROWSER_NOTICE, friendlyAuthError } from '@/lib/auth-callback';
 
 type AuthMode = 'signin' | 'signup' | 'magic';
 
@@ -92,7 +92,7 @@ export default function LoginPage() {
       }
       // A real session is redirected by AuthProvider. Keep the form locked until then.
     } catch (err: any) {
-      setError(err.message || 'Authentication failed');
+      setError(friendlyAuthError(err?.message));
       endSubmit();
     }
   };
@@ -379,7 +379,7 @@ export default function LoginPage() {
                         <button
                           type="button"
                           onClick={() => setShowPassword((current) => !current)}
-                          className="text-xs font-medium text-watchman-muted hover:text-white px-1"
+                          className="text-xs font-medium text-watchman-muted hover:text-white px-2 min-h-[40px] min-w-[40px]"
                           aria-label={showPassword ? 'Hide password' : 'Show password'}
                         >
                           {showPassword ? 'Hide' : 'Show'}

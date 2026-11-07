@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { OTHER_BROWSER_NOTICE, callbackFailureRedirect, isMissingCodeVerifier } from './auth-callback'
+import { OTHER_BROWSER_NOTICE, callbackFailureRedirect, friendlyAuthError, isMissingCodeVerifier } from './auth-callback'
 
 const SUPABASE_PKCE_MESSAGE =
   'PKCE code verifier not found in storage. This can happen if the auth flow was initiated in a different browser or device, or if the storage was cleared. For SSR frameworks (Next.js, SvelteKit, etc.), use @supabase/ssr on both the server and client to store the code verifier in cookies.'
@@ -22,5 +22,15 @@ describe('auth callback failures', () => {
   it('keeps other errors as errors', () => {
     const url = callbackFailureRedirect('https://trywatchman.app', { message: 'Email link is invalid or has expired' })
     assert.equal(url, 'https://trywatchman.app/login?error=auth_failed&message=Email%20link%20is%20invalid%20or%20has%20expired')
+  })
+})
+
+describe('friendly sign-in errors', () => {
+  it('rewrites known Supabase messages and keeps unknown ones', () => {
+    assert.match(friendlyAuthError('Invalid login credentials'), /do not match an account/)
+    assert.match(friendlyAuthError('Email not confirmed'), /Confirm your email/)
+    assert.match(friendlyAuthError('Email rate limit exceeded'), /Too many attempts/)
+    assert.equal(friendlyAuthError('Something new'), 'Something new')
+    assert.match(friendlyAuthError(undefined), /did not work/)
   })
 })

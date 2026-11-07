@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { displayDateOnly, formatDateOnly } from '@/lib/date-only';
+import { patternPhrase, rotationTimeline, todayIso } from '@/lib/rotation-timeline';
 import { invalidateCalendar } from '@/lib/calendar-sync';
 import { FREE_HORIZON_MESSAGE, freeHorizonNotice } from '@/lib/free-horizon';
 import { FreeHorizonNotice } from '@/components/upgrade/FreeHorizonNotice';
@@ -318,7 +319,17 @@ export default function MasterSettingsPage() {
     await saveRotation(settings.cycle);
   };
 
-  const totalCycleDays = settings.cycle.pattern.reduce((sum, b) => sum + b.duration, 0);
+  // The saved cycle is the latest rotation. Show the one in force today, and
+  // list a scheduled change and earlier rotations separately.
+  const timeline = rotationTimeline(settings.cycle, todayIso());
+  const shown = timeline?.current ?? {
+    pattern: settings.cycle.pattern,
+    anchor_date: settings.cycle.anchor_date,
+    anchor_cycle_day: settings.cycle.anchor_cycle_day,
+    from: null,
+    until: null,
+  };
+  const totalCycleDays = shown.pattern.reduce((sum, b) => sum + b.duration, 0);
 
   const blockConfig: Record<string, { icon: any; color: string; glow: string; label: string; bg: string }> = {
     work_day: { icon: Sun, color: 'from-amber-500 to-orange-600', glow: 'shadow-amber-500/30', label: 'Day Shift', bg: 'bg-amber-500' },
@@ -476,7 +487,7 @@ export default function MasterSettingsPage() {
         <div className="p-6">
           {/* Pattern Visualization */}
           <div className="flex flex-wrap gap-3 mb-6">
-            {settings.cycle.pattern.map((block, idx) => {
+            {shown.pattern.map((block, idx) => {
               const config = blockConfig[block.label] || defaultBlockConfig;
               return (
                 <motion.div
@@ -505,7 +516,7 @@ export default function MasterSettingsPage() {
 
           {/* Cycle Timeline */}
           <div className="flex h-3 rounded-full overflow-hidden mb-6">
-            {settings.cycle.pattern.map((block, idx) => {
+            {shown.pattern.map((block, idx) => {
               const config = blockConfig[block.label] || defaultBlockConfig;
               const width = (block.duration / totalCycleDays) * 100;
               return (
@@ -526,18 +537,39 @@ export default function MasterSettingsPage() {
               <Sparkles className="w-4 h-4 shrink-0 text-watchman-accent" />
               <span className="text-watchman-muted shrink-0">Anchor:</span>
               <span className="font-medium whitespace-nowrap">
-                {settings.cycle.anchor_date
-                  ? (displayDateOnly(settings.cycle.anchor_date) ?? settings.cycle.anchor_date)
+                {shown.anchor_date
+                  ? (displayDateOnly(shown.anchor_date) ?? shown.anchor_date)
                   : 'Not set'}
               </span>
             </div>
             <div className="flex items-center gap-2 px-4 py-2 glass rounded-xl w-fit max-w-full">
               <Target className="w-4 h-4 shrink-0 text-watchman-purple" />
               <span className="text-watchman-muted">Day</span>
-              <span className="font-bold text-watchman-accent">{settings.cycle.anchor_cycle_day}</span>
+              <span className="font-bold text-watchman-accent">{shown.anchor_cycle_day}</span>
               <span className="text-watchman-muted whitespace-nowrap">of cycle</span>
             </div>
+            {shown.until && (
+              <div className="flex items-center gap-2 px-4 py-2 glass rounded-xl w-fit max-w-full">
+                <span className="text-watchman-muted">Until</span>
+                <span className="font-medium whitespace-nowrap">{displayDateOnly(shown.until) ?? shown.until}</span>
+              </div>
+            )}
           </div>
+          {timeline && (timeline.upcoming.length > 0 || timeline.earlier.length > 0) && (
+            <div className="mt-4 space-y-2 text-sm" data-testid="rotation-timeline">
+              {timeline.upcoming.map((rotation) => (
+                <p key={`up-${rotation.from}`} className="px-4 py-2 rounded-xl bg-watchman-accent/10 border border-watchman-accent/20">
+                  <span className="font-medium">From {displayDateOnly(rotation.from) ?? rotation.from}:</span>{' '}
+                  {patternPhrase(rotation.pattern)}
+                </p>
+              ))}
+              {timeline.earlier.slice().reverse().map((rotation) => (
+                <p key={`was-${rotation.until}`} className="px-4 py-2 rounded-xl glass text-watchman-muted">
+                  Until {displayDateOnly(rotation.until) ?? rotation.until}: {patternPhrase(rotation.pattern)}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       </motion.div>
 

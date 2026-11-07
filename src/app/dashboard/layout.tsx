@@ -44,6 +44,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false); // Desktop collapse
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
+  // Escape closes the mobile menu.
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSidebarOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [sidebarOpen]);
+
   // Load collapsed state from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('sidebar-collapsed');
@@ -154,6 +164,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <button
             className="lg:hidden p-2 hover:bg-white/5 rounded-xl transition-colors"
             onClick={() => setSidebarOpen(false)}
+            aria-label="Close menu"
           >
             <X className="w-5 h-5" />
           </button>
