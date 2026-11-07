@@ -581,3 +581,42 @@ export function mergeChatHistory<T extends ChatListMessage>(local: T[], history:
   })
   return collapseUserEchoes([...history, ...pending])
 }
+
+/** What the server did with a chat turn's change. Chat applies changes immediately. */
+export interface AppliedChange {
+  status: 'applied' | 'no_change' | 'failed'
+  changed: boolean
+  message: string
+  commandId: string | null
+}
+
+export function appliedChange(response: unknown): AppliedChange | null {
+  if (!response || typeof response !== 'object') return null
+  const raw = (response as Record<string, unknown>).applied
+  if (!raw || typeof raw !== 'object') return null
+  const record = raw as Record<string, unknown>
+  const status = record.status === 'applied' || record.status === 'no_change' || record.status === 'failed'
+    ? record.status
+    : null
+  if (!status) return null
+  const commandId = typeof record.command_id === 'string' && record.command_id.trim() ? record.command_id : null
+  return {
+    status,
+    changed: status === 'applied' && record.changed !== false,
+    message: typeof record.message === 'string' ? record.message : '',
+    commandId,
+  }
+}
+
+/** Undo is offered only on a change that was saved and can be named in the log. */
+export function canUndoChange(change: AppliedChange | null | undefined): boolean {
+  return Boolean(change && change.changed && change.commandId)
+}
+
+export const UNDO_CONFLICT_MESSAGE = 'Only your latest change can be undone. Undo the newer one first.'
+export const UNDO_FAILED_MESSAGE = "That change couldn't be undone. Please try again."
+
+export function undoneText(change: AppliedChange | null | undefined): string {
+  const what = change?.message?.trim().replace(/\.$/, '')
+  return what ? `Undone: ${what}.` : 'Undone. The last change has been reverted.'
+}

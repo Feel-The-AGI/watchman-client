@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
+  appliedChange,
   appliedConfirmation,
+  canUndoChange,
+  undoneText,
   chatInputLocked,
   chatMessageText,
   chatScrollBehavior,
@@ -401,5 +404,37 @@ describe('chat display', () => {
     assert.equal(visible.some((message) => message.id === 'tool'), false)
     assert.equal(visible.some((message) => message.id === 'done'), true)
     assert.equal(sanitizeChatDisplay('Executing override_days'), 'Updating your calendar.')
+  })
+})
+
+describe('applied chat changes', () => {
+  it('reads an applied change with its command id', () => {
+    const change = appliedChange({ applied: { status: 'applied', changed: true, message: 'Mark Thu 5 Nov 2026 as Off', command_id: 'cmd-1' } })
+    assert.deepEqual(change, { status: 'applied', changed: true, message: 'Mark Thu 5 Nov 2026 as Off', commandId: 'cmd-1' })
+    assert.equal(canUndoChange(change), true)
+    assert.equal(undoneText(change), 'Undone: Mark Thu 5 Nov 2026 as Off.')
+  })
+
+  it('does not offer undo when nothing changed or the change failed', () => {
+    assert.equal(canUndoChange(appliedChange({ applied: { status: 'no_change', changed: false, message: 'No change' } })), false)
+    assert.equal(canUndoChange(appliedChange({ applied: { status: 'failed', changed: false, message: 'Nope' } })), false)
+    assert.equal(canUndoChange(appliedChange({ applied: { status: 'applied', changed: true, message: 'x' } })), false)
+  })
+
+  it('ignores responses without a recognised applied block', () => {
+    assert.equal(appliedChange(null), null)
+    assert.equal(appliedChange({}), null)
+    assert.equal(appliedChange({ applied: 'yes' }), null)
+    assert.equal(appliedChange({ applied: { status: 'weird' } }), null)
+  })
+
+  it('treats an applied status with changed false as no change', () => {
+    const change = appliedChange({ applied: { status: 'applied', changed: false, message: 'm', command_id: 'c' } })
+    assert.equal(change?.changed, false)
+    assert.equal(canUndoChange(change), false)
+  })
+
+  it('falls back to a plain undone sentence', () => {
+    assert.equal(undoneText(null), 'Undone. The last change has been reverted.')
   })
 })

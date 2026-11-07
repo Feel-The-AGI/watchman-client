@@ -8,7 +8,7 @@ interface DayRow {
   overtime_hours: number
 }
 
-function installCalendar(page: Page, options?: { failLoads?: number; horizonEnd?: string }) {
+function installCalendar(page: Page, options?: { failLoads?: number; horizonEnd?: string; instant?: boolean }) {
   let failedLoadsLeft = options?.failLoads ?? 0
   const days = new Map<string, DayRow>([
     ['2026-10-14', { date: '2026-10-14', work_type: 'work_day', cycle_day: 5, actual_hours_worked: 12, overtime_hours: 0 }],
@@ -17,6 +17,7 @@ function installCalendar(page: Page, options?: { failLoads?: number; horizonEnd?
   ])
   const stats = { work_days: 10, work_nights: 12, off_days: 8, leave_days: 1, study_hours: 4, commitment_count: 2, total_days: 365 }
   const yearsFetched: number[] = []
+  const undoBodies: unknown[] = []
   let review: 'apply' | 'no_change' | 'expired' = 'apply'
   let proposalSeq = 1
 
@@ -57,6 +58,7 @@ function installCalendar(page: Page, options?: { failLoads?: number; horizonEnd?
 
   return {
     yearsFetched,
+    undoBodies,
     stats,
     days,
     setReview(next: 'apply' | 'no_change' | 'expired') {
@@ -134,6 +136,7 @@ function installCalendar(page: Page, options?: { failLoads?: number; horizonEnd?
           return json(route, { success: true, updated_days: 1, dates: ['2026-10-15', '2027-01-01'] })
         }
         if (pathname === '/api/commands/undo' && method === 'POST') {
+          undoBodies.push(route.request().postDataJSON())
           const day = days.get('2026-10-15')!
           day.work_type = 'work_night'
           stats.work_nights = 12
@@ -146,6 +149,18 @@ function installCalendar(page: Page, options?: { failLoads?: number; horizonEnd?
           stats.work_nights = 11
           stats.off_days = 9
           return json(route, { success: true, dates: ['2026-10-15'] })
+        }
+        if (pathname === '/api/chat/message' && method === 'POST' && options?.instant) {
+          days.get('2026-10-15')!.work_type = 'off'
+          return json(route, {
+            user_message: { id: 'u-now', role: 'user', content: 'I was off on 15 Oct', created_at: '2026-10-22T10:00:00.000Z' },
+            assistant_message: { id: 'a-now', role: 'assistant', content: 'Done: Mark Thu 15 Oct 2026 as Off.', created_at: '2026-10-22T10:00:01.000Z' },
+            response: 'Done: Mark Thu 15 Oct 2026 as Off.',
+            proposal: null,
+            is_command: true,
+            command: { action: 'override_days', payload: { start_date: '2026-10-15', end_date: '2026-10-15', work_type: 'off' } },
+            applied: { status: 'applied', changed: true, message: 'Mark Thu 15 Oct 2026 as Off', command_id: 'cmd-now', proposal_id: 'p-now', action: 'override_days' },
+          })
         }
         if (pathname === '/api/chat/message' && method === 'POST') {
           proposalSeq += 1
@@ -374,4 +389,32 @@ test('a free account shows the three-month lock past the horizon', async ({ page
   await page.getByRole('button', { name: 'Year' }).click()
   await expect(page.getByText('The free plan shows 3 months ahead. Upgrade to Pro to plan further.').first()).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath(`${testInfo.project.name}-horizon-year.png`), fullPage: true })
+})
+
+
+test('a chat change is applied at once and can be undone from the message', async ({ page }, testInfo) => {
+  const mock = installCalendar(page, { instant: true })
+  await mock.route()
+  await page.addInitScript(() => {
+    localStorage.setItem('watchman_pro_celebration_e2e-user', 'true')
+  })
+  await page.goto('/dashboard')
+  const cell = page.locator('[data-date="2026-10-15"]').first()
+  await expect(cell).toHaveAttribute('data-work-type', 'work_night')
+
+  await page.getByPlaceholder('Tell me about your schedule...').fill('I was off on 15 Oct')
+  await page.getByPlaceholder('Tell me about your schedule...').press('Enter')
+
+  await expect(page.getByText('Done: Mark Thu 15 Oct 2026 as Off.')).toBeVisible()
+  const chip = page.getByTestId('applied-change')
+  await expect(chip.getByText('Saved')).toBeVisible()
+  await expect(cell).toHaveAttribute('data-work-type', 'off')
+  await page.screenshot({ path: testInfo.outputPath(`${testInfo.project.name}-instant.png`), fullPage: true })
+
+  await chip.getByRole('button', { name: 'Undo' }).click()
+  await expect(page.getByText('Undone: Mark Thu 15 Oct 2026 as Off.')).toBeVisible()
+  await expect(chip.getByText('Undone')).toBeVisible()
+  await expect(chip.getByRole('button', { name: 'Undo' })).toHaveCount(0)
+  await expect(cell).toHaveAttribute('data-work-type', 'work_night')
+  expect(mock.undoBodies).toEqual([{ command_id: 'cmd-now' }])
 })
