@@ -10,7 +10,13 @@ import { invalidateCalendar } from '@/lib/calendar-sync'
 import { approvalUpgradeMessage, FREE_HORIZON_MESSAGE, freeHorizonNotice } from '@/lib/free-horizon'
 import { FreeHorizonNotice } from '@/components/upgrade/FreeHorizonNotice'
 import {
+  appliedChange,
   appliedConfirmation,
+  canUndoChange,
+  undoneText,
+  UNDO_CONFLICT_MESSAGE,
+  UNDO_FAILED_MESSAGE,
+  type AppliedChange,
   chatInputLocked,
   chatMessageText,
   chatScrollBehavior,
@@ -125,6 +131,8 @@ interface Message {
   isProposal?: boolean
   proposal?: any
   freeHorizon?: boolean
+  applied?: AppliedChange | null
+  undone?: boolean
 }
 
 interface ChatPanelProps {
@@ -299,6 +307,7 @@ export function ChatPanel({ className, autoExecute = false, userTier = 'free' }:
         return
       }
       
+      const change = appliedChange(response)
       const assistantText = response.assistant_message
         ? chatMessageText(response.assistant_message.content)
         : null
@@ -308,14 +317,15 @@ export function ChatPanel({ className, autoExecute = false, userTier = 'free' }:
         ? {
           ...response.assistant_message,
           content: response.proposal ? proposalCardText(response.proposal, assistantText) : assistantText,
-          isProposal: response.is_command,
+          isProposal: Boolean(response.proposal) && response.is_command,
           proposal: response.proposal,
+          applied: change,
         }
         : null
       setMessages(prev => messagesAfterSend(prev, tempUserMessage.id, savedUser, assistantMessage))
       setHistoryError(null)
       
-      if (response.execution?.success) {
+      if (response.execution?.success || change?.changed) {
         await invalidateCalendar(response)
       }
 
@@ -475,20 +485,57 @@ export function ChatPanel({ className, autoExecute = false, userTier = 'free' }:
     }
   }
 
+  const say = (content: string, prefix: string) => {
+    setMessages(prev => [...prev, {
+      id: `${prefix}-${Date.now()}`,
+      role: 'assistant',
+      content,
+      created_at: new Date().toISOString(),
+    }])
+  }
+
+  const undoFailed = (error: unknown) => {
+    console.error('Failed to undo:', error)
+    say(apiStatus(error) === 409 ? UNDO_CONFLICT_MESSAGE : UNDO_FAILED_MESSAGE, 'undo-error')
+  }
+
+  /** Undo one change the agent just applied, by its command id. */
+  const undoChange = async (messageId: string, change: AppliedChange) => {
+    if (isReviewing || !canUndoChange(change)) return
+    setIsReviewing(true)
+    try {
+      const result = await api.commands.undo(change.commandId || undefined)
+      if (!result?.success) {
+        say(UNDO_FAILED_MESSAGE, 'undo-error')
+        return
+      }
+      setMessages(prev => prev.map((message) => message.id === messageId ? { ...message, undone: true } : message))
+      say(undoneText(change), 'undo')
+      await invalidateCalendar(result)
+    } catch (error) {
+      undoFailed(error)
+    } finally {
+      setIsReviewing(false)
+    }
+  }
+
   const handleUndo = async () => {
     try {
       const result = await api.commands.undo()
+      if (result?.result?.message === 'Nothing to undo') {
+        say('There is nothing to undo.', 'undo')
+        return
+      }
       if (result.success) {
-        setMessages(prev => [...prev, {
-          id: `undo-${Date.now()}`,
-          role: 'assistant',
-          content: 'Undone! The last change has been reverted.',
-          created_at: new Date().toISOString()
-        }])
+        const undoneId = typeof result.command_id === 'string' ? result.command_id : null
+        setMessages(prev => prev.map((message) => (
+          undoneId && message.applied?.commandId === undoneId ? { ...message, undone: true } : message
+        )))
+        say('Undone! The last change has been reverted.', 'undo')
         await invalidateCalendar(result)
       }
     } catch (error) {
-      console.error('Failed to undo:', error)
+      undoFailed(error)
     }
   }
 
@@ -619,6 +666,31 @@ export function ChatPanel({ className, autoExecute = false, userTier = 'free' }:
                         : message.content}
                   />
                 </p>
+                )}
+                {message.applied && message.applied.status !== 'failed' && (
+                  <div className="mt-2 flex items-center gap-2 text-xs" data-testid="applied-change">
+                    {message.undone ? (
+                      <span className="text-watchman-muted">Undone</span>
+                    ) : message.applied.changed ? (
+                      <>
+                        <span className="inline-flex items-center gap-1 text-watchman-success">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          Saved
+                        </span>
+                        {canUndoChange(message.applied) && (
+                          <button
+                            type="button"
+                            onClick={() => message.applied && undoChange(message.id, message.applied)}
+                            disabled={isReviewing}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-white/10 text-watchman-muted hover:text-white hover:border-white/20 disabled:opacity-40"
+                          >
+                            <Undo2 className="w-3 h-3" />
+                            Undo
+                          </button>
+                        )}
+                      </>
+                    ) : null}
+                  </div>
                 )}
                 {message.proposal && proposalModelNote(message.proposal) && (
                   <p className="mt-2 text-xs text-watchman-muted whitespace-pre-wrap">
