@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
+import { callbackFailureRedirect } from '@/lib/auth-callback'
 
 function safeNextPath(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
 
   if (error) {
     console.error('Auth callback error:', error)
-    return NextResponse.redirect(`${origin}/login?error=auth_failed&message=${encodeURIComponent(error.message)}`)
+    return NextResponse.redirect(callbackFailureRedirect(origin, error))
   }
 
   if (redirectTo) {
