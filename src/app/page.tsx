@@ -982,7 +982,7 @@ export default function LandingPage() {
                   </div>
                 ) : (
                   <Link href="/login">
-                    <Button variant="glass" size="sm" className="border-white/10 hover:border-white/20 hover:bg-white/5">
+                    <Button variant="glass" size="sm" className="min-h-[40px] border-white/10 hover:border-white/20 hover:bg-white/5">
                       Sign In
                     </Button>
                   </Link>

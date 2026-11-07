@@ -71,7 +71,7 @@ function constraintRule(encoded: string): { type: string; value: string | number
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user, loading: authLoading, refreshProfile } = useAuth();
+  const { user, profile, loading: authLoading, refreshProfile } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,6 +123,14 @@ export default function OnboardingPage() {
       router.replace('/login');
     }
   }, [authLoading, user, router]);
+
+  // An account that finished setup has a rotation. Setup again would only
+  // offer to replace it, so send them to the calendar.
+  useEffect(() => {
+    if (!authLoading && user && profile?.onboarding_completed && !finishingRef.current) {
+      router.replace('/dashboard');
+    }
+  }, [authLoading, user, profile, router]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

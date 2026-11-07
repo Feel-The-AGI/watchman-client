@@ -148,10 +148,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     if (isOnPublicPage) {
       // Check if onboarding is complete
+      // replace, not push: Back must not land on /login and bounce again.
       if (profile && !profile.onboarding_completed) {
-        router.push('/onboarding')
+        router.replace('/onboarding')
       } else {
-        router.push('/dashboard')
+        router.replace('/dashboard')
       }
     }
   }, [pathname, router])
