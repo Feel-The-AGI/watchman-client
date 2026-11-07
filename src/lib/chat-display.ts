@@ -588,6 +588,7 @@ export interface AppliedChange {
   changed: boolean
   message: string
   commandId: string | null
+  action?: string | null
 }
 
 export function appliedChange(response: unknown): AppliedChange | null {
@@ -600,16 +601,20 @@ export function appliedChange(response: unknown): AppliedChange | null {
     : null
   if (!status) return null
   const commandId = typeof record.command_id === 'string' && record.command_id.trim() ? record.command_id : null
+  const action = typeof record.action === 'string' ? record.action : null
   return {
     status,
     changed: status === 'applied' && record.changed !== false,
     message: typeof record.message === 'string' ? record.message : '',
     commandId,
+    ...(action ? { action } : {}),
   }
 }
 
 /** Undo is offered only on a change that was saved and can be named in the log. */
 export function canUndoChange(change: AppliedChange | null | undefined): boolean {
+  // An undo or redo reply points at the command it reverted. Undoing it again would 409.
+  if (change?.action === 'undo' || change?.action === 'redo') return false
   return Boolean(change && change.changed && change.commandId)
 }
 

@@ -434,6 +434,16 @@ describe('applied chat changes', () => {
     assert.equal(canUndoChange(change), false)
   })
 
+  it('does not offer undo on a reply that was itself an undo or redo', () => {
+    for (const action of ['undo', 'redo']) {
+      const change = appliedChange({ applied: { status: 'applied', changed: true, message: 'Undo your last change', command_id: 'cmd-1', action } })
+      assert.equal(change?.action, action)
+      assert.equal(canUndoChange(change), false)
+    }
+    const real = appliedChange({ applied: { status: 'applied', changed: true, message: 'x', command_id: 'c', action: 'override_days' } })
+    assert.equal(canUndoChange(real), true)
+  })
+
   it('falls back to a plain undone sentence', () => {
     assert.equal(undoneText(null), 'Undone. The last change has been reverted.')
   })
