@@ -355,13 +355,13 @@ export default function PricingPage() {
             Feature Comparison
           </h2>
           
-          <div className="glass rounded-2xl border border-white/10 overflow-hidden">
+          <div className="glass rounded-2xl border border-white/10 overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-white/10 bg-white/[0.02]">
-                  <th className="text-left py-4 px-6 text-watchman-muted font-medium">Feature</th>
-                  <th className="text-center px-6 py-4 text-watchman-muted font-medium">Free</th>
-                  <th className="text-center px-6 py-4 font-medium">
+                  <th className="text-left py-4 px-3 sm:px-6 text-watchman-muted font-medium">Feature</th>
+                  <th className="text-center px-3 sm:px-6 py-4 text-watchman-muted font-medium">Free</th>
+                  <th className="text-center px-3 sm:px-6 py-4 font-medium">
                     <span className="text-gradient">Pro</span>
                   </th>
                 </tr>
@@ -383,13 +383,13 @@ export default function PricingPage() {
                     transition={{ delay: reduceMotion ? 0 : i * 0.03 }}
                     className="border-b border-white/5 last:border-0"
                   >
-                    <td className="py-4 px-6">{row.feature}</td>
-                    <td className="text-center px-6 py-4 text-watchman-muted">
+                    <td className="py-4 px-3 sm:px-6">{row.feature}</td>
+                    <td className="text-center px-3 sm:px-6 py-4 text-watchman-muted">
                       {typeof row.free === 'boolean' ? (
                         row.free ? <Check className="w-4 h-4 mx-auto text-emerald-400" /> : <span className="text-watchman-muted/50">—</span>
                       ) : row.free}
                     </td>
-                    <td className="text-center px-6 py-4">
+                    <td className="text-center px-3 sm:px-6 py-4">
                       {typeof row.pro === 'boolean' ? (
                         row.pro ? <Check className="w-4 h-4 mx-auto text-emerald-400" /> : <span className="text-watchman-muted/50">—</span>
                       ) : <span className="text-watchman-accent font-medium">{row.pro}</span>}
@@ -467,7 +467,7 @@ export default function PricingPage() {
             <Link href="/legal/privacy" className="hover:text-white transition-colors">Privacy</Link>
             <Link href="/legal/terms" className="hover:text-white transition-colors">Terms</Link>
           </div>
-          <p className="text-sm text-watchman-muted">
+          <p className="text-sm text-watchman-muted" suppressHydrationWarning>
             © {new Date().getFullYear()} Watchman
           </p>
         </div>
