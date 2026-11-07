@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Logo } from '@/components/ui/Logo';
 import { useAuth } from '@/hooks/useAuth';
 import { passwordRules, resendConfirmationFeedback, resendCooldownRemaining } from '@/lib/signup-flow';
+import { OTHER_BROWSER_MESSAGE, OTHER_BROWSER_NOTICE } from '@/lib/auth-callback';
 
 type AuthMode = 'signin' | 'signup' | 'magic';
 
@@ -20,6 +21,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,7 +41,9 @@ export default function LoginPage() {
     }
     const message = params.get('message');
     const authError = params.get('error');
-    if (message) {
+    if (params.get('notice') === OTHER_BROWSER_NOTICE) {
+      setNotice(OTHER_BROWSER_MESSAGE);
+    } else if (message) {
       setError(message);
     } else if (authError) {
       setError('Sign-in could not be completed. Request a new link and try again.');
@@ -51,6 +55,7 @@ export default function LoginPage() {
     submittingRef.current = true;
     setIsSubmitting(true);
     setError('');
+    setNotice('');
     return true;
   };
 
@@ -308,6 +313,17 @@ export default function LoginPage() {
                   className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20"
                 >
                   <p className="text-sm text-red-400">{error}</p>
+                </motion.div>
+              )}
+              {!error && notice && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: 'auto' }}
+                  exit={{ opacity: 0, y: -10, height: 0 }}
+                  role="status"
+                  className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20"
+                >
+                  <p className="text-sm text-emerald-400">{notice}</p>
                 </motion.div>
               )}
             </AnimatePresence>
