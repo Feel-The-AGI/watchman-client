@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
-import { useRef, useEffect, useState, useMemo } from 'react';
+import { useRef, useEffect, useState, useMemo, useSyncExternalStore } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { authNavChoice } from '@/lib/signup-flow';
 import { BOUNDARY_STEP, CLOSING_LINE, ROTATION_FEATURE, RULES_FEATURE } from '@/lib/marketing-copy';
@@ -655,35 +655,41 @@ interface LiveCalendarProps {
   onDayClick: (date: Date, workType: 'day_shift' | 'night_shift' | 'off') => void;
 }
 
-function LiveCalendar({ selectedDate, onDayClick }: LiveCalendarProps) {
-  // Track the actual "today" date (never changes)
-  const realToday = useMemo(() => new Date(), []);
-  const todayDate = realToday.getDate();
-  const todayMonth = realToday.getMonth();
-  const todayYear = realToday.getFullYear();
+const subscribeToNothing = () => () => {};
 
-  // Track the currently viewed month (can be navigated)
-  const [viewDate, setViewDate] = useState(new Date());
-  const viewMonth = viewDate.getMonth();
-  const viewYear = viewDate.getFullYear();
+function LiveCalendar({ selectedDate, onDayClick }: LiveCalendarProps) {
+  // The landing page is prerendered and cached for weeks, so the server's
+  // "today" is the build date. Read the date only in the browser, after
+  // hydration, or React throws #418 and re-renders the whole page.
+  const mounted = useSyncExternalStore(subscribeToNothing, () => true, () => false);
+  const realToday = useMemo(() => (mounted ? new Date() : null), [mounted]);
+  const todayDate = realToday?.getDate() ?? 0;
+  const todayMonth = realToday?.getMonth() ?? -1;
+  const todayYear = realToday?.getFullYear() ?? -1;
+
+  // Month the visitor navigated to. Null means the current month.
+  const [pickedMonth, setPickedMonth] = useState<Date | null>(null);
+  const viewDate = pickedMonth ?? realToday;
+  const viewMonth = viewDate?.getMonth() ?? 0;
+  const viewYear = viewDate?.getFullYear() ?? 0;
 
   // Navigation functions
   const goToPreviousMonth = () => {
-    setViewDate(new Date(viewYear, viewMonth - 1, 1));
+    if (viewDate) setPickedMonth(new Date(viewYear, viewMonth - 1, 1));
   };
 
   const goToNextMonth = () => {
-    setViewDate(new Date(viewYear, viewMonth + 1, 1));
+    if (viewDate) setPickedMonth(new Date(viewYear, viewMonth + 1, 1));
   };
 
   // Check if we're viewing the current month (to show "today" highlight)
-  const isCurrentMonth = viewMonth === todayMonth && viewYear === todayYear;
+  const isCurrentMonth = !viewDate || (viewMonth === todayMonth && viewYear === todayYear);
 
   // Get month details
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
                       'July', 'August', 'September', 'October', 'November', 'December'];
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = viewDate ? new Date(viewYear, viewMonth + 1, 0).getDate() : 0;
+  const firstDayOfMonth = viewDate ? new Date(viewYear, viewMonth, 1).getDay() : 1;
   // Convert Sunday=0 to Monday=0 format
   const startDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
 
@@ -748,12 +754,12 @@ function LiveCalendar({ selectedDate, onDayClick }: LiveCalendarProps) {
         </button>
         <div className="flex items-center gap-2">
           <h3 className="text-sm sm:text-base font-semibold text-white">
-            {monthNames[viewMonth]} {viewYear}
+            {viewDate ? `${monthNames[viewMonth]} ${viewYear}` : '\u00a0'}
           </h3>
           {/* "Today" button - only show when not viewing current month */}
           {!isCurrentMonth && (
             <button
-              onClick={() => setViewDate(new Date())}
+              onClick={() => setPickedMonth(null)}
               className="px-2 py-0.5 text-[10px] font-medium rounded-md bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors"
             >
               Today
@@ -1415,7 +1421,7 @@ export default function LandingPage() {
               <Link href="/legal/privacy" className="hover:text-white transition-colors">Privacy</Link>
               <Link href="/legal/terms" className="hover:text-white transition-colors">Terms</Link>
             </div>
-            <p className="text-sm text-white/50">
+            <p className="text-sm text-white/50" suppressHydrationWarning>
               © {new Date().getFullYear()} Watchman. Time under control.
             </p>
           </div>

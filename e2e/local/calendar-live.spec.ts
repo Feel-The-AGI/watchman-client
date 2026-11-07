@@ -221,6 +221,12 @@ async function goTo(page: Page, name: string) {
   await link.click()
 }
 
+// The fixtures are dated around 22 Oct 2026, and the dashboard opens on the
+// current month. Pin the browser date so the suite does not rot as time passes.
+test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-10-22T09:00:00Z'))
+})
+
 test('calendar updates as soon as a change is applied', async ({ page }, testInfo) => {
   const mock = installCalendar(page)
   await mock.route()
