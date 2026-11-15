@@ -27,7 +27,7 @@ const config: Config = {
           orange: '#F97316',    // Orange accent
           text: '#FAFAFA',      // Pure white - Primary
           'text-secondary': '#A1A1AA', // Zinc-400
-          muted: '#71717A',     // Zinc-500
+          muted: '#8E8E99',     // Readable on bg and surface (WCAG AA)
           error: '#EF4444',     // Red-500
           'error-glow': 'rgba(239, 68, 68, 0.5)',
           warning: '#F59E0B',   // Amber-500

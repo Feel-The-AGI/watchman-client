@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -43,6 +43,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false); // Mobile
   const [collapsed, setCollapsed] = useState(false); // Desktop collapse
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  // Tell people when the browser is offline, so stale data is not a surprise.
+  const [offline, setOffline] = useState(false);
+  useEffect(() => {
+    const update = () => setOffline(typeof navigator !== 'undefined' && navigator.onLine === false);
+    update();
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+    };
+  }, []);
+
+  // Opening the mobile menu moves focus into it.
+  const closeMenuRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (sidebarOpen) closeMenuRef.current?.focus();
+  }, [sidebarOpen]);
 
   // Escape closes the mobile menu.
   useEffect(() => {
@@ -130,6 +149,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Sidebar - Fixed on all screens */}
       <aside
+        aria-label="Main menu"
         className={cn(
           'fixed inset-y-0 left-0 z-50 glass-strong border-r border-white/5 flex flex-col transition-all duration-300 ease-spring',
           // Mobile: full width when open, hidden when closed
@@ -162,6 +182,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </span>
           </Link>
           <button
+            ref={closeMenuRef}
             className="lg:hidden p-2 hover:bg-white/5 rounded-xl transition-colors"
             onClick={() => setSidebarOpen(false)}
             aria-label="Close menu"
@@ -363,6 +384,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Page Content */}
         <div className="flex-1 p-6 lg:p-8">
+          {offline && (
+            <div role="status" className="mb-4 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-sm text-amber-300">
+              You&apos;re offline. This is the last calendar that loaded, and changes won&apos;t save until you&apos;re back online.
+            </div>
+          )}
           {children}
         </div>
       </main>

@@ -259,7 +259,7 @@ test('calendar updates as soon as a change is applied', async ({ page }, testInf
   await cell.click()
   const shiftLabel = page.locator('p.text-lg')
   await expect(shiftLabel).toHaveText('Night Shift')
-  await expect(page.getByText('Day 6 of rotation')).toBeVisible()
+  await expect(page.getByText('Day 6 of your rotation cycle')).toBeVisible()
   await expect(page.getByText('October 15, 2026', { exact: true })).toBeVisible()
   await page.getByLabel('Edit hours').click()
   await page.locator('input[type="number"]').first().fill('8')

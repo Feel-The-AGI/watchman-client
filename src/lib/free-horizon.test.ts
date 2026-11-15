@@ -111,7 +111,9 @@ describe('free horizon lock', () => {
     assert.equal(capped.leaveDays, 0)
     const open = yearMonthShiftCounts(days, null)
     assert.equal(open.offDays, 2)
-    assert.equal(open.nightShifts, 1)
+    // The night on leave is counted once, as leave.
+    assert.equal(open.nightShifts, 0)
     assert.equal(open.leaveDays, 1)
+    assert.equal(open.dayShifts + open.nightShifts + open.offDays + open.leaveDays, days.length)
   })
 })

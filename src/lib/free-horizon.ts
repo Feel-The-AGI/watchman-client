@@ -132,8 +132,9 @@ export function yearMonthShiftCounts<T extends { date: string; work_type?: strin
     ? days.filter((day) => !isDayPastFreeHorizon(day.date, horizonEnd))
     : days
   return {
-    dayShifts: visible.filter((day) => day.work_type === 'work_day').length,
-    nightShifts: visible.filter((day) => day.work_type === 'work_night').length,
+    // A leave day is counted once, as leave, so the four numbers add up to the month.
+    dayShifts: visible.filter((day) => day.work_type === 'work_day' && !day.is_leave).length,
+    nightShifts: visible.filter((day) => day.work_type === 'work_night' && !day.is_leave).length,
     offDays: visible.filter((day) => day.work_type === 'off' && !day.is_leave).length,
     leaveDays: visible.filter((day) => Boolean(day.is_leave)).length,
   }
