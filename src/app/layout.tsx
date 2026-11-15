@@ -44,7 +44,8 @@ export default function RootLayout({
         <Providers>
           {children}
         </Providers>
-        <Analytics />
+        {/* The analytics script is served only by Vercel deployments. */}
+        {process.env.VERCEL === '1' && <Analytics />}
       </body>
     </html>
   )
