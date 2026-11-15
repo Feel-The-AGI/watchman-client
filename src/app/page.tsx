@@ -966,6 +966,12 @@ export default function LandingPage() {
               </Link>
 
               <div className="flex items-center gap-6">
+                <Link href="/tools/shift-calculator" className="text-white/60 hover:text-white transition-colors hidden md:block text-sm">
+                  Shift calculator
+                </Link>
+                <Link href="/schedules" className="text-white/60 hover:text-white transition-colors hidden lg:block text-sm">
+                  Schedules
+                </Link>
                 <Link href="/pricing" className="text-white/60 hover:text-white transition-colors hidden sm:block text-sm">
                   Pricing
                 </Link>
@@ -1416,7 +1422,9 @@ export default function LandingPage() {
               />
               <span className="font-semibold text-white">Watchman</span>
             </div>
-            <div className="flex items-center gap-6 text-sm text-white/50">
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-white/50">
+              <Link href="/tools/shift-calculator" className="hover:text-white transition-colors">Shift calculator</Link>
+              <Link href="/schedules" className="hover:text-white transition-colors">Schedules</Link>
               <Link href="/pricing" className="hover:text-white transition-colors">Pricing</Link>
               <Link href="/legal/privacy" className="hover:text-white transition-colors">Privacy</Link>
               <Link href="/legal/terms" className="hover:text-white transition-colors">Terms</Link>

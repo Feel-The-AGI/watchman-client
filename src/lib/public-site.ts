@@ -6,6 +6,9 @@ export const PUBLIC_PAGES = ['/', '/pricing', '/login', '/legal/privacy', '/lega
 /** Private app routes. Crawlers may read the rest of the public site. */
 export const PRIVATE_ROBOT_PATHS = ['/dashboard', '/settings', '/api', '/onboarding', '/shared'] as const
 
+/** Free tools and guides, listed after the core pages. */
+export { guidePaths } from './schedule-library'
+
 export function publicPageUrl(path: string): string {
   if (path === '/') return PUBLIC_SITE_ORIGIN
   return `${PUBLIC_SITE_ORIGIN}${path}`

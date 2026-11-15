@@ -33,6 +33,7 @@ import { copyRulesIntoSettings, createdCycleIdAfterChoiceChange, rulesStillNeede
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { dashboardHandoffButton } from '@/lib/onboarding-handoff';
+import { CALCULATOR_HANDOFF_KEY, describePattern, readHandoff } from '@/lib/shift-calculator';
 import {
   buildMonthPreview,
   parseLocalDate,
@@ -140,6 +141,31 @@ export default function OnboardingPage() {
     }, 300);
     return () => clearTimeout(timer);
   }, []);
+
+  // A rotation built in the free calculator before sign-up is picked for you, once.
+  const handoffUsedRef = useRef(false);
+  useEffect(() => {
+    if (handoffUsedRef.current || authLoading || !user || profile?.onboarding_completed) return;
+    handoffUsedRef.current = true;
+    let saved: CycleBlock[] | null = null;
+    try {
+      saved = readHandoff(window.localStorage.getItem(CALCULATOR_HANDOFF_KEY));
+      window.localStorage.removeItem(CALCULATOR_HANDOFF_KEY);
+    } catch {
+      saved = null;
+    }
+    if (!saved) return;
+    const chosen = saved;
+    // No cleanup: a later profile refresh must not cancel the one pick.
+    setTimeout(() => {
+      handleSelectCycle({
+        name: 'the rotation from the calculator',
+        description: describePattern(chosen),
+        pattern: chosen,
+      });
+    }, 900);
+    // handleSelectCycle is recreated each render; the ref keeps this to one run.
+  }, [authLoading, user, profile]);
 
   const addMessage = (role: 'assistant' | 'user', content: string) => {
     setMessages(prev => [...prev, {
