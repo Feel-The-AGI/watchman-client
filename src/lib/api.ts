@@ -17,6 +17,14 @@ export const BACKEND_TIMEOUT_MESSAGE =
 
 export const REQUEST_TIMEOUT_MS = 90_000
 
+export function browserTimeZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null
+  } catch {
+    return null
+  }
+}
+
 export function getApiBaseUrl(): string | null {
   const configured = process.env.NEXT_PUBLIC_API_URL?.trim()
   if (!configured) return null
@@ -60,6 +68,10 @@ class APIService {
       'Content-Type': 'application/json',
       ...options.headers,
     }
+
+    // "Today" and "tomorrow" mean the person's own day, so send the browser's zone.
+    const zone = browserTimeZone()
+    if (zone) (headers as Record<string, string>)['X-Timezone'] = zone
 
     if (this.token) {
       (headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`

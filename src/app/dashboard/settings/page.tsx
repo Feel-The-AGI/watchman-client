@@ -126,6 +126,7 @@ export default function SettingsPage() {
   });
   const [timezoneSource, setTimezoneSource] = useState<TimezoneSource>('browser');
   const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const canUseWeighted = subscription?.tier === 'pro' || subscription?.tier === 'admin';
 
   // Sharing states
   const [shares, setShares] = useState<CalendarShare[]>([]);
@@ -262,9 +263,13 @@ export default function SettingsPage() {
 
   const handleSaveProfile = async () => {
     try {
+      if (!name.trim()) {
+        setError('Enter a name before saving.');
+        return;
+      }
       setSaving(true);
       setError(null);
-      await api.settings.updateProfile({ name });
+      await api.settings.updateProfile({ name: name.trim() });
       setSuccess('Profile updated successfully');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
@@ -283,8 +288,13 @@ export default function SettingsPage() {
         notifications_email: settings.notifications_email,
         notifications_push: settings.notifications_push,
         theme: settings.theme,
-        weighted_mode_enabled: settings.weighted_mode,
-        constraint_mode: settings.weighted_mode ? 'weighted' : 'binary',
+        // Free accounts cannot turn weighted mode on. Sending it would fail the whole save.
+        ...(canUseWeighted
+          ? {
+            weighted_mode_enabled: settings.weighted_mode,
+            constraint_mode: settings.weighted_mode ? 'weighted' : 'binary',
+          }
+          : {}),
       });
       await invalidateCalendar();
       setSuccess('Settings saved successfully');
@@ -974,10 +984,14 @@ export default function SettingsPage() {
 
                     <ToggleOption
                       icon={<Settings className="w-5 h-5" />}
-                      title="Weighted Mode"
-                      description="Enable weighted constraints for flexible scheduling"
-                      checked={settings.weighted_mode}
-                      onChange={(checked) => setSettings({ ...settings, weighted_mode: checked })}
+                      title={canUseWeighted ? 'Weighted Mode' : 'Weighted Mode (Pro)'}
+                      description={canUseWeighted
+                        ? 'Enable weighted constraints for flexible scheduling'
+                        : 'Weighted constraints are part of Pro. Your other preferences save as usual.'}
+                      checked={canUseWeighted && settings.weighted_mode}
+                      onChange={(checked) => {
+                        if (canUseWeighted) setSettings({ ...settings, weighted_mode: checked });
+                      }}
                     />
 
                     <div className="pt-4">
