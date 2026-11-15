@@ -79,15 +79,26 @@ interface MasterSettings {
   }[];
 }
 
+const SHIFT_WORDS: Record<string, string> = {
+  work_night: 'night shifts',
+  work_day: 'day shifts',
+  off: 'days off',
+};
+
+function shiftWords(value: unknown): string {
+  const key = String(value ?? '');
+  return SHIFT_WORDS[key] || key.replace(/_/g, ' ');
+}
+
 function ruleLabel(rule: MasterSettings['constraints'][number]['rule']): string {
-  if (typeof rule === 'string') return rule;
+  if (typeof rule === 'string') return rule.replace(/_/g, ' ');
   if (!rule || typeof rule !== 'object') return '';
   if (rule.type === 'no_study_on' && rule.value != null && rule.value !== '') {
-    return `no study on ${rule.value}`;
+    return `Blocks study on ${shiftWords(rule.value)}`;
   }
   if (rule.type === 'no_activity_on') {
-    const types = Array.isArray(rule.work_types) ? rule.work_types.join(', ') : '';
-    return `no ${rule.activity || 'activity'}${types ? ` on ${types}` : ''}`;
+    const types = Array.isArray(rule.work_types) ? rule.work_types.map(shiftWords).join(', ') : '';
+    return `Blocks ${rule.activity || 'activity'}${types ? ` on ${types}` : ''}`;
   }
   if (rule.type) {
     return rule.value != null && rule.value !== '' ? `${rule.type}: ${rule.value}` : rule.type;
@@ -450,7 +461,7 @@ export default function MasterSettingsPage() {
               <div className="min-w-0">
                 <h2 className="text-lg sm:text-xl font-bold leading-tight">Work Rotation Cycle</h2>
                 <p className="text-sm text-watchman-muted">
-                  {totalCycleDays} days total cycle length
+                  {settings.cycle.anchor_date ? `${totalCycleDays} days total cycle length` : 'No rotation saved yet. This is an example.'}
                 </p>
               </div>
             </div>

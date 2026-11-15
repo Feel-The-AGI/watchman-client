@@ -12,6 +12,11 @@ export const BACKEND_NOT_CONFIGURED_MESSAGE =
 export const BACKEND_UNAVAILABLE_MESSAGE =
   'Watchman can’t reach its server right now. Nothing was changed. Try again once the connection is back.'
 
+export const BACKEND_TIMEOUT_MESSAGE =
+  'Watchman took too long to answer. Check your calendar before trying again, in case the change went through.'
+
+export const REQUEST_TIMEOUT_MS = 90_000
+
 export function getApiBaseUrl(): string | null {
   const configured = process.env.NEXT_PUBLIC_API_URL?.trim()
   if (!configured) return null
@@ -60,14 +65,22 @@ class APIService {
       (headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`
     }
 
+    // A request that never answers (a server restart mid-call) must not
+    // leave a screen waiting forever. The free host can take about a minute
+    // to wake, so the limit is generous.
     let response: Response
+    const controller = options.signal ? null : new AbortController()
+    const timer = controller ? setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS) : null
     try {
       response = await fetch(url, {
         ...options,
         headers,
+        ...(controller ? { signal: controller.signal } : {}),
       })
     } catch {
-      throw new APIError(0, BACKEND_UNAVAILABLE_MESSAGE)
+      throw new APIError(0, controller?.signal.aborted ? BACKEND_TIMEOUT_MESSAGE : BACKEND_UNAVAILABLE_MESSAGE)
+    } finally {
+      if (timer) clearTimeout(timer)
     }
 
     if (!response.ok) {
