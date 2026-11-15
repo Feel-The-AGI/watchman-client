@@ -906,6 +906,7 @@ export default function MasterSettingsPage() {
                       className="flex items-center gap-2"
                     >
                       <select
+                        aria-label={`Block ${index + 1} shift type`}
                         value={block.label}
                         onChange={(e) => {
                           const updated = [...editPattern];
@@ -921,6 +922,7 @@ export default function MasterSettingsPage() {
                       <input
                         type="number"
                         min="1"
+                        aria-label={`Block ${index + 1} number of days`}
                         value={block.duration}
                         onChange={(e) => {
                           const updated = [...editPattern];
@@ -935,6 +937,7 @@ export default function MasterSettingsPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => setEditPattern(editPattern.filter((_, i) => i !== index))}
+                          aria-label={`Remove block ${index + 1}`}
                         >
                           <X className="w-4 h-4" />
                         </Button>
@@ -1059,6 +1062,7 @@ export default function MasterSettingsPage() {
                         type="number"
                         min="0"
                         max="24"
+                        aria-label="Study hours on off days"
                         value={editOffHours}
                         onChange={(e) => setEditOffHours(Math.min(24, Math.max(0, parseInt(e.target.value) || 0)))}
                         className="flex-1 px-4 py-3 glass border border-white/10 rounded-xl focus:border-watchman-accent focus:outline-none text-center"
@@ -1073,6 +1077,7 @@ export default function MasterSettingsPage() {
                         type="number"
                         min="0"
                         max="12"
+                        aria-label="Study hours on work days"
                         value={editWorkHours}
                         onChange={(e) => setEditWorkHours(Math.min(12, Math.max(0, parseInt(e.target.value) || 0)))}
                         className="flex-1 px-4 py-3 glass border border-white/10 rounded-xl focus:border-watchman-accent focus:outline-none text-center"

@@ -682,7 +682,7 @@ export function ChatPanel({ className, autoExecute = false, userTier = 'free' }:
                             type="button"
                             onClick={() => message.applied && undoChange(message.id, message.applied)}
                             disabled={isReviewing}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-white/10 text-watchman-muted hover:text-white hover:border-white/20 disabled:opacity-40"
+                            className="inline-flex items-center gap-1 px-3 min-h-[36px] rounded-md border border-white/10 text-watchman-muted hover:text-white hover:border-white/20 disabled:opacity-40"
                           >
                             <Undo2 className="w-3 h-3" />
                             Undo
