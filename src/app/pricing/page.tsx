@@ -11,9 +11,9 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { authNavChoice } from '@/lib/signup-flow';
 import { api } from '@/lib/api';
-import { cedisChargeLine, OPENING_CHECKOUT_LABEL, plainCheckoutError, type PricingAmounts } from '@/lib/billing';
+import { BILLING_NOTE, OPENING_CHECKOUT_LABEL, parsePlan, planPrice, plainCheckoutError, type Plan } from '@/lib/billing';
+import type { StripePricing } from '@/lib/api';
 import { pricingRowMotion } from '@/lib/pricing-display';
-import { rememberCheckoutReference } from '@/lib/checkout';
 import { AGENT_FAQ, BINARY_CONSTRAINT_FAQ, RENEWAL_FAQ } from '@/lib/marketing-copy';
 
 const tiers = [
@@ -46,8 +46,8 @@ const tiers = [
   {
     name: 'Pro',
     price: '$12',
-    period: 'for 30 days',
-    description: 'Paid through Paystack for 30 days. Another checkout extends it. This one does not bill you again on its own.',
+    period: 'per month',
+    description: 'Everything in Watchman, with no limits. Cancel any time.',
     icon: Crown,
     gradient: 'from-watchman-accent to-watchman-purple',
     glow: 'shadow-watchman-accent/30',
@@ -94,41 +94,48 @@ export default function PricingPage() {
   const router = useRouter();
   const [upgrading, setUpgrading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pricingAmounts, setPricingAmounts] = useState<PricingAmounts | null>(null);
+  const [pricing, setPricing] = useState<StripePricing | null>(null);
+  const [plan, setPlan] = useState<Plan>('annual');
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     api.payments.getPricing()
-      .then((pricing) => {
-        if (!cancelled) setPricingAmounts(pricing);
+      .then((value) => {
+        if (!cancelled) setPricing(value);
       })
       .catch(() => {
-        if (!cancelled) setPricingAmounts(null);
+        if (!cancelled) setPricing(null);
       });
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('plan')) setPlan(parsePlan(params.get('plan')));
+    if (params.get('checkout') === 'cancelled') setNotice('Checkout was closed. Nothing was charged.');
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const proPrice = planPrice(pricing, plan);
+  const paymentsReady = pricing?.configured !== false;
 
   const isLoggedIn = !!user;
   const isPro = profile?.tier === 'pro' || profile?.tier === 'admin';
 
   const handleUpgrade = async () => {
     if (!isLoggedIn) {
-      router.push('/login');
+      router.push('/login?mode=signup');
       return;
     }
 
     try {
       setUpgrading(true);
       setError(null);
-      const result = await api.payments.createCheckout();
-      if (result.reference) rememberCheckoutReference(result.reference);
+      const result = await api.payments.createCheckout(plan);
       if (result.checkout_url) {
         window.location.href = result.checkout_url;
         return;
       }
-      setError("Paystack didn't open. Nothing was charged. Try again in a moment.");
+      setError("Checkout didn't open. Nothing was charged. Try again in a moment.");
       setUpgrading(false);
     } catch (err: unknown) {
       setError(plainCheckoutError(err));
@@ -183,8 +190,13 @@ export default function PricingPage() {
       </nav>
 
       {/* Error Message */}
+      {notice && !error && (
+        <div role="status" className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl bg-white/10 border border-white/15 text-white text-sm">
+          {notice}
+        </div>
+      )}
       {error && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-sm">
+        <div role="alert" className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-sm">
           {error}
         </div>
       )}
@@ -209,8 +221,8 @@ export default function PricingPage() {
               Simple, <span className="text-gradient">Honest</span> Pricing
             </h1>
             <p className="text-xl text-watchman-muted max-w-2xl mx-auto">
-              Start on the free plan. Pro is $12 for 30 days through Paystack.
-              It does not bill you again on its own.
+              Start on the free plan. Pro is {planPrice(pricing, 'monthly').price} a month,
+              or {planPrice(pricing, 'annual').price} a year. Cancel any time.
             </p>
           </motion.div>
         </div>
@@ -219,6 +231,30 @@ export default function PricingPage() {
       {/* Pricing Cards */}
       <section className="relative py-16 px-6">
         <div className="max-w-6xl mx-auto">
+          <div className="flex justify-center mb-10">
+            <div role="radiogroup" aria-label="Billing period" className="inline-flex p-1 rounded-2xl glass border border-white/10">
+              {(['monthly', 'annual'] as Plan[]).map((choice) => (
+                <button
+                  key={choice}
+                  type="button"
+                  role="radio"
+                  aria-checked={plan === choice}
+                  onClick={() => setPlan(choice)}
+                  className={cn(
+                    'px-4 sm:px-6 min-h-[40px] rounded-xl text-sm font-medium transition-colors',
+                    plan === choice ? 'bg-watchman-accent text-white' : 'text-watchman-muted hover:text-white'
+                  )}
+                >
+                  {choice === 'monthly' ? 'Monthly' : 'Yearly'}
+                  {choice === 'annual' && (pricing ?? null)?.annual?.saving_percent !== 0 && (
+                    <span className="ml-2 text-xs text-emerald-300">
+                      save {(pricing?.annual?.saving_percent ?? 33)}%
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {tiers.map((tier, index) => (
               <motion.div
@@ -258,12 +294,12 @@ export default function PricingPage() {
                   </div>
                   <h3 className="text-2xl font-bold">{tier.name}</h3>
                   <div className="mt-3 flex items-baseline gap-1">
-                    <span className="text-5xl font-bold">{tier.price}</span>
-                    <span className="text-watchman-muted text-lg">{tier.period}</span>
+                    <span className="text-5xl font-bold">{tier.name === 'Pro' ? proPrice.price : tier.price}</span>
+                    <span className="text-watchman-muted text-lg">{tier.name === 'Pro' ? proPrice.period : tier.period}</span>
                   </div>
                   {tier.name === 'Pro' && (
-                    <p className="mt-3 text-sm text-watchman-muted leading-relaxed" data-testid="ghs-charge-note">
-                      {cedisChargeLine(pricingAmounts)}
+                    <p className="mt-3 text-sm text-watchman-muted leading-relaxed" data-testid="plan-price-note">
+                      {proPrice.note}
                     </p>
                   )}
                   <p className="mt-4 text-sm text-watchman-muted leading-relaxed">{tier.description}</p>
@@ -296,13 +332,15 @@ export default function PricingPage() {
                     size="lg"
                     className="w-full gap-2 mb-8"
                     onClick={handleUpgrade}
-                    disabled={upgrading}
+                    disabled={upgrading || !paymentsReady}
                   >
                     {upgrading ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
                         {OPENING_CHECKOUT_LABEL}
                       </>
+                    ) : !paymentsReady ? (
+                      <>Pro checkout opens soon</>
                     ) : (
                       <>
                         {isLoggedIn ? 'Upgrade Now' : tier.cta}
@@ -345,6 +383,7 @@ export default function PricingPage() {
               </motion.div>
             ))}
           </div>
+          <p className="mt-8 text-center text-xs text-watchman-muted max-w-xl mx-auto">{BILLING_NOTE}</p>
         </div>
       </section>
 

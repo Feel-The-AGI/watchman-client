@@ -12,4 +12,4 @@ export const AGENT_FAQ = 'Watchman is your scheduling assistant. Chat naturally 
 
 export const BINARY_CONSTRAINT_FAQ = 'Binary constraints are hard rules: allowed or not allowed. The one Watchman checks is no study on night shifts. A study commitment on those nights is shown to you before it can be applied.'
 
-export const RENEWAL_FAQ = 'Pro does not renew automatically. Each payment covers a fixed period. $12 through Paystack covers 30 days. Another checkout adds 30 more days. If you cancel, Pro stays until the end of the days you already paid for.'
+export const RENEWAL_FAQ = 'Yes. Pro renews each month, or each year on the yearly plan, until you cancel. Cancel any time from Settings → Subscription → Manage billing. Pro stays until the end of the period you already paid for, and you are not charged again.'

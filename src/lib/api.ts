@@ -42,6 +42,21 @@ function messageFromPayload(payload: unknown, fallback: string): string {
   return fallback
 }
 
+export interface PlanPrice {
+  amount: number;
+  display: string;
+  interval: 'month' | 'year';
+  per_month?: number;
+  saving_percent?: number;
+}
+
+export interface StripePricing {
+  currency: string;
+  configured: boolean;
+  monthly: PlanPrice;
+  annual: PlanPrice;
+}
+
 export class APIError extends Error {
   constructor(public status: number, message: string, public detail?: unknown) {
     super(message)
@@ -245,33 +260,31 @@ class APIService {
   }
 
   payments = {
-    createCheckout: () => this.request<{ 
-      checkout_url: string; 
-      access_code: string; 
-      reference: string;
-      amount_ghs: number;
-      amount_usd: number;
-      exchange_rate: number;
+    createCheckout: (plan: 'monthly' | 'annual' = 'monthly') => this.request<{
+      checkout_url: string;
+      session_id?: string;
+      plan: 'monthly' | 'annual';
     }>('/api/payments/create-checkout-session', {
       method: 'POST',
+      body: JSON.stringify({ plan }),
     }),
+    verifySession: (sessionId: string) =>
+      this.request<{ status: string; access_until?: string | null; message?: string }>(
+        `/api/payments/verify-session/${encodeURIComponent(sessionId)}`
+      ),
     getHistory: () => this.request<{ payments: any[] }>('/api/payments/payment-history'),
     getSubscriptionStatus: () => this.request<any>('/api/payments/subscription-status'),
     cancelSubscription: () => this.request<any>('/api/payments/cancel-subscription', {
       method: 'POST',
     }),
-    verifyTransaction: (reference: string) => this.request<any>(`/api/payments/verify/${reference}`),
+    resumeSubscription: () => this.request<any>('/api/payments/resume-subscription', {
+      method: 'POST',
+    }),
+    openBillingPortal: () => this.request<{ url: string }>('/api/payments/billing-portal', {
+      method: 'POST',
+    }),
     getManageSubscription: () => this.request<any>('/api/payments/manage-subscription'),
-    getPricing: () => this.request<{
-      usd_price: number;
-      ghs_amount: number;
-      exchange_rate: number;
-      currency: string;
-      display_price: string;
-      display_ghs: string;
-      period_days?: number;
-      note: string;
-    }>('/api/payments/pricing'),
+    getPricing: () => this.request<StripePricing>('/api/payments/pricing'),
   }
 
   auth = {

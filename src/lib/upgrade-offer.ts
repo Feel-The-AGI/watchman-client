@@ -1,17 +1,19 @@
-import { ghsAmountLabel, type PricingAmounts } from './billing'
+export const LOCKED_MONTH_PAY_LINE = 'Pay by card, Apple Pay or Google Pay'
 
-export const LOCKED_MONTH_PAY_LINE = 'Pay with Mobile Money or bank transfer'
-
-export type LockedMonthPricing = PricingAmounts & {
-  usd_price?: number | null
+interface OfferPricing {
+  monthly?: { amount?: number | null } | null
+  annual?: { amount?: number | null } | null
 }
 
-/** "$12 · GHS 186.40" from the public pricing payload. No rate is invented here. */
-export function lockedMonthPriceLine(pricing: LockedMonthPricing | null | undefined): string | null {
-  const usd = pricing?.usd_price
-  if (typeof usd !== 'number' || !Number.isFinite(usd) || usd <= 0) return null
-  const ghs = ghsAmountLabel(pricing)
-  if (!ghs) return null
-  const dollars = Number.isInteger(usd) ? `$${usd}` : `$${usd.toFixed(2)}`
-  return `${dollars} · ${ghs}`
+function dollars(value: number): string {
+  return Number.isInteger(value) ? `$${value}` : `$${value.toFixed(2)}`
+}
+
+/** "$12/month · $96/year" from the public pricing payload, or null without it. */
+export function lockedMonthPriceLine(pricing: OfferPricing | null | undefined): string | null {
+  const monthly = pricing?.monthly?.amount
+  if (typeof monthly !== 'number' || !Number.isFinite(monthly) || monthly <= 0) return null
+  const annual = pricing?.annual?.amount
+  const yearly = typeof annual === 'number' && Number.isFinite(annual) && annual > 0 ? ` · ${dollars(annual)}/year` : ''
+  return `${dollars(monthly)}/month${yearly}`
 }

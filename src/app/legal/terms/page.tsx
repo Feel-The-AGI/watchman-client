@@ -81,13 +81,13 @@ export default function TermsOfServicePage() {
                   <div>
                     <h3 className="font-medium text-white">Pro Plan</h3>
                     <p>
-                      Pro is $12 for 30 days, paid through Paystack in GHS at the exchange rate shown at checkout. It unlocks calendar sharing, CSV and PDF exports, weighted constraints, and unlimited Watchman messages. Leave planning is included on the free plan. Pro does not renew automatically. Each payment covers a fixed period. Another checkout adds another 30 days.
+                      Pro is a subscription at the price shown on the pricing page at checkout ($12 a month or $96 a year, in US dollars). It unlocks calendar sharing, CSV and PDF exports, weighted constraints, and unlimited Watchman messages. Leave planning is included on the free plan. Pro renews automatically at the end of each billing period until you cancel. You can cancel at any time in Settings → Subscription; Pro then stays until the end of the period you have paid for and you are not charged again. Payments already made are not refunded except where the law requires it.
                     </p>
                   </div>
                   <div>
                     <h3 className="font-medium text-white">Payment</h3>
                     <p>
-                      Payments are processed by Paystack. We do not store your payment details. A verified payment turns on Pro until the end of that 30-day period. We do not charge the same payment method again unless you start another checkout.
+                      Payments are processed by Stripe. We do not store your card details. A successful payment turns on Pro until the end of the period it pays for. Each renewal is charged to the payment method you saved with Stripe; you can change it or cancel in Manage billing.
                     </p>
                   </div>
                   <div>

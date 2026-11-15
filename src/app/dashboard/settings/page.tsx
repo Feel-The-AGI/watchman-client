@@ -37,9 +37,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import { invalidateCalendar } from '@/lib/calendar-sync';
 import { localDateFromStored } from '@/lib/date-only';
-import { checkoutReferenceFromReturn, clearCheckoutReference, rememberCheckoutReference } from '@/lib/checkout';
+import { checkoutSessionFromReturn, clearCheckoutReturn } from '@/lib/checkout';
 import { browserTimeZone, displayProfileName, resolvePreferenceTimezone, type TimezoneSource } from '@/lib/profile-display';
-import { cedisChargeLine, OPENING_CHECKOUT_LABEL, plainCheckoutError } from '@/lib/billing';
+import { BILLING_NOTE, OPENING_CHECKOUT_LABEL, planPrice, plainCheckoutError, type Plan } from '@/lib/billing';
+import type { StripePricing } from '@/lib/api';
 import { BlockSkeleton, LoadingState } from '@/components/ui/LoadingState';
 import { cn } from '@/lib/utils';
 
@@ -158,23 +159,21 @@ export default function SettingsPage() {
   // Upgrade modal state
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
-  const [pricingInfo, setPricingInfo] = useState<{
-    usd_price: number;
-    ghs_amount: number;
-    exchange_rate: number;
-    display_ghs: string;
-    period_days?: number;
-  } | null>(null);
+  const [pricingInfo, setPricingInfo] = useState<StripePricing | null>(null);
+  const [upgradePlan, setUpgradePlan] = useState<Plan>('annual');
+  const [openingPortal, setOpeningPortal] = useState(false);
   const [loadingPricing, setLoadingPricing] = useState(false);
 
   useEffect(() => {
-    const reference = checkoutReferenceFromReturn();
-    if (!reference) {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('tab') === 'subscription') setActiveTab('subscription');
+    const session = checkoutSessionFromReturn();
+    if (!session) {
       fetchSettings();
       return;
     }
     setActiveTab('subscription');
-    verifyCheckout(reference).finally(() => fetchSettings(false));
+    verifyCheckout(session).finally(() => fetchSettings(false));
   }, []);
 
   useEffect(() => {
@@ -306,33 +305,30 @@ export default function SettingsPage() {
     }
   };
 
-  const verifyCheckout = async (reference: string) => {
+  const verifyCheckout = async (sessionId: string) => {
     try {
       setError(null);
-      const result = await api.payments.verifyTransaction(reference);
+      // The webhook can land a moment after the redirect. Ask a few times.
+      let result: { status: string; access_until?: string | null } | null = null;
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        result = await api.payments.verifySession(sessionId);
+        if (result?.status === 'active' || result?.status === 'trialing') break;
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
       const paid = await api.payments.getSubscriptionStatus().catch(() => null);
       if (paid && Object.prototype.hasOwnProperty.call(paid, 'current_period_end')) {
         setSubscription(subscriptionFromStatus(paid));
       }
       await refreshProfile();
-      const until = result?.access_until || paid?.current_period_end;
-      if (result?.status === 'paid' && until) {
-        setSuccess(`Pro until ${formatAccessDate(until)}.`);
-      } else if (result?.status === 'paid') {
-        setSuccess('Pro access is active.');
+      if (result?.status === 'active' || result?.status === 'trialing') {
+        setSuccess('Welcome to Pro. Your subscription is active.');
       } else {
         setError('The payment is not confirmed yet. If you completed checkout, refresh in a moment.');
       }
     } catch (err: any) {
       setError(err.message || 'Could not confirm the payment.');
     } finally {
-      clearCheckoutReference();
-      const url = new URL(window.location.href);
-      url.searchParams.delete('reference');
-      url.searchParams.delete('trxref');
-      url.searchParams.delete('success');
-      const next = `${url.pathname}${url.search}`;
-      window.history.replaceState({}, '', next);
+      clearCheckoutReturn();
     }
   };
 
@@ -340,38 +336,61 @@ export default function SettingsPage() {
     setShowUpgradeModal(true);
     setLoadingPricing(true);
     setPricingUnavailable(false);
-    setPricingInfo(null);
     try {
       const pricing = await api.payments.getPricing();
-      if (!pricing?.display_ghs || pricing.ghs_amount == null) {
-        setPricingUnavailable(true);
-        return;
-      }
       setPricingInfo(pricing);
+      setPricingUnavailable(pricing?.configured === false);
     } catch (err) {
       console.error('Failed to fetch pricing:', err);
-      setPricingUnavailable(true);
+      setPricingInfo(null);
     } finally {
       setLoadingPricing(false);
     }
   };
 
   const handleProceedToCheckout = async () => {
-    if (pricingUnavailable || !pricingInfo) return;
+    if (pricingUnavailable) return;
     try {
       setUpgrading(true);
       setError(null);
-      const result = await api.payments.createCheckout();
-      if (result.reference) rememberCheckoutReference(result.reference);
+      const result = await api.payments.createCheckout(upgradePlan);
       if (result.checkout_url) {
         window.location.href = result.checkout_url;
         return;
       }
-      setError("Paystack didn't open. Nothing was charged. Try again in a moment.");
+      setError("Checkout didn't open. Nothing was charged. Try again in a moment.");
       setUpgrading(false);
     } catch (err: unknown) {
       setError(plainCheckoutError(err));
       setUpgrading(false);
+    }
+  };
+
+  const openBillingPortal = async () => {
+    try {
+      setOpeningPortal(true);
+      setError(null);
+      const { url } = await api.payments.openBillingPortal();
+      if (url) {
+        window.location.href = url;
+        return;
+      }
+      setError('The billing page did not open. Try again in a moment.');
+    } catch (err: any) {
+      setError(err.message || 'The billing page did not open. Try again in a moment.');
+    }
+    setOpeningPortal(false);
+  };
+
+  const resumeSubscription = async () => {
+    try {
+      setError(null);
+      const result = await api.payments.resumeSubscription();
+      const paid = await api.payments.getSubscriptionStatus().catch(() => null);
+      if (paid) setSubscription(subscriptionFromStatus(paid));
+      setSuccess(result?.message || 'Pro will renew as normal.');
+    } catch (err: any) {
+      setError(err.message || 'Could not resume the subscription.');
     }
   };
 
@@ -744,22 +763,34 @@ export default function SettingsPage() {
                               </div>
                               <p className="text-sm text-watchman-muted mt-1">
                                 {subscription.cancel_at_period_end
-                                  ? 'Cancellation is saved. Pro lasts until the end of the paid period.'
+                                  ? 'Renewal is cancelled. Pro lasts until the end of the paid period.'
                                   : subscription.current_period_end
-                                    ? 'Another checkout adds 30 days. This period does not bill you again on its own.'
+                                    ? 'Renews automatically. Change card or plan, see invoices, or cancel in Manage billing.'
                                     : 'This account has Pro access without a paid end date.'}
                               </p>
                             </div>
-                            {subscription.current_period_end && !subscription.cancel_at_period_end && (
-                              <Button
-                                variant="secondary"
-                                onClick={() => setCancelSubscriptionModal(true)}
-                                className="gap-2 text-watchman-error hover:text-watchman-error hover:bg-watchman-error/10"
-                              >
-                                Cancel
-                              </Button>
-                            )}
                           </div>
+                          {subscription.current_period_end && (
+                            <div className="flex flex-wrap gap-2">
+                              <Button variant="secondary" onClick={openBillingPortal} disabled={openingPortal} className="gap-2">
+                                {openingPortal ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+                                Manage billing
+                              </Button>
+                              {subscription.cancel_at_period_end ? (
+                                <Button variant="secondary" onClick={resumeSubscription}>
+                                  Keep Pro
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="secondary"
+                                  onClick={() => setCancelSubscriptionModal(true)}
+                                  className="text-watchman-error hover:text-watchman-error hover:bg-watchman-error/10"
+                                >
+                                  Cancel renewal
+                                </Button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
                     </CardContent>
@@ -1346,32 +1377,42 @@ export default function SettingsPage() {
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-watchman-accent" />
               </div>
-            ) : pricingUnavailable || !pricingInfo ? (
+            ) : pricingUnavailable ? (
               <div className="text-center py-4">
-                <p className="font-medium">Pricing unavailable. Try again.</p>
+                <p className="font-medium">Pro checkout opens soon.</p>
                 <p className="text-sm text-watchman-muted mt-2">
-                  The exchange rate could not be loaded, so checkout stays closed. No estimated price is shown.
+                  Payments are being set up. Nothing was charged.
                 </p>
-                <div className="mt-6 flex gap-3">
-                  <Button variant="glass" className="flex-1" onClick={() => setShowUpgradeModal(false)}>
+                <div className="mt-6">
+                  <Button variant="glass" className="w-full" onClick={() => setShowUpgradeModal(false)}>
                     Close
-                  </Button>
-                  <Button variant="gradient" className="flex-1" onClick={handleUpgrade}>
-                    Try again
                   </Button>
                 </div>
               </div>
             ) : (
               <>
-                <div className="bg-watchman-bg rounded-xl p-4 mb-6">
-                  <div className="flex items-baseline justify-center gap-2">
-                    <span className="text-4xl font-bold">${pricingInfo.usd_price || 12}</span>
-                    <span className="text-watchman-muted">for {pricingInfo.period_days || 30} days</span>
-                  </div>
-                  <p className="text-center text-sm text-watchman-muted mt-2" data-testid="upgrade-ghs-note">
-                    {cedisChargeLine(pricingInfo)}
-                  </p>
+                <div role="radiogroup" aria-label="Billing period" className="grid grid-cols-2 gap-2 mb-4">
+                  {(['monthly', 'annual'] as Plan[]).map((choice) => {
+                    const price = planPrice(pricingInfo, choice);
+                    return (
+                      <button
+                        key={choice}
+                        type="button"
+                        role="radio"
+                        aria-checked={upgradePlan === choice}
+                        onClick={() => setUpgradePlan(choice)}
+                        className={`p-3 rounded-xl border text-left transition-colors ${upgradePlan === choice ? 'border-watchman-accent bg-watchman-accent/10' : 'border-white/10 hover:border-white/20'}`}
+                      >
+                        <span className="block text-xs text-watchman-muted">{choice === 'monthly' ? 'Monthly' : 'Yearly'}</span>
+                        <span className="block text-xl font-bold">{price.price}</span>
+                        <span className="block text-xs text-watchman-muted">{price.period}</span>
+                      </button>
+                    );
+                  })}
                 </div>
+                <p className="text-center text-sm text-watchman-muted mb-6" data-testid="upgrade-plan-note">
+                  {planPrice(pricingInfo, upgradePlan).note}
+                </p>
 
                 {error && (
                   <p className="mb-4 text-sm text-center text-red-300">{error}</p>
@@ -1416,15 +1457,13 @@ export default function SettingsPage() {
                     ) : (
                       <>
                         <CreditCard className="w-4 h-4" />
-                        Pay with Paystack
+                        Continue to checkout
                       </>
                     )}
                   </Button>
                 </div>
 
-                <p className="text-center text-xs text-watchman-muted mt-4">
-                  Paystack checkout for {pricingInfo.period_days || 30} days. It does not bill you again on its own.
-                </p>
+                <p className="text-center text-xs text-watchman-muted mt-4">{BILLING_NOTE}</p>
               </>
             )}
           </motion.div>
