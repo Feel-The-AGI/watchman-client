@@ -227,6 +227,11 @@ export function DayInspector({
             setLogs(logsRes.value);
           } else if (logsRes.value.logs) {
             setLogs(logsRes.value.logs);
+          } else if (logsRes.value.id && String(logsRes.value.note || '').trim()) {
+            // The server keeps one log per day and returns it as a single object.
+            setLogs([logsRes.value]);
+          } else {
+            setLogs([]);
           }
           if (!editingHoursRef.current && hoursWereLogged(logsRes.value.actual_hours)) {
             setActualHours(logsRes.value.actual_hours);
@@ -269,24 +274,15 @@ export function DayInspector({
         note: newLogNote.trim(),
       });
 
-      setLogs(prev => [...prev, result]);
+      // One log per day: the server adds a new note to the day's log and returns it.
+      setLogs(result?.id ? [result] : []);
       setNewLogNote('');
       setShowAddLog(false);
       void invalidateCalendar({ dates: [dateStr] });
       onDataChange?.();
       toast.success('Note saved', 'Your daily note has been recorded');
     } catch (err) {
-      // For now, just add locally if API fails
-      const localLog: DailyLog = {
-        id: `local-${Date.now()}`,
-        date: dateStr,
-        note: newLogNote.trim(),
-        created_at: new Date().toISOString(),
-      };
-      setLogs(prev => [...prev, localLog]);
-      setNewLogNote('');
-      setShowAddLog(false);
-      toast.warning('Saved locally', 'Note saved locally - will sync when online');
+      toast.error('Note not saved', err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setSaving(false);
     }
@@ -309,7 +305,14 @@ export function DayInspector({
   };
 
   // Save hours
+  const hoursInRange = (value: number | null) =>
+    value !== null && Number.isFinite(value) && value >= 0 && value <= 24;
+
   const handleSaveHours = async () => {
+    if (!hoursInRange(actualHours) || !hoursInRange(overtimeHours)) {
+      toast.error('Check the hours', 'Hours must be between 0 and 24.');
+      return;
+    }
     setSaving(true);
     try {
       await api.dailyLogs.updateHours(dateStr, {
@@ -321,9 +324,7 @@ export function DayInspector({
       onDataChange?.();
       toast.success('Hours updated', `${actualHours}h worked${overtimeHours > 0 ? ` (+${overtimeHours}h OT)` : ''}`);
     } catch (err) {
-      // Just close the editing state even if API fails
-      setEditingHours(false);
-      toast.warning('Saved locally', 'Hours saved locally - will sync when online');
+      toast.error('Hours not saved', err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setSaving(false);
     }
@@ -347,17 +348,7 @@ export function DayInspector({
       onDataChange?.();
       toast.success('Incident logged', `${incidentForm.severity.toUpperCase()} severity incident recorded`);
     } catch (err) {
-      // For now, add locally if API fails
-      const localIncident: Incident = {
-        id: `local-${Date.now()}`,
-        date: dateStr,
-        ...incidentForm,
-        created_at: new Date().toISOString(),
-      };
-      setIncidents(prev => [...prev, localIncident]);
-      resetIncidentForm();
-      setShowAddIncident(false);
-      toast.warning('Saved locally', 'Incident saved locally - will sync when online');
+      toast.error('Incident not saved', err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setSaving(false);
     }

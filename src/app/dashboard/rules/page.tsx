@@ -287,6 +287,10 @@ export default function MasterSettingsPage() {
 
   const handleSaveWorkHours = () => {
     if (!canSaveMasterSettings(loadedDocument)) return;
+    if (editDayStart === editDayEnd || editNightStart === editNightEnd) {
+      setError('A shift cannot start and end at the same time.');
+      return;
+    }
     void saveSettings(settingsWithWorkHours(loadedDocument.settings, {
       day_hours: { start: editDayStart, end: editDayEnd },
       night_hours: { start: editNightStart, end: editNightEnd },
