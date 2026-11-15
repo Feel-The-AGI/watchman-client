@@ -54,6 +54,8 @@ interface Message {
   typing?: boolean;
 }
 
+const MAX_CYCLE_DAYS = 366;
+
 const PRESET_CONSTRAINTS = [
   { name: 'No study on night shifts', rule: 'no_study_on:work_night', icon: Moon },
   { name: 'Max 2 commitments per day', rule: 'max_concurrent_commitments:2', icon: Target },
@@ -278,14 +280,30 @@ export default function OnboardingPage() {
     setInputValue('');
     setShowQuickActions(false);
 
-    if (step === 1) {
-      const acceptRotation = (parsed: ParsedRotation) => {
-        setPattern(parsed.pattern);
-        addMessage('assistant', `Got it! ${parsed.description} (${parsed.totalDays}-day cycle). Pick a date you know, and which day of that cycle it is. The preview updates as you change the anchor.`);
-        setStep(2);
+    const acceptRotation = (parsed: ParsedRotation) => {
+      if (parsed.totalDays > MAX_CYCLE_DAYS) {
+        addMessage('assistant', `A rotation can repeat over at most ${MAX_CYCLE_DAYS} days, and that one is ${parsed.totalDays}. Could you check the numbers?`);
         setShowQuickActions(true);
-      };
+        return;
+      }
+      setPattern(parsed.pattern);
+      // A new rotation has a new cycle length, so the old cycle day may not exist in it.
+      setAnchorCycleDay(1);
+      addMessage('assistant', `Got it! ${parsed.description} (${parsed.totalDays}-day cycle). Pick a date you know, and which day of that cycle it is. The preview updates as you change the anchor.`);
+      setStep(2);
+      setShowQuickActions(true);
+    };
 
+    // Typing a different rotation at the anchor or rules step replaces the earlier pick.
+    if (step === 2 || step === 3) {
+      const replaced = parseRotation(userMessage);
+      if (replaced) {
+        acceptRotation(replaced);
+        return;
+      }
+    }
+
+    if (step === 1) {
       const parsed = parseRotation(userMessage);
       if (parsed) {
         acceptRotation(parsed);
