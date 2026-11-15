@@ -15,8 +15,19 @@ export const DEFAULT_PRICING: StripePricing = {
 
 export const BILLING_NOTE = 'Secure checkout by Stripe. Cancel any time; Pro stays until the end of the period you paid for.'
 
+/** Server prices when the payload has the expected shape, otherwise the defaults. */
+export function usablePricing(pricing: unknown): StripePricing {
+  const value = pricing as Partial<StripePricing> | null | undefined
+  const ok = (plan: unknown) => {
+    const amount = (plan as { amount?: unknown } | null | undefined)?.amount
+    return typeof amount === 'number' && Number.isFinite(amount) && amount > 0
+  }
+  if (!value || !ok(value.monthly) || !ok(value.annual)) return DEFAULT_PRICING
+  return value as StripePricing
+}
+
 export function planPrice(pricing: StripePricing | null | undefined, plan: Plan): { price: string; period: string; note: string } {
-  const source = pricing ?? DEFAULT_PRICING
+  const source = usablePricing(pricing)
   if (plan === 'annual') {
     const perMonth = source.annual.per_month ?? source.annual.amount / 12
     const saving = source.annual.saving_percent

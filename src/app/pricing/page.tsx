@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { authNavChoice } from '@/lib/signup-flow';
 import { api } from '@/lib/api';
-import { BILLING_NOTE, OPENING_CHECKOUT_LABEL, parsePlan, planPrice, plainCheckoutError, type Plan } from '@/lib/billing';
+import { BILLING_NOTE, OPENING_CHECKOUT_LABEL, parsePlan, planPrice, plainCheckoutError, usablePricing, type Plan } from '@/lib/billing';
 import type { StripePricing } from '@/lib/api';
 import { pricingRowMotion } from '@/lib/pricing-display';
 import { AGENT_FAQ, BINARY_CONSTRAINT_FAQ, RENEWAL_FAQ } from '@/lib/marketing-copy';
@@ -116,7 +116,7 @@ export default function PricingPage() {
   }, []);
 
   const proPrice = planPrice(pricing, plan);
-  const paymentsReady = pricing?.configured !== false;
+  const paymentsReady = (pricing as { configured?: unknown } | null)?.configured !== false;
 
   const isLoggedIn = !!user;
   const isPro = profile?.tier === 'pro' || profile?.tier === 'admin';
@@ -246,9 +246,9 @@ export default function PricingPage() {
                   )}
                 >
                   {choice === 'monthly' ? 'Monthly' : 'Yearly'}
-                  {choice === 'annual' && (pricing ?? null)?.annual?.saving_percent !== 0 && (
+                  {choice === 'annual' && (usablePricing(pricing).annual.saving_percent ?? 0) > 0 && (
                     <span className="ml-2 text-xs text-emerald-300">
-                      save {(pricing?.annual?.saving_percent ?? 33)}%
+                      save {usablePricing(pricing).annual.saving_percent}%
                     </span>
                   )}
                 </button>
