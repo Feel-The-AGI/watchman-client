@@ -22,10 +22,12 @@ test.describe('public pages @viewport', () => {
     })
   }
 
-  test('pricing keeps the $12 headline and explains cedis billing', async ({ page }) => {
+  test('pricing shows the monthly and yearly Pro prices', async ({ page }) => {
     await page.goto('/pricing')
+    await expect(page.getByRole('radio', { name: /Yearly/ })).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByTestId('plan-price-note')).toContainText(/billed yearly/i)
+    await page.getByRole('radio', { name: 'Monthly' }).click()
     await expect(page.getByText('$12').first()).toBeVisible()
-    await expect(page.getByText('for 30 days').first()).toBeVisible()
-    await expect(page.getByTestId('ghs-charge-note')).toContainText(/charged in cedis via Paystack/i)
+    await expect(page.getByText('per month').first()).toBeVisible()
   })
 })

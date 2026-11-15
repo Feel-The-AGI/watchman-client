@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/next'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { Providers } from './providers'
@@ -43,6 +44,8 @@ export default function RootLayout({
         <Providers>
           {children}
         </Providers>
+        {/* The analytics script is served only by Vercel deployments. */}
+        {process.env.VERCEL === '1' && <Analytics />}
       </body>
     </html>
   )

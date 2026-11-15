@@ -1,19 +1,15 @@
-const CHECKOUT_REFERENCE_KEY = 'watchman_checkout_reference'
-
-export function rememberCheckoutReference(reference: string) {
-  sessionStorage.setItem(CHECKOUT_REFERENCE_KEY, reference)
+/** The Stripe Checkout session id on the return from checkout, if any. */
+export function checkoutSessionFromReturn(search: string = window.location.search): string | null {
+  const params = new URLSearchParams(search)
+  const session = params.get('session_id')
+  if (params.get('checkout') !== 'success' || !session) return null
+  return /^cs_[A-Za-z0-9_]+$/.test(session) ? session : null
 }
 
-/** Reference Paystack sends back, or the one stored before leaving for checkout. */
-export function checkoutReferenceFromReturn(): string | null {
-  const params = new URLSearchParams(window.location.search)
-  const fromUrl = params.get('reference') || params.get('trxref')
-  const stored = sessionStorage.getItem(CHECKOUT_REFERENCE_KEY)
-  if (fromUrl) return fromUrl
-  if (params.get('success') === 'true' && stored) return stored
-  return null
-}
-
-export function clearCheckoutReference() {
-  sessionStorage.removeItem(CHECKOUT_REFERENCE_KEY)
+/** Remove the checkout markers from the address bar after handling them. */
+export function clearCheckoutReturn() {
+  const url = new URL(window.location.href)
+  url.searchParams.delete('session_id')
+  url.searchParams.delete('checkout')
+  window.history.replaceState(null, '', url.pathname + (url.search ? url.search : '') + url.hash)
 }

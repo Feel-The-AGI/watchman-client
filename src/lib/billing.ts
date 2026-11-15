@@ -1,39 +1,56 @@
-import { APIError, BACKEND_NOT_CONFIGURED_MESSAGE, BACKEND_UNAVAILABLE_MESSAGE } from '@/lib/api'
+import { APIError, BACKEND_NOT_CONFIGURED_MESSAGE, BACKEND_UNAVAILABLE_MESSAGE, type StripePricing } from '@/lib/api'
 import { looksLikeRawPayload } from '@/lib/chat-display'
+
+export type Plan = 'monthly' | 'annual'
 
 export const OPENING_CHECKOUT_LABEL = 'Opening secure checkout…'
 
-export const CEDIS_NOTE = 'Charged in cedis via Paystack at the day’s rate.'
-
-export interface PricingAmounts {
-  ghs_amount?: number | null
-  display_ghs?: string | null
+/** Shown until the server reports its prices. Matches the server defaults. */
+export const DEFAULT_PRICING: StripePricing = {
+  currency: 'usd',
+  configured: true,
+  monthly: { amount: 12, display: '$12', interval: 'month' },
+  annual: { amount: 96, display: '$96', interval: 'year', per_month: 8, saving_percent: 33 },
 }
 
-export function ghsAmountLabel(pricing: PricingAmounts | null | undefined): string | null {
-  if (!pricing) return null
-  const display = pricing.display_ghs?.trim()
-  if (display && /\d/.test(display)) {
-    const normalized = display.replace(/^≈\s*/, '')
-    if (/ghs/i.test(normalized)) return normalized.replace(/ghs/i, 'GHS')
-    return `GHS ${normalized}`
+export const BILLING_NOTE = 'Secure checkout by Stripe. Cancel any time; Pro stays until the end of the period you paid for.'
+
+/** Server prices when the payload has the expected shape, otherwise the defaults. */
+export function usablePricing(pricing: unknown): StripePricing {
+  const value = pricing as Partial<StripePricing> | null | undefined
+  const ok = (plan: unknown) => {
+    const amount = (plan as { amount?: unknown } | null | undefined)?.amount
+    return typeof amount === 'number' && Number.isFinite(amount) && amount > 0
   }
-  if (typeof pricing.ghs_amount === 'number' && Number.isFinite(pricing.ghs_amount) && pricing.ghs_amount > 0) {
-    return `GHS ${pricing.ghs_amount.toFixed(2)}`
-  }
-  return null
+  if (!value || !ok(value.monthly) || !ok(value.annual)) return DEFAULT_PRICING
+  return value as StripePricing
 }
 
-/** Headline stays $12. This is the line under it. */
-export function cedisChargeLine(pricing: PricingAmounts | null | undefined): string {
-  const amount = ghsAmountLabel(pricing)
-  if (!amount) return CEDIS_NOTE
-  return `≈ ${amount}, charged in cedis via Paystack`
+export function planPrice(pricing: StripePricing | null | undefined, plan: Plan): { price: string; period: string; note: string } {
+  const source = usablePricing(pricing)
+  if (plan === 'annual') {
+    const perMonth = source.annual.per_month ?? source.annual.amount / 12
+    const saving = source.annual.saving_percent
+    return {
+      price: source.annual.display || `$${source.annual.amount}`,
+      period: 'per year',
+      note: `$${formatAmount(perMonth)} a month, billed yearly${saving ? ` (save ${saving}%)` : ''}.`,
+    }
+  }
+  return {
+    price: source.monthly.display || `$${source.monthly.amount}`,
+    period: 'per month',
+    note: 'Billed monthly. Cancel any time.',
+  }
+}
+
+function formatAmount(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2)
 }
 
 export function plainCheckoutError(error: unknown): string {
-  const unreachable = "We couldn't reach Watchman to open Paystack. Check your connection and try again. Nothing was charged."
-  const generic = "Paystack didn't open. Nothing was charged. Try again in a moment."
+  const unreachable = "We couldn't reach Watchman to open checkout. Check your connection and try again. Nothing was charged."
+  const generic = "Checkout didn't open. Nothing was charged. Try again in a moment."
 
   if (error instanceof APIError) {
     if (error.status === 0) return unreachable
@@ -46,4 +63,8 @@ export function plainCheckoutError(error: unknown): string {
   if (!raw || raw === BACKEND_UNAVAILABLE_MESSAGE || raw === BACKEND_NOT_CONFIGURED_MESSAGE) return unreachable
   if (looksLikeRawPayload(raw) || raw.length > 180) return generic
   return raw
+}
+
+export function parsePlan(value: string | null | undefined): Plan {
+  return value === 'annual' ? 'annual' : 'monthly'
 }
