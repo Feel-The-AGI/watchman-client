@@ -13,7 +13,7 @@ interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'ref' | 'children'
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', size = 'md', loading, disabled, children, glow, ...props }, ref) => {
     const baseStyles = `
-      relative inline-flex items-center justify-center font-medium rounded-xl
+      relative inline-flex items-center justify-center font-medium rounded-xl whitespace-nowrap shrink-0
       transition-all duration-300 ease-spring
       focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-watchman-bg
       disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none

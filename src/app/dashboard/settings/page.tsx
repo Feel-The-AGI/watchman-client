@@ -126,6 +126,7 @@ export default function SettingsPage() {
   });
   const [timezoneSource, setTimezoneSource] = useState<TimezoneSource>('browser');
   const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const canUseWeighted = subscription?.tier === 'pro' || subscription?.tier === 'admin';
 
   // Sharing states
   const [shares, setShares] = useState<CalendarShare[]>([]);
@@ -262,9 +263,13 @@ export default function SettingsPage() {
 
   const handleSaveProfile = async () => {
     try {
+      if (!name.trim()) {
+        setError('Enter a name before saving.');
+        return;
+      }
       setSaving(true);
       setError(null);
-      await api.settings.updateProfile({ name });
+      await api.settings.updateProfile({ name: name.trim() });
       setSuccess('Profile updated successfully');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
@@ -283,8 +288,13 @@ export default function SettingsPage() {
         notifications_email: settings.notifications_email,
         notifications_push: settings.notifications_push,
         theme: settings.theme,
-        weighted_mode_enabled: settings.weighted_mode,
-        constraint_mode: settings.weighted_mode ? 'weighted' : 'binary',
+        // Free accounts cannot turn weighted mode on. Sending it would fail the whole save.
+        ...(canUseWeighted
+          ? {
+            weighted_mode_enabled: settings.weighted_mode,
+            constraint_mode: settings.weighted_mode ? 'weighted' : 'binary',
+          }
+          : {}),
       });
       await invalidateCalendar();
       setSuccess('Settings saved successfully');
@@ -436,9 +446,9 @@ export default function SettingsPage() {
         setShowCommitments(false);
         // Auto-copy to clipboard
         const fullUrl = `${window.location.origin}${createdShare.share_url}`;
-        navigator.clipboard.writeText(fullUrl);
-        setCopiedShareId(createdShare.id);
-        setSuccess('Share link created and copied!');
+        const copied = await copyText(fullUrl);
+        if (copied) setCopiedShareId(createdShare.id);
+        setSuccess(copied ? 'Share link created and copied!' : 'Share link created. Copy it from the list below.');
         setTimeout(() => {
           setSuccess(null);
           setCopiedShareId(null);
@@ -469,9 +479,22 @@ export default function SettingsPage() {
     }
   };
 
-  const copyShareLink = (share: CalendarShare) => {
+  /** True only when the browser really put the text on the clipboard. */
+  const copyText = async (text: string): Promise<boolean> => {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const copyShareLink = async (share: CalendarShare) => {
     const fullUrl = `${window.location.origin}${share.share_url}`;
-    navigator.clipboard.writeText(fullUrl);
+    if (!(await copyText(fullUrl))) {
+      setError(`Could not copy. The link is ${fullUrl}`);
+      return;
+    }
     setCopiedShareId(share.id);
     setTimeout(() => setCopiedShareId(null), 2000);
   };
@@ -752,9 +775,9 @@ export default function SettingsPage() {
                       <div className="space-y-3">
                         <div className="flex items-center justify-between py-2 border-b border-white/10">
                           <span className="text-sm font-medium">Feature</span>
-                          <div className="flex items-center gap-8">
-                            <span className="text-sm font-medium text-watchman-muted w-24 text-center">Free</span>
-                            <span className="text-sm font-medium text-watchman-accent w-24 text-center">Pro</span>
+                          <div className="flex items-center gap-2 sm:gap-8 shrink-0">
+                            <span className="text-sm font-medium text-watchman-muted w-16 sm:w-24 text-center">Free</span>
+                            <span className="text-sm font-medium text-watchman-accent w-16 sm:w-24 text-center">Pro</span>
                           </div>
                         </div>
                         {[
@@ -768,10 +791,10 @@ export default function SettingsPage() {
                           { feature: 'Calendar sharing', free: '—', pro: '✓' },
                         ].map((row) => (
                           <div key={row.feature} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
-                            <span className="text-sm">{row.feature}</span>
-                            <div className="flex items-center gap-8">
-                              <span className="text-sm text-watchman-muted w-24 text-center">{row.free}</span>
-                              <span className="text-sm text-watchman-accent w-24 text-center">{row.pro}</span>
+                            <span className="text-sm min-w-0 pr-2">{row.feature}</span>
+                            <div className="flex items-center gap-2 sm:gap-8 shrink-0">
+                              <span className="text-sm text-watchman-muted w-16 sm:w-24 text-center">{row.free}</span>
+                              <span className="text-sm text-watchman-accent w-16 sm:w-24 text-center">{row.pro}</span>
                             </div>
                           </div>
                         ))}
@@ -974,10 +997,14 @@ export default function SettingsPage() {
 
                     <ToggleOption
                       icon={<Settings className="w-5 h-5" />}
-                      title="Weighted Mode"
-                      description="Enable weighted constraints for flexible scheduling"
-                      checked={settings.weighted_mode}
-                      onChange={(checked) => setSettings({ ...settings, weighted_mode: checked })}
+                      title={canUseWeighted ? 'Weighted Mode' : 'Weighted Mode (Pro)'}
+                      description={canUseWeighted
+                        ? 'Enable weighted constraints for flexible scheduling'
+                        : 'Weighted constraints are part of Pro. Your other preferences save as usual.'}
+                      checked={canUseWeighted && settings.weighted_mode}
+                      onChange={(checked) => {
+                        if (canUseWeighted) setSettings({ ...settings, weighted_mode: checked });
+                      }}
                     />
 
                     <div className="pt-4">
