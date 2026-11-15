@@ -566,7 +566,7 @@ export default function StatsPage() {
             Pro
           </span>
           <p className="text-sm text-watchman-text flex-1">
-            CSV, PDF, and Export All are Pro features. Statistics, daily logs, and incident exports all use the same gate.
+            Exports are a Pro feature. Upgrade to download your statistics, daily logs, and incident reports as CSV or PDF.
           </p>
           <a href="/pricing" className="inline-flex items-center justify-center rounded-xl bg-watchman-accent px-4 py-2 text-sm font-medium text-white">
             Upgrade to Pro
@@ -1172,7 +1172,8 @@ export default function StatsPage() {
                             </div>
                             <button
                               onClick={(e) => { e.stopPropagation(); setSelectedIncident(incident); }}
-                              className="p-2 rounded-lg hover:bg-white/10 text-watchman-muted hover:text-watchman-accent transition-colors opacity-0 group-hover:opacity-100"
+                              aria-label="View incident"
+                              className="p-2 rounded-lg hover:bg-white/10 text-watchman-muted hover:text-watchman-accent transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                             >
                               <Eye className="w-4 h-4" />
                             </button>
@@ -1230,7 +1231,8 @@ export default function StatsPage() {
                           </div>
                           <button
                             onClick={(e) => { e.stopPropagation(); setSelectedLog(log); }}
-                            className="p-2 rounded-lg hover:bg-white/10 text-watchman-muted hover:text-watchman-accent transition-colors opacity-0 group-hover:opacity-100"
+                            aria-label="View note"
+                            className="p-2 rounded-lg hover:bg-white/10 text-watchman-muted hover:text-watchman-accent transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                           >
                             <Eye className="w-4 h-4" />
                           </button>

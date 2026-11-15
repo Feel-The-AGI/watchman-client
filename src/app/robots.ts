@@ -9,6 +9,6 @@ export default function robots(): MetadataRoute.Robots {
       disallow: [...PRIVATE_ROBOT_PATHS],
     },
     sitemap: `${PUBLIC_SITE_ORIGIN}/sitemap.xml`,
-    host: PUBLIC_SITE_ORIGIN,
+    host: new URL(PUBLIC_SITE_ORIGIN).host,
   }
 }

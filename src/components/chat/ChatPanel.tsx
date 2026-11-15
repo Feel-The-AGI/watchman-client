@@ -611,7 +611,7 @@ export function ChatPanel({ className, autoExecute = false, userTier = 'free' }:
       )}
 
       {/* Messages */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div ref={messagesContainerRef} role="log" aria-label="Conversation with Watchman" tabIndex={0} className="flex-1 overflow-y-auto p-4 space-y-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-watchman-accent/60">
         {messages.length === 0 && !historyError && (
           <motion.div 
             className="text-center py-8"

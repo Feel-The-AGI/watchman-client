@@ -564,7 +564,7 @@ export function DayInspector({
             <div className="flex-1">
               <p className="font-semibold text-lg">{workInfo.label}</p>
               <p className="text-sm text-watchman-muted">
-                {dayData?.cycle_day && `Day ${dayData.cycle_day} of rotation`}
+                {dayData?.cycle_day && `Day ${dayData.cycle_day} of your rotation cycle`}
               </p>
             </div>
           </motion.div>

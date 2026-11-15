@@ -500,13 +500,13 @@ function LandingDayInspector({ date, workType, onClose }: LandingDayInspectorPro
               </div>
               <div className="text-left">
                 <p className="font-medium text-sm text-white">Daily Notes</p>
-                <p className="text-xs text-white/40">{notes.length} note{notes.length !== 1 ? 's' : ''} recorded</p>
+                <p className="text-xs text-white/60">{notes.length} note{notes.length !== 1 ? 's' : ''} recorded</p>
               </div>
             </div>
             {expandedSection === 'notes' ? (
-              <ChevronUp className="w-4 h-4 text-white/40" />
+              <ChevronUp className="w-4 h-4 text-white/60" />
             ) : (
-              <ChevronDown className="w-4 h-4 text-white/40" />
+              <ChevronDown className="w-4 h-4 text-white/60" />
             )}
           </button>
 
@@ -598,13 +598,13 @@ function LandingDayInspector({ date, workType, onClose }: LandingDayInspectorPro
               </div>
               <div className="text-left">
                 <p className="font-medium text-sm text-white">Incidents & Issues</p>
-                <p className="text-xs text-white/40">0 incidents logged</p>
+                <p className="text-xs text-white/60">0 incidents logged</p>
               </div>
             </div>
             {expandedSection === 'incidents' ? (
-              <ChevronUp className="w-4 h-4 text-white/40" />
+              <ChevronUp className="w-4 h-4 text-white/60" />
             ) : (
-              <ChevronDown className="w-4 h-4 text-white/40" />
+              <ChevronDown className="w-4 h-4 text-white/60" />
             )}
           </button>
 
@@ -627,7 +627,7 @@ function LandingDayInspector({ date, workType, onClose }: LandingDayInspectorPro
 
         {/* Commitments Section (Display Only) */}
         <div className="space-y-2">
-          <h4 className="text-xs font-medium text-white/40 uppercase tracking-wider px-1">
+          <h4 className="text-xs font-medium text-white/60 uppercase tracking-wider px-1">
             Commitments
           </h4>
           <div className="p-4 bg-white/5 rounded-xl text-center">
@@ -779,7 +779,7 @@ function LiveCalendar({ selectedDate, onDayClick }: LiveCalendarProps) {
       {/* Day Headers */}
       <div className="grid grid-cols-7 border-b border-white/5">
         {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => (
-          <div key={i} className="py-2 text-center text-[10px] font-medium text-white/40">
+          <div key={i} className="py-2 text-center text-[10px] font-medium text-white/60">
             {day}
           </div>
         ))}
@@ -1021,7 +1021,7 @@ export default function LandingPage() {
           >
             <span className="text-white">Your Life Isn't</span>
             <br />
-            <span className="text-white/40">Event-Based.</span>
+            <span className="text-white/60">Event-Based.</span>
             <br />
             <span className="bg-gradient-to-r from-cyan-400 via-emerald-400 to-green-400 bg-clip-text text-transparent">
               It's Rule-Based.
@@ -1127,7 +1127,7 @@ export default function LandingPage() {
               {/* Click hint - show when no day selected */}
               {!selectedDay && (
                 <motion.p
-                  className="text-center text-xs text-white/40 mt-4"
+                  className="text-center text-xs text-white/60 mt-4"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 1 }}
@@ -1168,7 +1168,7 @@ export default function LandingPage() {
             viewport={{ once: true }}
           >
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-8 leading-tight">
-              <span className="text-white/40">You're not disorganized.</span>
+              <span className="text-white/60">You're not disorganized.</span>
               <br />
               <span className="text-white">Your tools are.</span>
             </h2>
@@ -1241,7 +1241,7 @@ export default function LandingPage() {
           >
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
               Four Steps.
-              <span className="text-white/40"> Zero Surprises.</span>
+              <span className="text-white/60"> Zero Surprises.</span>
             </h2>
           </motion.div>
 
@@ -1280,7 +1280,7 @@ export default function LandingPage() {
             If Your Life Runs on Cycles,
             <span className="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent"> Watchman Fits.</span>
           </h2>
-          <p className="text-white/40 text-sm">
+          <p className="text-white/60 text-sm">
             And anyone tired of fighting their calendar every week.
           </p>
         </div>
