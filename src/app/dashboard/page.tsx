@@ -1,5 +1,6 @@
 'use client';
 
+import { toast } from '@/components/ui/Toast';
 import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { format } from 'date-fns';
@@ -242,7 +243,10 @@ export default function DashboardPage() {
   const showMonth = (month: Date) => {
     const tier = profile?.tier === 'pro' || profile?.tier === 'admin' ? profile.tier : 'free';
     const next = monthToShow(month, new Date(), tier);
-    if (!next) return;
+    if (!next) {
+      toast.info('Free plan limit', 'The free plan shows 3 months ahead. Upgrade to Pro to plan further.');
+      return;
+    }
     setSelectedDate((current) => selectedDateAfterMonthChange(current, next));
     const year = yearToLoad(currentYearRef.current, next);
     viewedYearRef.current = headerYear(next);
